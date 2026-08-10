@@ -10,10 +10,10 @@ function safeEqual(left, right) {
 }
 
 function configuration() {
-  const username = process.env.HLTPC_OWNER_USERNAME;
+  const username = process.env.HLTPC_OWNER_USERNAME || "lanches";
   const password = process.env.HLTPC_OWNER_PASSWORD;
-  const secret = process.env.HLTPC_SESSION_SECRET;
-  return username && password && secret ? { username, password, secret } : null;
+  const secret = process.env.HLTPC_SESSION_SECRET || (password ? crypto.createHash("sha256").update(`hltpc-session:${password}`).digest("hex") : null);
+  return password && secret ? { username, password, secret } : null;
 }
 
 function sign(payload, secret) {
