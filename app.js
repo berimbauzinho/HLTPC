@@ -126,12 +126,29 @@
     const visible = data.players.filter((player) => player.toLocaleLowerCase("pt-BR").includes(normalized));
     document.querySelector("#players").innerHTML = visible.map((player) => {
       const history = [...(playerHistory.get(player) || [])].sort(byNewest);
-      return `<article class="profile-card">
-        <h3>${escapeHtml(player)}</h3><p class="profile-meta">${history.length} participaç${history.length === 1 ? "ão" : "ões"}</p>
+      return `<a class="profile-card player-card" href="#jogador/${encodeURIComponent(player)}">
+        <div class="player-card-head"><span>${escapeHtml(player.slice(0, 2).toUpperCase())}</span><div><h3>${escapeHtml(player)}</h3><p class="profile-meta">${history.length} participaç${history.length === 1 ? "ão" : "ões"}</p></div></div>
         <div class="trophies"><div class="trophy-count"><b>${titleCount(player, "major")}</b><small>títulos oficiais</small></div><div class="trophy-count"><b>${titleCount(player, "resenha")}</b><small>títulos de resenha</small></div></div>
         <ul class="history">${history.map(({ event, team }) => `<li><b>${event.year} · ${escapeHtml(team)}</b>${escapeHtml(event.name)}</li>`).join("")}</ul>
-      </article>`;
+      </a>`;
     }).join("");
+  }
+
+  function renderPlayerProfile(player) {
+    const history = [...(playerHistory.get(player) || [])].sort(byNewest);
+    const current = history[0];
+    const wins = data.tournaments.filter((event) => event.champion && event.entries.some((entry) => entry.team === event.champion && entry.players.includes(player)));
+    const uniqueTeams = [...new Set(history.map((item) => item.team))];
+    document.querySelector("#playerProfile").innerHTML = `<a class="profile-back" href="#jogadores">← Voltar aos jogadores</a>
+      <article class="player-hero">
+        <div class="player-portrait"><span>${escapeHtml(player.slice(0, 2).toUpperCase())}</span><small>PLAYER</small></div>
+        <div class="player-summary"><span>PERFIL HLTPC</span><h1>${escapeHtml(player)}</h1><p>Competidor do histórico oficial da turma</p>
+          <dl><div><dt>Equipe mais recente</dt><dd>${escapeHtml(current?.team || "Sem equipe")}</dd></div><div><dt>Participações</dt><dd>${history.length}</dd></div><div><dt>Equipes defendidas</dt><dd>${uniqueTeams.length}</dd></div><div><dt>Títulos oficiais</dt><dd>${titleCount(player, "major")}</dd></div></dl>
+        </div>
+        <div class="player-rating"><small>HLTPC SCORE</small><b>${String(titleCount(player, "major") * 100 + history.length * 10).padStart(3, "0")}</b><span>base histórica</span></div>
+      </article>
+      <section class="achievement-strip"><header><span>CONQUISTAS</span><b>${wins.length} título${wins.length === 1 ? "" : "s"}</b></header><div>${wins.length ? wins.map((event) => `<article><i>★</i><span><b>${escapeHtml(event.name)}</b><small>${event.year} · ${categoryLabel(event.category)}</small></span></article>`).join("") : `<p>Nenhum título registrado até o momento.</p>`}</div></section>
+      <div class="player-detail-grid"><section><div class="section-heading"><div><span>CARREIRA</span><h2>Histórico por campeonato</h2></div></div><div class="career-list">${history.map(({ event, team }) => `<article><time>${event.year}</time><div><b>${escapeHtml(team)}</b><span>${escapeHtml(event.name)}</span></div><em>${event.champion === team ? "CAMPEÃO" : event.status === "ongoing" ? "EM ANDAMENTO" : "PARTICIPANTE"}</em></article>`).join("")}</div></section><aside><div class="section-heading"><div><span>ORGANIZAÇÕES</span><h2>Equipes</h2></div></div><div class="profile-teams">${uniqueTeams.map((team) => `<span>${escapeHtml(team)}</span>`).join("")}</div></aside></div>`;
   }
 
   function renderTeams() {
@@ -148,9 +165,14 @@
 
   function navigate() {
     const requested = location.hash.slice(1) || "inicio";
-    const route = document.querySelector(`[data-view="${CSS.escape(requested)}"]`) ? requested : "inicio";
+    const [requestedRoute, parameter] = requested.split("/");
+    const route = document.querySelector(`[data-view="${CSS.escape(requestedRoute)}"]`) ? requestedRoute : "inicio";
+    if (route === "jogador" && parameter) {
+      const player = decodeURIComponent(parameter);
+      if (playerHistory.has(player)) renderPlayerProfile(player); else location.hash = "jogadores";
+    }
     document.querySelectorAll(".view").forEach((view) => view.classList.toggle("active", view.dataset.view === route));
-    document.querySelectorAll("[data-route]").forEach((link) => link.classList.toggle("active", link.dataset.route === route));
+    document.querySelectorAll("[data-route]").forEach((link) => link.classList.toggle("active", link.dataset.route === (route === "jogador" ? "jogadores" : route)));
     window.scrollTo({ top: 0, behavior: "instant" });
   }
 
