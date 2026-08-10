@@ -27,6 +27,16 @@
   to = "/.netlify/functions/admin-users"
   status = 200
 
+[[redirects]]
+  from = "/api/content"
+  to = "/.netlify/functions/content"
+  status = 200
+
+[[redirects]]
+  from = "/api/admin/content"
+  to = "/.netlify/functions/admin-content"
+  status = 200
+
 [[headers]]
   for = "/*"
   [headers.values]
