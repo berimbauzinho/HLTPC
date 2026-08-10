@@ -23,6 +23,15 @@
         <div class="login-error" id="loginError" role="alert"></div>
         <a href="../">← Voltar ao site público</a>
       </form>
+      <form class="login-card" id="changePasswordForm" hidden>
+        <span>PRIMEIRO ACESSO</span>
+        <h1>Crie sua senha</h1>
+        <p>A senha temporária funcionou. Agora escolha uma senha só sua.</p>
+        <label>Nova senha<input name="password" type="password" minlength="8" autocomplete="new-password" required /></label>
+        <label>Confirmar nova senha<input name="confirmation" type="password" minlength="8" autocomplete="new-password" required /></label>
+        <button class="primary" type="submit">Salvar nova senha</button>
+        <div class="login-error" id="changePasswordError" role="alert"></div>
+      </form>
     </section>
 
     <div class="admin-app" id="adminApp">
@@ -36,7 +45,7 @@
         <button data-section="matches"><i>◫</i>Partidas</button>
         <button data-section="news"><i>▤</i>Notícias</button>
         <button data-section="files"><i>⇧</i>Arquivos</button>
-        <button data-section="users"><i>♙</i>Usuários e acessos</button>
+        <button data-section="users" data-owner-only><i>♙</i>Usuários e acessos</button>
       </nav>
       <div class="sidebar-footer"><a href="../">↗ Ver site público</a><button id="logoutButton">⇥ Sair</button></div>
     </aside>
