@@ -13,7 +13,7 @@ exports.handler = async (event) => {
     if (!safeEqual(credentials.password || "", config.password)) return json(401, { error: "Usuário ou senha incorretos." });
     user = { username: config.username, role: "owner", mustChangePassword: false };
   } else {
-    const stored = await findUser(username);
+    const stored = await findUser(event, username);
     if (!stored || !stored.active || !verifyPassword(credentials.password || "", stored)) return json(401, { error: "Usuário ou senha incorretos." });
     user = { username: stored.username, role: stored.role, mustChangePassword: stored.mustChangePassword };
   }
