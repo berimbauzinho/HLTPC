@@ -9,7 +9,8 @@ exports.handler = async (event) => {
   try { credentials = JSON.parse(event.body || "{}"); } catch (_) { return json(400, { error: "Dados inválidos." }); }
   const username = normalizeUsername(credentials.username);
   let user;
-  if (safeEqual(username, normalizeUsername(config.username)) && safeEqual(credentials.password || "", config.password)) {
+  if (safeEqual(username, normalizeUsername(config.username))) {
+    if (!safeEqual(credentials.password || "", config.password)) return json(401, { error: "Usuário ou senha incorretos." });
     user = { username: config.username, role: "owner", mustChangePassword: false };
   } else {
     const stored = await findUser(username);
