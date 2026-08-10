@@ -102,6 +102,7 @@ nav.tabs{
   max-width:1100px;margin:0 auto;
   display:flex;gap:2px;
   padding:0 20px;
+  overflow-x:auto;
 }
 nav.tabs button{
   background:none;border:none;
@@ -281,6 +282,14 @@ main{max-width:1100px;margin:0 auto;padding:28px 20px 80px;}
 .news-item .meta{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted);margin-bottom:5px;}
 .news-item .meta b{color:var(--teal);}
 .news-empty{color:var(--muted);font-size:13px;font-style:italic;padding:20px;text-align:center;}
+.empty-state{
+  background:var(--bg-card);border:1px dashed var(--line);padding:24px;
+  color:var(--muted);font-size:13px;text-align:center;line-height:1.7;
+}
+.empty-state strong{display:block;color:var(--text);font-family:'Oswald',sans-serif;font-size:17px;font-style:normal;}
+.history-list{list-style:none;font-size:12px;color:var(--muted);line-height:1.7;margin-top:10px;}
+.history-list b{color:var(--text);font-weight:600;}
+.data-note{font-size:11px;color:var(--muted);margin:0 0 12px;line-height:1.6;}
 
 footer{
   text-align:center;padding:24px;color:var(--muted);
@@ -339,6 +348,7 @@ footer{
 
   <!-- ================= NOTICIAS ================= -->
   <section id="noticias" class="view">
+    <p class="data-note">Nesta primeira versão, publicações feitas aqui ficam salvas apenas neste navegador. O mural compartilhado será ligado ao banco de dados na próxima etapa.</p>
     <div class="composer">
       <div class="row">
         <input id="newsAuthor" type="text" placeholder="Seu nick" maxlength="24">
@@ -357,27 +367,6 @@ footer{
 /* ============================================================
    DADOS
    ============================================================ */
-const players = {
-  "lanches":["Tamprimes","PROCEDER","BOCA DE FUMO"],
-  "fancy":["Tamprimes","TWICE","RED PILL"],
-  "Cuazzi":["Tamprimes","Kamikuazi","Deftones"],
-  "Downey":["Tamprimes","Kamikuazi","RED PILL"],
-  "PRIMO":["Tamprimes","Kamikuazi","BOCA DE FUMO"],
-  "hhh":["FROM SOFTWARE","PROCEDER","BOCA DE FUMO"],
-  "cerex":["FROM SOFTWARE","PROCEDER","BOCA DE FUMO"],
-  "ROMAOCrazy":["FROM SOFTWARE","PROCEDER","BOCA DE FUMO"],
-  "Oblivion":["FROM SOFTWARE","Deftones"],
-  "Cobix":["FROM SOFTWARE","PROCEDER"],
-  "LnW":["TWICE","RED PILL"],
-  "190":["PROCEDER","RED PILL"],
-  "cuavila":["Kamikuazi"],
-  "GJota":["Kamikuazi","BOCA DE FUMO"],
-  "PIRUVATO":["TWICE","RED PILL"],
-  "ice greg":["PROCEDER"],
-  "John Weed":["Deftones"],
-  "MECTREFF":["BOCA DE FUMO"]
-};
-
 const tournaments = [
   {
     id:1, name:"IEM Major Gramadão", year:2024, status:"finalizado",
@@ -419,10 +408,25 @@ const tournaments = [
   }
 ];
 
+/* Partidas só entram aqui quando houver confronto e resultado confirmados. */
+const matches = [];
+
+/* Players e históricos são derivados das escalações para evitar duplicidade. */
+const players = [...new Set(
+  tournaments.flatMap(t=>t.teams.flatMap(team=>team.players))
+)];
+
+function getPlayerHistory(player){
+  return tournaments.flatMap(t=>t.teams
+    .filter(team=>team.players.includes(player))
+    .map(team=>({tournament:t, team}))
+  ).sort((a,b)=>b.tournament.year-a.tournament.year || b.tournament.id-a.tournament.id);
+}
+
 /* achievements: majors (oficiais) vs resenha */
 function computeAchievements(){
   const acc = {};
-  Object.keys(players).forEach(p=>acc[p]={majors:0,resenha:0});
+  players.forEach(p=>acc[p]={majors:0,resenha:0});
   tournaments.forEach(t=>{
     const champTeam = t.teams.find(tm=>tm.champ);
     if(!champTeam) return;
@@ -435,19 +439,23 @@ function computeAchievements(){
 }
 const achievements = computeAchievements();
 
-/* unique teams -> roster (from top players list, all-time tags) */
+/* Times oficiais e suas aparições; times da resenha não viram organizações. */
 const teamsMap = {};
-Object.entries(players).forEach(([p,tms])=>{
-  tms.forEach(t=>{
-    if(!teamsMap[t]) teamsMap[t]=[];
-    teamsMap[t].push(p);
+const canonicalTeamName = name => name
+  .replace(/\s+(Gaming|E-sports)$/i,'')
+  .trim();
+tournaments.filter(t=>!t.resenha).forEach(t=>{
+  t.teams.forEach(team=>{
+    const key = canonicalTeamName(team.name);
+    if(!teamsMap[key]) teamsMap[key]=[];
+    teamsMap[key].push({tournament:t, roster:team.players});
   });
 });
 const teamTitles = {};
 tournaments.forEach(t=>{
   const champTeam = t.teams.find(tm=>tm.champ);
   if(!champTeam || t.resenha) return;
-  const key = Object.keys(teamsMap).find(k=> champTeam.name.toUpperCase().startsWith(k.toUpperCase()) || k.toUpperCase().startsWith(champTeam.name.split(" ")[0].toUpperCase()));
+  const key = canonicalTeamName(champTeam.name);
   if(key) teamTitles[key] = (teamTitles[key]||0)+1;
 });
 
@@ -481,45 +489,32 @@ function renderMatches(){
   const past = document.getElementById('pastMatches');
   live.innerHTML = ""; past.innerHTML = "";
 
-  tournaments.filter(t=>t.status==="em andamento").forEach(t=>{
-    const names = t.teams.map(tm=>tm.name);
+  matches.filter(m=>m.status==="agendada" || m.status==="ao vivo").forEach(m=>{
     live.innerHTML += `
       <div class="match-card live">
-        <div class="match-meta"><b>${t.year}</b>${t.name}</div>
+        <div class="match-meta"><b>${m.date || 'A definir'}</b>${m.tournament}</div>
         <div class="match-sides">
-          ${names.map(n=>`
-            <div class="side">
-              <div class="crest">${initials(n)}</div>
-              <div class="tname">${n}</div>
-            </div>`).join('<div class="vs">vs</div>')}
+          <div class="side"><div class="crest">${initials(m.teamA)}</div><div class="tname">${m.teamA}</div></div>
+          <div class="vs">vs</div>
+          <div class="side right"><div class="crest">${initials(m.teamB)}</div><div class="tname">${m.teamB}</div></div>
         </div>
-        <span class="badge live">Em andamento</span>
+        <span class="badge live">${m.status}</span>
       </div>`;
   });
-  if(!live.innerHTML) live.innerHTML = `<div class="news-empty">Nenhum campeonato em andamento no momento.</div>`;
+  if(!live.innerHTML) live.innerHTML = `<div class="empty-state"><strong>Confrontos ainda não divulgados</strong>O PGL Major Abadia 2026 está em andamento, mas nenhuma partida foi cadastrada oficialmente.</div>`;
 
-  tournaments.filter(t=>t.status==="finalizado").sort((a,b)=>b.year-a.year).forEach(t=>{
-    const champ = t.teams.find(tm=>tm.champ);
-    const others = t.teams.filter(tm=>!tm.champ);
-    others.forEach(o=>{
-      past.innerHTML += `
-        <div class="match-card">
-          <div class="match-meta"><b>${t.year}</b>${t.name}${t.resenha?' <br><span style="color:var(--teal)">resenha</span>':''}</div>
-          <div class="match-sides">
-            <div class="side winner">
-              <div class="crest">${initials(champ.name)}</div>
-              <div class="tname">${champ.name}</div>
-            </div>
-            <div class="vs">venceu</div>
-            <div class="side right">
-              <div class="crest">${initials(o.name)}</div>
-              <div class="tname">${o.name}</div>
-            </div>
-          </div>
-          <span class="badge ${t.resenha?'resenha':'champion'}">${t.resenha?'Título de resenha':'Campeã'}</span>
-        </div>`;
-    });
+  matches.filter(m=>m.status==="finalizada").forEach(m=>{
+    past.innerHTML += `
+      <div class="match-card">
+        <div class="match-meta"><b>${m.date}</b>${m.tournament}</div>
+        <div class="match-sides">
+          <div class="side ${m.scoreA>m.scoreB?'winner':''}"><div class="crest">${initials(m.teamA)}</div><div class="tname">${m.teamA}</div></div>
+          <div class="vs">${m.scoreA} : ${m.scoreB}</div>
+          <div class="side right ${m.scoreB>m.scoreA?'winner':''}"><div class="crest">${initials(m.teamB)}</div><div class="tname">${m.teamB}</div></div>
+        </div>
+      </div>`;
   });
+  if(!past.innerHTML) past.innerHTML = `<div class="empty-state"><strong>Resultados não cadastrados</strong>Os campeões históricos estão na aba Campeonatos, mas os confrontos e placares antigos ainda não foram informados.</div>`;
 }
 
 /* ============================================================
@@ -555,43 +550,45 @@ function renderTourneys(){
    ============================================================ */
 function renderPlayers(){
   const wrap = document.getElementById('playersGrid');
-  wrap.innerHTML = Object.entries(players).map(([name,tms])=>{
+  wrap.innerHTML = players.map(name=>{
     const a = achievements[name] || {majors:0,resenha:0};
+    const history = getPlayerHistory(name);
     return `
       <div class="player-card">
         <div class="pname">${name}</div>
-        <div class="stamps">${tms.map(t=>`<span class="stamp">${t}</span>`).join('')}</div>
+        <div class="stamps">${[...new Set(history.map(h=>canonicalTeamName(h.team.name)))].map(t=>`<span class="stamp">${t}</span>`).join('')}</div>
         <div class="achv-row">
           <div class="achv"><b>${a.majors}</b>títulos oficiais</div>
           <div class="achv"><b>${a.resenha}</b>títulos de resenha</div>
         </div>
+        <ul class="history-list">${history.map(h=>`<li><b>${h.tournament.year}</b> · ${h.team.name} — ${h.tournament.name}</li>`).join('')}</ul>
       </div>`;
   }).join('');
 }
 
 function renderTeams(){
   const wrap = document.getElementById('teamsGrid');
-  wrap.innerHTML = Object.entries(teamsMap).map(([team,roster])=>{
+  wrap.innerHTML = Object.entries(teamsMap).map(([team,appearances])=>{
     const titles = teamTitles[team]||0;
     return `
       <div class="team-card">
         <h3>${team}</h3>
         <div class="team-titles">${titles>0 ? '🏆 '+titles+' título'+(titles>1?'s':'')+' oficial'+(titles>1?'is':'') : 'sem títulos oficiais ainda'}</div>
-        <ul>${[...new Set(roster)].map(p=>`<li>${p}</li>`).join('')}</ul>
+        <ul class="history-list">${appearances.sort((a,b)=>b.tournament.year-a.tournament.year).map(a=>`<li><b>${a.tournament.year} · ${a.tournament.name}</b><br>${a.roster.join(' · ')}</li>`).join('')}</ul>
       </div>`;
   }).join('');
 }
 
 /* ============================================================
-   NEWS FEED (persisted, shared)
+   NEWS FEED (rascunhos locais até a integração com banco de dados)
    ============================================================ */
 async function loadNews(){
   const feed = document.getElementById('newsFeed');
   feed.innerHTML = `<div class="news-empty">Carregando notícias...</div>`;
   let stored = [];
   try{
-    const res = await window.storage.get('hltpc-news', true);
-    stored = res && res.value ? JSON.parse(res.value) : [];
+    const item = localStorage.getItem('hltpc-news');
+    stored = item ? JSON.parse(item) : [];
   }catch(e){
     stored = [];
   }
@@ -616,10 +613,9 @@ async function postNews(){
   const text = document.getElementById('newsText').value.trim();
   if(!text) return;
   try{
-    const res = await window.storage.get('hltpc-news', true).catch(()=>null);
-    let stored = res && res.value ? JSON.parse(res.value) : [];
+    let stored = JSON.parse(localStorage.getItem('hltpc-news') || '[]');
     stored.push({author, text, ts:Date.now()});
-    await window.storage.set('hltpc-news', JSON.stringify(stored), true);
+    localStorage.setItem('hltpc-news', JSON.stringify(stored));
   }catch(e){
     console.error('Falha ao salvar notícia', e);
   }
