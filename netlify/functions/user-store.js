@@ -8,7 +8,7 @@ function store(event) {
 }
 
 async function listUsers(event) {
-  const users = await store(event).get(USERS_KEY, { type: "json", consistency: "strong" });
+  const users = await store(event).get(USERS_KEY, { type: "json" });
   return Array.isArray(users) ? users : [];
 }
 
