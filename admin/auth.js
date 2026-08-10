@@ -18,6 +18,8 @@
     document.querySelector("#currentInitials").textContent = user.username.slice(0, 2).toUpperCase();
     document.body.classList.add("authenticated");
     document.querySelectorAll("[data-owner-only]").forEach((element) => { element.hidden = user.role !== "owner"; });
+    window.HLTPC_AUTHENTICATED = true;
+    window.dispatchEvent(new CustomEvent("hltpc:authenticated", { detail: user }));
   }
 
   function requireNewPassword(user) {
