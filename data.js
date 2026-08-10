@@ -36,12 +36,12 @@ window.HLTPC_DATA = {
       id: "blast-vila-sao-paulo-2025",
       name: "BLAST Resenha Series — Vila São Paulo",
       year: 2025,
-      category: "resenha",
+      category: "major",
       status: "finished",
       champion: "TIME 2",
       format: "Times montados na hora",
       demos: "unavailable",
-      note: "Campeonato de resenha, sem demo. Conta no histórico individual, mas TIME 1 e TIME 2 não são organizações permanentes.",
+      note: "Título oficial do HLTPC, considerado Major. Evento sem demo; confrontos e estatísticas não foram cadastrados.",
       entries: [
         { team: "TIME 1", players: ["lanches", "hhh", "Cuazzi", "cerex", "ice greg"] },
         { team: "TIME 2", players: ["GJota", "LnW", "ROMAOCrazy", "190", "Downey"] }
