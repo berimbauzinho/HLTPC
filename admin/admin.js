@@ -103,7 +103,7 @@
   async function usersView() {
     content.innerHTML = `${pageTitle("Usuários e acessos", "Confira quem pode entrar e administrar o HLTPC.", false)}
       <div class="access-grid"><div class="panel access-panel"><div class="panel-title">Contas autorizadas</div><div id="accessUsers"><div class="helper">Carregando usuários...</div></div></div>
-      <form class="panel access-create" id="createUserForm"><div class="panel-title">Liberar novo acesso</div><label>Nome de usuário<input name="username" minlength="3" maxlength="30" pattern="[A-Za-z0-9._-]+" placeholder="Ex.: romao" required /></label><button class="primary" type="submit">Criar usuário</button><div class="helper">O primeiro acesso será feito com <b>mudar1234</b>. Depois disso, a pessoa será obrigada a criar sua própria senha.</div></form></div>`;
+      <form class="panel access-create" id="createUserForm"><div class="panel-title">Liberar novo acesso</div><label>Nome de usuário<input name="username" minlength="3" maxlength="30" pattern="[A-Za-z0-9._-]+" placeholder="Ex.: romao" required /></label><button class="primary" type="submit">Criar usuário</button><div class="helper">O primeiro acesso será feito com <b>mudar1234</b>. Depois disso, a pessoa será obrigada a criar sua própria senha.</div><div class="access-error" id="createUserError" role="alert"></div></form></div>`;
     document.querySelector("#createUserForm").addEventListener("submit", createAdminUser);
     await loadAccessUsers();
   }
@@ -120,7 +120,7 @@
     if (!target) return;
     try {
       const result = await accessRequest();
-      target.innerHTML = result.users.map((user) => `<div class="access-user"><span>${initials(user.username)}</span><div><b>${escapeHtml(user.username)}</b><small>${user.mustChangePassword ? "Aguardando troca da senha temporária" : user.role === "owner" ? "Conta principal do HLTPC" : "Acesso ativo"}</small></div><em>${user.role.toUpperCase()}</em>${user.role !== "owner" ? `<button class="ghost" data-reset-user="${escapeHtml(user.username)}">Redefinir senha</button><button class="danger" data-remove-user="${escapeHtml(user.username)}">Remover</button>` : ""}</div>`).join("");
+      target.innerHTML = result.users.map((user) => `<div class="access-user"><span>${initials(user.username)}</span><div><b>${escapeHtml(user.username)}</b><small>${user.mustChangePassword ? "Aguardando troca da senha temporária" : user.role === "owner" ? "Conta principal do HLTPC" : "Acesso ativo"}</small></div><em>${user.role.toUpperCase()}</em>${user.role !== "owner" ? `<button class="ghost" data-reset-user="${escapeHtml(user.username)}">Redefinir senha</button><button class="danger" data-remove-user="${escapeHtml(user.username)}">Remover</button>` : ""}</div>`).join("") + (result.storageError ? `<div class="helper storage-warning"><b>Armazenamento indisponível:</b> ${escapeHtml(result.storageError)}</div>` : "");
       target.querySelectorAll("[data-reset-user]").forEach((button) => button.addEventListener("click", () => updateAdminUser("reset", button.dataset.resetUser)));
       target.querySelectorAll("[data-remove-user]").forEach((button) => button.addEventListener("click", () => updateAdminUser("delete", button.dataset.removeUser)));
     } catch (reason) { target.innerHTML = `<div class="helper">${escapeHtml(reason.message)}</div>`; }
@@ -129,11 +129,13 @@
   async function createAdminUser(event) {
     event.preventDefault();
     const formElement = event.currentTarget;
+    const errorTarget = document.querySelector("#createUserError");
+    errorTarget.classList.remove("show");
     try {
       const username = new FormData(formElement).get("username");
       await accessRequest({ method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username }) });
       formElement.reset(); showToast(`${username} foi liberado com a senha temporária mudar1234`); await loadAccessUsers();
-    } catch (reason) { showToast(reason.message); }
+    } catch (reason) { errorTarget.textContent = reason.message; errorTarget.classList.add("show"); showToast(reason.message); }
   }
 
   async function updateAdminUser(action, username) {
