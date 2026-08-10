@@ -1,658 +1,85 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="pt-BR">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>HLTPC — Histórico da Turma</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
-<style>
-:root{
-  --bg:#111014;
-  --bg-elev:#18171d;
-  --bg-card:#1d1c23;
-  --line:#2b2a33;
-  --text:#f2ede4;
-  --muted:#8b8994;
-  --amber:#e6a13c;
-  --amber-dim:#5c4321;
-  --brick:#c9503f;
-  --gold:#f0c419;
-  --teal:#3ea89a;
-  --radius:2px;
-}
-*{box-sizing:border-box;margin:0;padding:0;}
-body{
-  background:var(--bg);
-  color:var(--text);
-  font-family:'Inter',sans-serif;
-  min-height:100vh;
-}
-::selection{background:var(--amber);color:#111;}
-
-/* ---------- HEADER ---------- */
-header.top{
-  border-bottom:1px solid var(--line);
-  background:var(--bg-elev);
-}
-.brand-row{
-  max-width:1100px;margin:0 auto;
-  display:flex;align-items:baseline;justify-content:space-between;
-  padding:22px 20px 14px;
-}
-.brand{
-  font-family:'Oswald',sans-serif;
-  font-weight:700;
-  font-size:30px;
-  letter-spacing:1px;
-  color:var(--text);
-}
-.brand span{color:var(--amber);}
-.brand-sub{
-  font-family:'JetBrains Mono',monospace;
-  font-size:11px;
-  color:var(--muted);
-  letter-spacing:.5px;
-  margin-top:2px;
-}
-.season-tag{
-  font-family:'JetBrains Mono',monospace;
-  font-size:11px;
-  color:var(--muted);
-  border:1px solid var(--line);
-  padding:4px 10px;
-  border-radius:20px;
-}
-
-/* ticker */
-.ticker-wrap{
-  border-bottom:1px solid var(--line);
-  background:#0c0c0f;
-  overflow:hidden;
-  white-space:nowrap;
-  position:relative;
-}
-.ticker-wrap .tag{
-  position:absolute;left:0;top:0;bottom:0;
-  background:var(--brick);
-  color:#fff;
-  font-family:'JetBrains Mono',monospace;
-  font-size:10px;
-  font-weight:700;
-  letter-spacing:1px;
-  display:flex;align-items:center;
-  padding:0 12px;
-  z-index:2;
-}
-.ticker-track{
-  display:inline-block;
-  padding-left:100%;
-  animation:ticker 32s linear infinite;
-  font-family:'JetBrains Mono',monospace;
-  font-size:12px;
-  color:var(--amber);
-  padding-top:7px;padding-bottom:7px;
-  padding-left:calc(100% + 90px);
-}
-.ticker-track span{color:var(--muted);margin:0 10px;}
-@keyframes ticker{from{transform:translateX(0);}to{transform:translateX(-100%);}}
-
-/* nav */
-nav.tabs{
-  max-width:1100px;margin:0 auto;
-  display:flex;gap:2px;
-  padding:0 20px;
-  overflow-x:auto;
-}
-nav.tabs button{
-  background:none;border:none;
-  color:var(--muted);
-  font-family:'Oswald',sans-serif;
-  font-size:14px;
-  letter-spacing:.5px;
-  text-transform:uppercase;
-  padding:14px 16px 12px;
-  cursor:pointer;
-  border-bottom:3px solid transparent;
-  transition:color .15s;
-}
-nav.tabs button:hover{color:var(--text);}
-nav.tabs button.active{color:var(--text);border-bottom-color:var(--amber);}
-
-/* ---------- MAIN ---------- */
-main{max-width:1100px;margin:0 auto;padding:28px 20px 80px;}
-.view{display:none;}
-.view.active{display:block;animation:fade .25s ease;}
-@keyframes fade{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:translateY(0);}}
-
-.section-title{
-  font-family:'Oswald',sans-serif;
-  font-size:13px;
-  letter-spacing:2px;
-  text-transform:uppercase;
-  color:var(--muted);
-  margin:34px 0 14px;
-  display:flex;align-items:center;gap:10px;
-}
-.section-title:first-child{margin-top:0;}
-.section-title::after{content:'';flex:1;height:1px;background:var(--line);}
-
-/* ---- match / result cards ---- */
-.match-card{
-  background:var(--bg-card);
-  border:1px solid var(--line);
-  border-radius:var(--radius);
-  padding:16px 18px;
-  margin-bottom:10px;
-  display:flex;align-items:center;gap:18px;
-  flex-wrap:wrap;
-}
-.match-card.live{border-color:var(--brick);}
-.match-meta{
-  font-family:'JetBrains Mono',monospace;
-  font-size:10px;
-  color:var(--muted);
-  min-width:120px;
-}
-.match-meta b{color:var(--amber);display:block;font-size:11px;margin-bottom:2px;}
-.match-sides{display:flex;align-items:center;gap:14px;flex:1;min-width:240px;}
-.side{display:flex;align-items:center;gap:10px;flex:1;}
-.side.right{flex-direction:row-reverse;text-align:right;}
-.crest{
-  width:34px;height:34px;border-radius:50%;
-  background:var(--bg-elev);
-  border:1px solid var(--line);
-  display:flex;align-items:center;justify-content:center;
-  font-family:'Oswald',sans-serif;font-weight:600;font-size:13px;
-  color:var(--amber);flex-shrink:0;
-}
-.side .tname{font-family:'Oswald',sans-serif;font-size:15px;font-weight:500;}
-.side.winner .tname{color:var(--gold);}
-.vs{
-  font-family:'JetBrains Mono',monospace;
-  font-size:11px;color:var(--muted);padding:0 4px;
-}
-.badge{
-  font-family:'JetBrains Mono',monospace;
-  font-size:10px;letter-spacing:.5px;
-  padding:3px 8px;border-radius:20px;
-  text-transform:uppercase;
-}
-.badge.champion{background:var(--amber-dim);color:var(--gold);}
-.badge.live{background:var(--brick);color:#fff;}
-.badge.resenha{background:#2a2740;color:var(--teal);}
-
-/* ---- tournament card ---- */
-.tourney-card{
-  background:var(--bg-card);
-  border:1px solid var(--line);
-  border-radius:var(--radius);
-  margin-bottom:14px;
-  overflow:hidden;
-}
-.tourney-head{
-  padding:16px 18px;
-  display:flex;justify-content:space-between;align-items:flex-start;
-  cursor:pointer;
-  gap:12px;flex-wrap:wrap;
-}
-.tourney-name{font-family:'Oswald',sans-serif;font-size:18px;font-weight:600;}
-.tourney-year{color:var(--muted);font-family:'JetBrains Mono',monospace;font-size:12px;}
-.tourney-champ{
-  font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--gold);
-  margin-top:4px;
-}
-.tourney-body{
-  border-top:1px solid var(--line);
-  padding:16px 18px;
-  display:none;
-}
-.tourney-body.open{display:block;}
-.roster-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px;}
-.roster{
-  border:1px solid var(--line);
-  border-radius:var(--radius);
-  padding:12px;
-  background:var(--bg-elev);
-}
-.roster.champ{border-color:var(--amber);}
-.roster h4{font-family:'Oswald',sans-serif;font-size:13px;letter-spacing:.5px;margin-bottom:8px;display:flex;align-items:center;gap:6px;}
-.roster ul{list-style:none;font-size:13px;color:var(--muted);line-height:1.9;}
-.roster.champ h4{color:var(--gold);}
-.tourney-note{
-  margin-top:12px;font-size:12px;color:var(--muted);
-  font-style:italic;border-left:2px solid var(--line);padding-left:10px;
-}
-
-/* ---- players / teams ---- */
-.subtabs{display:flex;gap:8px;margin-bottom:18px;}
-.subtabs button{
-  background:var(--bg-elev);border:1px solid var(--line);
-  color:var(--muted);font-family:'Oswald',sans-serif;font-size:12px;
-  letter-spacing:.5px;text-transform:uppercase;
-  padding:7px 14px;border-radius:20px;cursor:pointer;
-}
-.subtabs button.active{background:var(--amber-dim);color:var(--gold);border-color:var(--amber);}
-
-.grid-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px;}
-.player-card{
-  background:var(--bg-card);border:1px solid var(--line);border-radius:var(--radius);
-  padding:16px;
-}
-.player-card .pname{font-family:'Oswald',sans-serif;font-size:17px;font-weight:600;}
-.stamps{display:flex;flex-wrap:wrap;gap:5px;margin:10px 0;}
-.stamp{
-  font-family:'JetBrains Mono',monospace;font-size:10px;
-  border:1px dashed var(--line);color:var(--muted);
-  padding:3px 7px;border-radius:20px;
-}
-.achv-row{display:flex;gap:14px;margin-top:10px;padding-top:10px;border-top:1px solid var(--line);}
-.achv{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted);}
-.achv b{color:var(--gold);font-size:14px;display:block;font-family:'Oswald',sans-serif;}
-
-.team-card{
-  background:var(--bg-card);border:1px solid var(--line);border-radius:var(--radius);padding:16px;
-}
-.team-card h3{font-family:'Oswald',sans-serif;font-size:17px;margin-bottom:6px;}
-.team-titles{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--gold);margin-bottom:10px;}
-.team-card ul{list-style:none;font-size:13px;color:var(--muted);line-height:1.8;}
-
-/* ---- news ---- */
-.composer{
-  background:var(--bg-card);border:1px solid var(--line);border-radius:var(--radius);
-  padding:16px;margin-bottom:20px;
-}
-.composer input, .composer textarea{
-  width:100%;background:var(--bg-elev);border:1px solid var(--line);color:var(--text);
-  font-family:'Inter',sans-serif;font-size:13px;padding:9px 11px;border-radius:var(--radius);
-  margin-bottom:8px;resize:vertical;
-}
-.composer .row{display:flex;gap:8px;}
-.composer .row input:first-child{max-width:160px;}
-.composer button{
-  background:var(--amber);border:none;color:#161616;font-weight:700;
-  font-family:'Oswald',sans-serif;letter-spacing:.5px;text-transform:uppercase;
-  font-size:12px;padding:9px 18px;border-radius:var(--radius);cursor:pointer;
-}
-.composer button:hover{background:#f0b559;}
-.news-item{
-  background:var(--bg-card);border:1px solid var(--line);border-left:3px solid var(--amber);
-  border-radius:var(--radius);padding:12px 16px;margin-bottom:8px;
-}
-.news-item .meta{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted);margin-bottom:5px;}
-.news-item .meta b{color:var(--teal);}
-.news-empty{color:var(--muted);font-size:13px;font-style:italic;padding:20px;text-align:center;}
-.empty-state{
-  background:var(--bg-card);border:1px dashed var(--line);padding:24px;
-  color:var(--muted);font-size:13px;text-align:center;line-height:1.7;
-}
-.empty-state strong{display:block;color:var(--text);font-family:'Oswald',sans-serif;font-size:17px;font-style:normal;}
-.history-list{list-style:none;font-size:12px;color:var(--muted);line-height:1.7;margin-top:10px;}
-.history-list b{color:var(--text);font-weight:600;}
-.data-note{font-size:11px;color:var(--muted);margin:0 0 12px;line-height:1.6;}
-
-footer{
-  text-align:center;padding:24px;color:var(--muted);
-  font-family:'JetBrains Mono',monospace;font-size:11px;border-top:1px solid var(--line);
-}
-</style>
-</head>
-<body>
-
-<header class="top">
-  <div class="brand-row">
-    <div>
-      <div class="brand">HLT<span>PC</span></div>
-      <div class="brand-sub">O CENÁRIO OFICIAL DA TURMA — HISTÓRICO, TIMES E RESENHA</div>
-    </div>
-    <div class="season-tag">TEMPORADA 2024–2026</div>
-  </div>
-  <div class="ticker-wrap">
-    <div class="tag">AO VIVO</div>
-    <div class="ticker-track" id="tickerTrack"></div>
-  </div>
-  <nav class="tabs">
-    <button data-view="partidas" class="active">Partidas</button>
-    <button data-view="campeonatos">Campeonatos</button>
-    <button data-view="players">Players & Times</button>
-    <button data-view="noticias">Notícias</button>
-  </nav>
-</header>
-
-<main>
-
-  <!-- ================= PARTIDAS ================= -->
-  <section id="partidas" class="view active">
-    <div class="section-title">Em andamento</div>
-    <div id="liveMatches"></div>
-
-    <div class="section-title">Resultados — Finais</div>
-    <div id="pastMatches"></div>
-  </section>
-
-  <!-- ================= CAMPEONATOS ================= -->
-  <section id="campeonatos" class="view">
-    <div class="section-title">Histórico de campeonatos</div>
-    <div id="tourneyList"></div>
-  </section>
-
-  <!-- ================= PLAYERS & TIMES ================= -->
-  <section id="players" class="view">
-    <div class="subtabs">
-      <button data-sub="playersGrid" class="active">Players</button>
-      <button data-sub="teamsGrid">Times</button>
-    </div>
-    <div id="playersGrid" class="grid-cards"></div>
-    <div id="teamsGrid" class="grid-cards" style="display:none;"></div>
-  </section>
-
-  <!-- ================= NOTICIAS ================= -->
-  <section id="noticias" class="view">
-    <p class="data-note">Nesta primeira versão, publicações feitas aqui ficam salvas apenas neste navegador. O mural compartilhado será ligado ao banco de dados na próxima etapa.</p>
-    <div class="composer">
-      <div class="row">
-        <input id="newsAuthor" type="text" placeholder="Seu nick" maxlength="24">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Histórico oficial dos campeonatos de Counter-Strike da turma." />
+    <title>HLTPC — Histórico da Turma</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&family=Oswald:wght@500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="header-main shell">
+        <a class="brand" href="#inicio" aria-label="HLTPC — início">HLT<span>PC</span><small>Histórico da turma</small></a>
+        <div class="season"><i></i> Temporada 2024–2026</div>
       </div>
-      <textarea id="newsText" rows="2" placeholder="Solta a bobeira ou a notícia do momento..." maxlength="280"></textarea>
-      <button id="newsPost">Publicar</button>
-    </div>
-    <div id="newsFeed"></div>
-  </section>
+      <nav class="navigation shell" aria-label="Navegação principal">
+        <a href="#inicio" data-route="inicio">Início</a>
+        <a href="#partidas" data-route="partidas">Partidas</a>
+        <a href="#campeonatos" data-route="campeonatos">Campeonatos</a>
+        <a href="#jogadores" data-route="jogadores">Jogadores</a>
+        <a href="#times" data-route="times">Times</a>
+        <a href="#noticias" data-route="noticias">Notícias</a>
+      </nav>
+    </header>
 
-</main>
+    <div class="ticker"><div class="shell"><strong>HLTPC AGORA</strong><span id="tickerText"></span></div></div>
 
-<footer>HLTPC · feito na resenha · dados sujeitos a fake news e deboche</footer>
-
-<script>
-/* ============================================================
-   DADOS
-   ============================================================ */
-const tournaments = [
-  {
-    id:1, name:"IEM Major Gramadão", year:2024, status:"finalizado",
-    champion:"TAMPRIMES",
-    teams:[
-      {name:"TAMPRIMES", champ:true, players:["lanches","fancy","Cuazzi","Downey","PRIMO"]},
-      {name:"FROM SOFTWARE Gaming", champ:false, players:["hhh","cerex","ROMAOCrazy","Oblivion","Cobix"]}
-    ],
-    note:"Sem demo do campeonato."
-  },
-  {
-    id:2, name:"BLAST Resenha Series — Vila São Paulo", year:2025, status:"finalizado", resenha:true,
-    champion:"TIME 2",
-    teams:[
-      {name:"TIME 1", champ:false, players:["lanches","hhh","Cuazzi","cerex","ice greg"]},
-      {name:"TIME 2", champ:true, players:["GJota","LnW","ROMAOCrazy","190","Downey"]}
-    ],
-    note:"Campeonato de resenha, sem demo. Times montados na hora (sem line-ups oficiais), mas conta no histórico individual de cada jogador."
-  },
-  {
-    id:3, name:"ESL Major Gramadão", year:2025, status:"finalizado",
-    champion:"PROCEDER Gaming",
-    teams:[
-      {name:"PROCEDER Gaming", champ:true, players:["lanches","hhh","190","ice greg","Cobix"]},
-      {name:"TWICE E-sports", champ:false, players:["LnW","cerex","fancy","ROMAOCrazy","PIRUVATO"]},
-      {name:"KAMIKUAZI", champ:false, players:["cuavila","GJota","Cuazzi","Downey","PRIMO"]}
-    ],
-    note:"Temos algumas demos desse campeonato."
-  },
-  {
-    id:4, name:"PGL Major Abadia", year:2026, status:"em andamento",
-    champion:null,
-    teams:[
-      {name:"BOCA DE FUMO Gaming", champ:false, players:["lanches","hhh","GJota","PRIMO","MECTREFF"]},
-      {name:"RED PILL Gaming", champ:false, players:["LnW","190","fancy","Downey","PIRUVATO"]},
-      {name:"Deftones", champ:false, players:["ROMAOCrazy","cerex","Cuazzi","Oblivion","John Weed"]}
-    ],
-    note:"Campeonato em andamento — confrontos ainda não definidos."
-  }
-];
-
-/* Partidas só entram aqui quando houver confronto e resultado confirmados. */
-const matches = [];
-
-/* Players e históricos são derivados das escalações para evitar duplicidade. */
-const players = [...new Set(
-  tournaments.flatMap(t=>t.teams.flatMap(team=>team.players))
-)];
-
-function getPlayerHistory(player){
-  return tournaments.flatMap(t=>t.teams
-    .filter(team=>team.players.includes(player))
-    .map(team=>({tournament:t, team}))
-  ).sort((a,b)=>b.tournament.year-a.tournament.year || b.tournament.id-a.tournament.id);
-}
-
-/* achievements: majors (oficiais) vs resenha */
-function computeAchievements(){
-  const acc = {};
-  players.forEach(p=>acc[p]={majors:0,resenha:0});
-  tournaments.forEach(t=>{
-    const champTeam = t.teams.find(tm=>tm.champ);
-    if(!champTeam) return;
-    champTeam.players.forEach(p=>{
-      if(!acc[p]) acc[p]={majors:0,resenha:0};
-      if(t.resenha) acc[p].resenha++; else acc[p].majors++;
-    });
-  });
-  return acc;
-}
-const achievements = computeAchievements();
-
-/* Times oficiais e suas aparições; times da resenha não viram organizações. */
-const teamsMap = {};
-const canonicalTeamName = name => name
-  .replace(/\s+(Gaming|E-sports)$/i,'')
-  .trim();
-tournaments.filter(t=>!t.resenha).forEach(t=>{
-  t.teams.forEach(team=>{
-    const key = canonicalTeamName(team.name);
-    if(!teamsMap[key]) teamsMap[key]=[];
-    teamsMap[key].push({tournament:t, roster:team.players});
-  });
-});
-const teamTitles = {};
-tournaments.forEach(t=>{
-  const champTeam = t.teams.find(tm=>tm.champ);
-  if(!champTeam || t.resenha) return;
-  const key = canonicalTeamName(champTeam.name);
-  if(key) teamTitles[key] = (teamTitles[key]||0)+1;
-});
-
-const news = [
-  {author:"HLTPC", text:"Bem-vindo ao HLTPC — o histórico oficial (e não oficial) da turma. Manda a bobeira aí.", ts:Date.now()-1000*60*60}
-];
-
-/* ============================================================
-   RENDER: TICKER
-   ============================================================ */
-function renderTicker(){
-  const bits = [
-    "TAMPRIMES campeã do IEM Major Gramadão 2024",
-    "PROCEDER Gaming levanta o ESL Major Gramadão 2025",
-    "PGL Major Abadia rolando agora — BOCA DE FUMO x RED PILL x Deftones",
-    "lembrete: aqui ninguém tem time fixo, sem exceção",
-    "lanches é o único bicampeão de major da história do HLTPC"
-  ];
-  document.getElementById('tickerTrack').innerHTML = bits.map(b=>b).join('<span>//</span>');
-}
-
-/* ============================================================
-   RENDER: PARTIDAS
-   ============================================================ */
-function initials(name){
-  return name.replace(/gaming|e-sports/ig,'').trim().split(" ").map(w=>w[0]).join("").slice(0,3).toUpperCase();
-}
-
-function renderMatches(){
-  const live = document.getElementById('liveMatches');
-  const past = document.getElementById('pastMatches');
-  live.innerHTML = ""; past.innerHTML = "";
-
-  matches.filter(m=>m.status==="agendada" || m.status==="ao vivo").forEach(m=>{
-    live.innerHTML += `
-      <div class="match-card live">
-        <div class="match-meta"><b>${m.date || 'A definir'}</b>${m.tournament}</div>
-        <div class="match-sides">
-          <div class="side"><div class="crest">${initials(m.teamA)}</div><div class="tname">${m.teamA}</div></div>
-          <div class="vs">vs</div>
-          <div class="side right"><div class="crest">${initials(m.teamB)}</div><div class="tname">${m.teamB}</div></div>
+    <main class="shell">
+      <section class="view" data-view="inicio">
+        <div id="hero"></div>
+        <div class="home-grid">
+          <div>
+            <div class="section-heading"><div><span>ÚLTIMAS</span><h2>Notícias</h2></div><a href="#noticias">Ver todas →</a></div>
+            <div id="homeNews" class="news-list"></div>
+          </div>
+          <aside>
+            <div class="section-heading"><div><span>HISTÓRICO</span><h2>Ranking de títulos</h2></div></div>
+            <div id="titleRanking" class="ranking"></div>
+          </aside>
         </div>
-        <span class="badge live">${m.status}</span>
-      </div>`;
-  });
-  if(!live.innerHTML) live.innerHTML = `<div class="empty-state"><strong>Confrontos ainda não divulgados</strong>O PGL Major Abadia 2026 está em andamento, mas nenhuma partida foi cadastrada oficialmente.</div>`;
+      </section>
 
-  matches.filter(m=>m.status==="finalizada").forEach(m=>{
-    past.innerHTML += `
-      <div class="match-card">
-        <div class="match-meta"><b>${m.date}</b>${m.tournament}</div>
-        <div class="match-sides">
-          <div class="side ${m.scoreA>m.scoreB?'winner':''}"><div class="crest">${initials(m.teamA)}</div><div class="tname">${m.teamA}</div></div>
-          <div class="vs">${m.scoreA} : ${m.scoreB}</div>
-          <div class="side right ${m.scoreB>m.scoreA?'winner':''}"><div class="crest">${initials(m.teamB)}</div><div class="tname">${m.teamB}</div></div>
+      <section class="view" data-view="partidas">
+        <header class="page-heading"><span>JOGOS CONFIRMADOS</span><h1>Partidas</h1><p>Somente confrontos, mapas e placares realmente cadastrados.</p></header>
+        <div class="section-heading"><div><span>AGENDA</span><h2>Próximas partidas</h2></div></div>
+        <div id="upcomingMatches"></div>
+        <div class="section-heading spaced"><div><span>ARQUIVO</span><h2>Resultados</h2></div></div>
+        <div id="finishedMatches"></div>
+      </section>
+
+      <section class="view" data-view="campeonatos">
+        <header class="page-heading"><span>2024 — 2026</span><h1>Campeonatos</h1><p>Cada edição mantém seus próprios times, escalações e nível de dados disponível.</p></header>
+        <div class="filters" id="tournamentFilters">
+          <button class="active" data-filter="all">Todos</button><button data-filter="major">Majors oficiais</button><button data-filter="resenha">Resenha</button>
         </div>
-      </div>`;
-  });
-  if(!past.innerHTML) past.innerHTML = `<div class="empty-state"><strong>Resultados não cadastrados</strong>Os campeões históricos estão na aba Campeonatos, mas os confrontos e placares antigos ainda não foram informados.</div>`;
-}
+        <div id="tournaments" class="tournaments"></div>
+      </section>
 
-/* ============================================================
-   RENDER: CAMPEONATOS
-   ============================================================ */
-function renderTourneys(){
-  const wrap = document.getElementById('tourneyList');
-  wrap.innerHTML = tournaments.slice().sort((a,b)=>b.year-a.year).map(t=>`
-    <div class="tourney-card">
-      <div class="tourney-head" onclick="this.nextElementSibling.classList.toggle('open')">
-        <div>
-          <div class="tourney-name">${t.name} <span class="tourney-year">${t.year}</span></div>
-          ${t.champion ? `<div class="tourney-champ">🏆 ${t.champion}</div>` : `<div class="tourney-champ" style="color:var(--brick)">EM ANDAMENTO</div>`}
-        </div>
-        ${t.resenha ? '<span class="badge resenha">Resenha</span>' : '<span class="badge champion">Oficial</span>'}
-      </div>
-      <div class="tourney-body">
-        <div class="roster-grid">
-          ${t.teams.map(tm=>`
-            <div class="roster ${tm.champ?'champ':''}">
-              <h4>${tm.champ?'🏆 ':''}${tm.name}</h4>
-              <ul>${tm.players.map(p=>`<li>${p}</li>`).join('')}</ul>
-            </div>`).join('')}
-        </div>
-        ${t.note ? `<div class="tourney-note">${t.note}</div>` : ''}
-      </div>
-    </div>
-  `).join('');
-}
+      <section class="view" data-view="jogadores">
+        <header class="page-heading"><span>PERFIS DERIVADOS</span><h1>Jogadores</h1><p>Participações e títulos calculados automaticamente a partir das escalações.</p></header>
+        <label class="search"><span>⌕</span><input id="playerSearch" type="search" placeholder="Buscar jogador..." /></label>
+        <div id="players" class="card-grid"></div>
+      </section>
 
-/* ============================================================
-   RENDER: PLAYERS & TIMES
-   ============================================================ */
-function renderPlayers(){
-  const wrap = document.getElementById('playersGrid');
-  wrap.innerHTML = players.map(name=>{
-    const a = achievements[name] || {majors:0,resenha:0};
-    const history = getPlayerHistory(name);
-    return `
-      <div class="player-card">
-        <div class="pname">${name}</div>
-        <div class="stamps">${[...new Set(history.map(h=>canonicalTeamName(h.team.name)))].map(t=>`<span class="stamp">${t}</span>`).join('')}</div>
-        <div class="achv-row">
-          <div class="achv"><b>${a.majors}</b>títulos oficiais</div>
-          <div class="achv"><b>${a.resenha}</b>títulos de resenha</div>
-        </div>
-        <ul class="history-list">${history.map(h=>`<li><b>${h.tournament.year}</b> · ${h.team.name} — ${h.tournament.name}</li>`).join('')}</ul>
-      </div>`;
-  }).join('');
-}
+      <section class="view" data-view="times">
+        <header class="page-heading"><span>ORGANIZAÇÕES</span><h1>Times</h1><p>Não existe elenco permanente: cada formação está ligada ao campeonato em que jogou.</p></header>
+        <div id="teams" class="card-grid teams-grid"></div>
+      </section>
 
-function renderTeams(){
-  const wrap = document.getElementById('teamsGrid');
-  wrap.innerHTML = Object.entries(teamsMap).map(([team,appearances])=>{
-    const titles = teamTitles[team]||0;
-    return `
-      <div class="team-card">
-        <h3>${team}</h3>
-        <div class="team-titles">${titles>0 ? '🏆 '+titles+' título'+(titles>1?'s':'')+' oficial'+(titles>1?'is':'') : 'sem títulos oficiais ainda'}</div>
-        <ul class="history-list">${appearances.sort((a,b)=>b.tournament.year-a.tournament.year).map(a=>`<li><b>${a.tournament.year} · ${a.tournament.name}</b><br>${a.roster.join(' · ')}</li>`).join('')}</ul>
-      </div>`;
-  }).join('');
-}
+      <section class="view" data-view="noticias">
+        <header class="page-heading"><span>ARQUIVO HLTPC</span><h1>Notícias</h1><p>Comunicados e histórias compartilhadas com todos os visitantes.</p></header>
+        <div class="notice"><b>Publicação administrativa em preparação</b><span>O formulário público foi removido: visitantes não devem alterar o site. A próxima etapa ligará o painel protegido ao banco compartilhado.</span></div>
+        <div id="news" class="news-list large"></div>
+      </section>
+    </main>
 
-/* ============================================================
-   NEWS FEED (rascunhos locais até a integração com banco de dados)
-   ============================================================ */
-async function loadNews(){
-  const feed = document.getElementById('newsFeed');
-  feed.innerHTML = `<div class="news-empty">Carregando notícias...</div>`;
-  let stored = [];
-  try{
-    const item = localStorage.getItem('hltpc-news');
-    stored = item ? JSON.parse(item) : [];
-  }catch(e){
-    stored = [];
-  }
-  const all = [...stored, ...news].sort((a,b)=>b.ts-a.ts);
-  if(!all.length){
-    feed.innerHTML = `<div class="news-empty">Nenhuma notícia ainda. Manda a primeira bobeira.</div>`;
-    return;
-  }
-  feed.innerHTML = all.map(n=>`
-    <div class="news-item">
-      <div class="meta"><b>${escapeHtml(n.author||'anônimo')}</b> · ${new Date(n.ts).toLocaleString('pt-BR')}</div>
-      <div>${escapeHtml(n.text)}</div>
-    </div>`).join('');
-}
-function escapeHtml(s){
-  const d = document.createElement('div');
-  d.innerText = s;
-  return d.innerHTML;
-}
-async function postNews(){
-  const author = document.getElementById('newsAuthor').value.trim() || "anônimo";
-  const text = document.getElementById('newsText').value.trim();
-  if(!text) return;
-  try{
-    let stored = JSON.parse(localStorage.getItem('hltpc-news') || '[]');
-    stored.push({author, text, ts:Date.now()});
-    localStorage.setItem('hltpc-news', JSON.stringify(stored));
-  }catch(e){
-    console.error('Falha ao salvar notícia', e);
-  }
-  document.getElementById('newsText').value = '';
-  loadNews();
-}
+    <footer><div class="shell"><span class="brand footer-brand">HLT<span>PC</span></span><p>Counter-Strike entre amigos, com a história organizada direito.</p><small>Dados confirmados · sem estatísticas inventadas</small></div></footer>
 
-/* ============================================================
-   NAV
-   ============================================================ */
-document.querySelectorAll('nav.tabs button').forEach(btn=>{
-  btn.addEventListener('click', ()=>{
-    document.querySelectorAll('nav.tabs button').forEach(b=>b.classList.remove('active'));
-    btn.classList.add('active');
-    document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
-    document.getElementById(btn.dataset.view).classList.add('active');
-  });
-});
-document.querySelectorAll('.subtabs button').forEach(btn=>{
-  btn.addEventListener('click', ()=>{
-    document.querySelectorAll('.subtabs button').forEach(b=>b.classList.remove('active'));
-    btn.classList.add('active');
-    document.getElementById('playersGrid').style.display = btn.dataset.sub==='playersGrid' ? 'grid':'none';
-    document.getElementById('teamsGrid').style.display = btn.dataset.sub==='teamsGrid' ? 'grid':'none';
-  });
-});
-document.getElementById('newsPost').addEventListener('click', postNews);
-
-/* ============================================================
-   INIT
-   ============================================================ */
-renderTicker();
-renderMatches();
-renderTourneys();
-renderPlayers();
-renderTeams();
-loadNews();
-</script>
-</body>
+    <script src="data.js"></script>
+    <script src="app.js"></script>
+  </body>
 </html>
