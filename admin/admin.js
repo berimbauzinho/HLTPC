@@ -7,11 +7,10 @@
     teams: [...new Set(source.tournaments.flatMap((event) => event.entries.map((entry) => entry.team)))].map((name, index) => ({ id: `team-${index}`, name, acronym: initials(name), status: "published", logo: "", updated: "Derivado das edições" })),
     tournaments: source.tournaments.map((event) => ({ id: event.id, name: event.name, subtitle: String(event.year), status: "published", logo: "", format: event.format, formatType: "custom", teams: event.entries.map((entry) => entry.team), updated: event.status === "ongoing" ? "Em andamento" : `Campeão: ${event.champion}` })),
     matches: [],
-    news: source.news.map((item) => ({ id: item.id, name: item.title, subtitle: item.summary, status: "published", updated: item.date })),
-    files: []
+    news: source.news.map((item) => ({ id: item.id, name: item.title, subtitle: item.summary, author: item.author, date: item.date, tournamentId: item.tournamentId, status: "published", updated: item.date }))
   };
 
-  const labels = { overview: "Visão geral", players: "Jogadores", teams: "Times", tournaments: "Campeonatos", matches: "Partidas", news: "Notícias", files: "Arquivos", users: "Usuários e acessos" };
+  const labels = { overview: "Visão geral", players: "Jogadores", teams: "Times", tournaments: "Campeonatos", matches: "Partidas", news: "Notícias", users: "Usuários e acessos" };
   const singular = { players: "jogador", teams: "time", tournaments: "campeonato", matches: "partida", news: "notícia" };
   let section = "overview";
   let editingId = null;
@@ -26,6 +25,28 @@
 
   function initials(value) {
     return value.replace(/gaming|e-sports/ig, "").trim().split(/\s+/).map((part) => part[0]).join("").slice(0, 3).toUpperCase();
+  }
+
+  async function contentRequest(options = {}) {
+    const response = await fetch("/api/admin/content", { credentials: "same-origin", ...options });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.error || "Não foi possível sincronizar o conteúdo.");
+    return result;
+  }
+
+  async function loadPersistedContent() {
+    try {
+      const saved = await contentRequest();
+      ["players", "teams", "tournaments", "matches", "news"].forEach((key) => { if (Array.isArray(saved[key])) state[key] = saved[key]; });
+      go(section);
+      showToast("Conteúdo compartilhado carregado");
+    } catch (reason) {
+      showToast(reason.message);
+    }
+  }
+
+  async function persistContent() {
+    return contentRequest({ method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ players: state.players, teams: state.teams, tournaments: state.tournaments, matches: state.matches, news: state.news }) });
   }
 
   function pageTitle(title, description, action = true) {
@@ -46,7 +67,7 @@
           ${[["✓","Cadastrar jogadores e aliases"],["✓","Criar times e selecionar logos"],["✓","Montar campeonatos e escalações"],["✓","Registrar partidas, mapas e resultados"],["✓","Publicar notícias compartilhadas"],["⇧","Enviar demos para processamento"]].map((item) => `<div class="activity"><span>${item[0]}</span><div><b>${item[1]}</b><small>Disponível para teste visual nesta demonstração</small></div></div>`).join("")}
         </section>
         <section class="panel"><div class="panel-title">Acesso rápido</div>
-          ${[["players","♟"],["teams","◆"],["tournaments","★"],["matches","◫"],["files","⇧"]].map(([key, icon]) => `<button class="quick" data-go="${key}"><i>${icon}</i><span><b>${labels[key]}</b><small>Abrir gerenciamento</small></span><em>›</em></button>`).join("")}
+          ${[["players","♟"],["teams","◆"],["tournaments","★"],["matches","◫"],["news","▤"]].map(([key, icon]) => `<button class="quick" data-go="${key}"><i>${icon}</i><span><b>${labels[key]}</b><small>Abrir gerenciamento</small></span><em>›</em></button>`).join("")}
         </section>
       </div>`;
     bindActions();
@@ -66,7 +87,7 @@
         <article class="stat"><span>◉</span><div><small>Total</small><b>${state[section].length}</b></div></article>
         <article class="stat"><span>✓</span><div><small>Publicados</small><b>${state[section].filter((item) => item.status === "published").length}</b></div></article>
         <article class="stat"><span>◷</span><div><small>Rascunhos</small><b>${state[section].filter((item) => item.status === "draft").length}</b></div></article>
-        <article class="stat"><span>↻</span><div><small>Modo</small><b style="font-size:15px">Demo</b></div></article>
+        <article class="stat"><span>↻</span><div><small>Modo</small><b style="font-size:15px">Conectado</b></div></article>
       </div>
       <div class="toolbar"><label class="search"><span>⌕</span><input id="adminSearch" value="${escapeHtml(search)}" placeholder="Buscar em ${labels[section].toLowerCase()}..." /></label><select><option>Todos os status</option><option>Publicados</option><option>Rascunhos</option></select><button>⇅ Ordenar</button><small>${items.length} resultados</small></div>
       ${items.length ? `<div class="data-table"><div class="table-head"><span>NOME</span><span>DETALHE</span><span>ORIGEM / ATUALIZAÇÃO</span><span>STATUS</span><span></span></div>${items.map(tableRow).join("")}</div>` : `<div class="empty"><span>＋</span><h3>Nenhum registro</h3><p>Adicione o primeiro ${singular[section]} para testar o fluxo.</p></div>`}`;
@@ -81,23 +102,6 @@
       <span>${escapeHtml(item.subtitle || item.acronym || "—")}</span><span>${escapeHtml(item.updated || "Agora")}</span>
       <span class="badge ${item.status === "draft" ? "draft" : ""}">${item.status === "draft" ? "Rascunho" : "Publicado"}</span><button class="more">•••</button>
     </div>`;
-  }
-
-  function filesView() {
-    content.innerHTML = `${pageTitle("Arquivos", "Teste a seleção de logos, imagens e demos. O upload real será feito pelo armazenamento do backend.", false)}
-      <div class="file-grid">
-        ${uploadCard("team-logo", "◆", "Logo de time", "PNG, JPG ou WebP para páginas e partidas.", "image/png,image/jpeg,image/webp")}
-        ${uploadCard("tournament-logo", "★", "Logo de campeonato", "Identidade de cada edição do HLTPC.", "image/png,image/jpeg,image/webp")}
-        ${uploadCard("demo", "▶", "Demo de partida", "Arquivo .dem para processamento futuro de estatísticas.", ".dem,application/octet-stream")}
-      </div>
-      <div class="panel" style="margin-top:13px"><div class="panel-title">Fila desta demonstração</div><div id="fileQueue">${state.files.length ? state.files.map((file) => `<div class="activity"><span>⇧</span><div><b>${escapeHtml(file.name)}</b><small>${escapeHtml(file.type)} · aguardando backend</small></div></div>`).join("") : `<div class="empty" style="border:0;padding:28px"><h3>Nenhum arquivo selecionado</h3><p>Use os campos acima para testar o fluxo.</p></div>`}</div></div>`;
-    document.querySelectorAll(".upload-card input").forEach((input) => input.addEventListener("change", () => {
-      const file = input.files[0];
-      if (!file) return;
-      state.files.unshift({ name: file.name, type: input.dataset.kind, size: file.size });
-      showToast(`${file.name} entrou na fila de demonstração`);
-      filesView();
-    }));
   }
 
   async function usersView() {
@@ -146,10 +150,6 @@
     } catch (reason) { showToast(reason.message); }
   }
 
-  function uploadCard(id, icon, title, description, accept) {
-    return `<article class="upload-card"><span>${icon}</span><h3>${title}</h3><p>${description}</p><label for="${id}">Clique para selecionar um arquivo<input id="${id}" data-kind="${title}" type="file" accept="${accept}" /></label><small class="selected-file">Nenhum arquivo selecionado</small></article>`;
-  }
-
   function openEditor(id = null) {
     editingId = id;
     const item = id ? state[section].find((record) => record.id === id) : null;
@@ -166,7 +166,7 @@
     if (section === "teams") return `${textField("name", "Nome oficial do time", item.name, "Ex.: Deftones", true)}<div class="field-row">${textField("acronym", "Sigla", item.acronym, "Ex.: DFT")}${selectField("status", item.status)}</div>${fileField("logo", "Logo do time", "image/*")}<div class="helper">O elenco mais recente e as formações históricas serão derivados de cada participação.</div>`;
     if (section === "tournaments") return `${textField("name", "Nome do campeonato", item.name, "Ex.: PGL Major Abadia", true)}<div class="field-row">${textField("subtitle", "Ano", item.subtitle, "2026", true)}${selectField("status", item.status)}</div><label>Modelo de formato<select name="formatType" id="formatType">${formatOptions(item.formatType)}</select></label><label>Descrição do formato<input name="format" id="formatDescription" value="${escapeHtml(item.format || "")}" placeholder="Será preenchido pelo modelo escolhido" /></label><div class="format-preview" id="formatPreview"></div>${fileField("logo", "Logo do campeonato", "image/*")}<div class="helper">Depois de criar a edição, você adicionará os times e os cinco jogadores de cada escalação. O formato define como classificação e chave serão exibidas.</div>`;
     if (section === "matches") return `<label>Campeonato<select name="tournamentId" id="matchTournament" required><option value="">Selecione primeiro o campeonato</option>${state.tournaments.map((event) => `<option value="${escapeHtml(event.id)}" ${item.tournamentId === event.id ? "selected" : ""}>${escapeHtml(event.name)} ${escapeHtml(event.subtitle)}</option>`).join("")}</select></label><div class="field-row"><label>Time A<select name="teamA" id="matchTeamA" required></select></label><label>Time B<select name="teamB" id="matchTeamB" required></select></label></div><div class="field-row">${textField("name", "Fase", item.name, "Ex.: Semifinal", true)}${textField("subtitle", "Data e hora", item.subtitle, "2026-08-15 20:30")}</div><div class="field-row">${textField("score", "Placar / mapas", item.score, "Somente após confirmação")}${selectField("status", item.status)}</div>${fileField("demo", "Demo da partida", ".dem")}<div class="helper" id="matchHelper">Escolha uma edição: os times serão limitados exclusivamente às escalações daquele campeonato.</div>`;
-    return `${textField("name", "Título", item.name, "Título da notícia", true)}<label>Texto / resumo<textarea name="subtitle" placeholder="Escreva a notícia...">${escapeHtml(item.subtitle)}</textarea></label><div class="field-row">${textField("author", "Autor", item.author, "HLTPC")}${selectField("status", item.status)}</div>${fileField("image", "Imagem de destaque", "image/*")}`;
+    return `${textField("name", "Título", item.name, "Título da notícia", true)}<label>Texto / resumo<textarea name="subtitle" placeholder="Escreva a notícia...">${escapeHtml(item.subtitle)}</textarea></label><div class="field-row">${textField("author", "Autor", item.author, "HLTPC")}${textField("date", "Data", item.date, "2026-08-10", true)}</div>${selectField("status", item.status)}${fileField("image", "Imagem de destaque", "image/*")}`;
   }
 
   function textField(name, label, value = "", placeholder = "", required = false) { return `<label>${label}<input name="${name}" value="${escapeHtml(value)}" placeholder="${placeholder}" ${required ? "required" : ""} /></label>`; }
@@ -240,26 +240,30 @@
     const values = {};
     for (const [key, value] of formData.entries()) if (!(typeof File !== "undefined" && value instanceof File)) values[key] = value;
     if (section === "players") values.teams = formData.getAll("teams");
+    if (section === "news" && !values.date) values.date = new Date().toISOString().slice(0, 10);
     const imageField = section === "players" ? "photo" : ["teams", "tournaments"].includes(section) ? "logo" : section === "news" ? "image" : null;
     const imageFile = imageField ? formData.get(imageField) : null;
+    if (imageFile?.size > 2 * 1024 * 1024) { showToast("Use uma imagem de até 2 MB"); return; }
     if (imageField && imageFile?.size) values[imageField] = await fileAsDataUrl(imageFile);
     const list = state[section];
     if (section === "matches" && values.teamA === values.teamB) { showToast("Escolha dois times diferentes"); return; }
     const fallbackName = section === "matches" ? `${values.teamA} x ${values.teamB}` : "Novo registro";
-    const record = { ...values, name: values.name || fallbackName, id: editingId || `${section}-${Date.now()}`, updated: "Alterado nesta demonstração" };
+    const record = { ...values, name: values.name || fallbackName, id: editingId || `${section}-${Date.now()}`, updated: "Atualizado pelo painel" };
     const index = list.findIndex((item) => item.id === editingId);
     if (index >= 0) list[index] = { ...list[index], ...record }; else list.unshift(record);
+    await persistContent();
     dialog.close();
-    showToast(`${record.name} foi salvo na demonstração`);
+    showToast(`${record.name} foi salvo e publicado`);
     listView();
   }
 
-  function deleteEditor() {
+  async function deleteEditor() {
     if (!editingId) return;
     const index = state[section].findIndex((item) => item.id === editingId);
     const [removed] = state[section].splice(index, 1);
+    await persistContent();
     dialog.close();
-    showToast(`${removed.name} foi removido da demonstração`);
+    showToast(`${removed.name} foi removido`);
     listView();
   }
 
@@ -282,15 +286,17 @@
     document.querySelector("#breadcrumb").textContent = labels[section];
     document.querySelectorAll("#adminNav button").forEach((button) => button.classList.toggle("active", button.dataset.section === section));
     document.querySelector(".sidebar").classList.remove("open");
-    if (section === "overview") overview(); else if (section === "files") filesView(); else if (section === "users") usersView(); else listView();
+    if (section === "overview") overview(); else if (section === "users") usersView(); else listView();
   }
 
   document.querySelectorAll("#adminNav button").forEach((button) => button.addEventListener("click", () => go(button.dataset.section)));
   document.querySelector("#mobileMenu").addEventListener("click", () => document.querySelector(".sidebar").classList.toggle("open"));
   document.querySelector("#closeDialog").addEventListener("click", () => dialog.close());
   document.querySelector("#cancelButton").addEventListener("click", () => dialog.close());
-  deleteButton.addEventListener("click", deleteEditor);
-  form.addEventListener("submit", async (event) => { event.preventDefault(); if (form.reportValidity()) await saveEditor(); });
+  deleteButton.addEventListener("click", async () => { try { await deleteEditor(); } catch (reason) { showToast(reason.message); } });
+  form.addEventListener("submit", async (event) => { event.preventDefault(); if (!form.reportValidity()) return; try { await saveEditor(); } catch (reason) { showToast(reason.message); } });
 
   overview();
+  window.addEventListener("hltpc:authenticated", loadPersistedContent);
+  if (window.HLTPC_AUTHENTICATED) loadPersistedContent();
 })();
