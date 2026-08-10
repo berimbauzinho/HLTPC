@@ -4,7 +4,7 @@ const { findUser } = require("./user-store");
 exports.handler = async (event) => {
   if (event.httpMethod !== "POST") return json(405, { error: "Método não permitido." });
   const config = configuration();
-  if (!config) return json(503, { error: "O acesso do owner ainda não foi configurado no Netlify." });
+  if (!config) return json(503, { error: "Cadastre HLTPC_OWNER_PASSWORD nas variáveis do Netlify para ativar o owner lanches." });
   let credentials;
   try { credentials = JSON.parse(event.body || "{}"); } catch (_) { return json(400, { error: "Dados inválidos." }); }
   const username = normalizeUsername(credentials.username);
