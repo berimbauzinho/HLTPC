@@ -1,0 +1,180 @@
+(() => {
+  "use strict";
+
+  const source = window.HLTPC_DATA;
+  const state = {
+    players: source.players.map((name, index) => ({ id: `player-${index}`, name, alias: "", status: "published", photo: "", updated: "Dados históricos" })),
+    teams: [...new Set(source.tournaments.filter((event) => event.category === "major").flatMap((event) => event.entries.map((entry) => entry.team)))].map((name, index) => ({ id: `team-${index}`, name, acronym: initials(name), status: "published", logo: "", updated: "Derivado das edições" })),
+    tournaments: source.tournaments.map((event) => ({ id: event.id, name: event.name, subtitle: String(event.year), status: event.status === "ongoing" ? "published" : "published", logo: "", updated: event.status === "ongoing" ? "Em andamento" : `Campeão: ${event.champion}` })),
+    matches: [],
+    news: source.news.map((item) => ({ id: item.id, name: item.title, subtitle: item.summary, status: "published", updated: item.date })),
+    files: []
+  };
+
+  const labels = { overview: "Visão geral", players: "Jogadores", teams: "Times", tournaments: "Campeonatos", matches: "Partidas", news: "Notícias", files: "Arquivos" };
+  const singular = { players: "jogador", teams: "time", tournaments: "campeonato", matches: "partida", news: "notícia" };
+  let section = "overview";
+  let editingId = null;
+  let search = "";
+
+  const content = document.querySelector("#content");
+  const dialog = document.querySelector("#editorDialog");
+  const form = document.querySelector("#editorForm");
+  const fields = document.querySelector("#formFields");
+  const deleteButton = document.querySelector("#deleteButton");
+  const escapeHtml = (value) => String(value ?? "").replace(/[&<>'"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[char]));
+
+  function initials(value) {
+    return value.replace(/gaming|e-sports/ig, "").trim().split(/\s+/).map((part) => part[0]).join("").slice(0, 3).toUpperCase();
+  }
+
+  function pageTitle(title, description, action = true) {
+    return `<div class="page-title"><div><span>PAINEL HLTPC</span><h1>${title}</h1><p>${description}</p></div>${action ? `<button class="primary" data-add>＋ Adicionar ${singular[section]}</button>` : ""}</div>`;
+  }
+
+  function overview() {
+    const published = ["players", "teams", "tournaments", "matches", "news"].flatMap((key) => state[key]).filter((item) => item.status === "published").length;
+    content.innerHTML = `${pageTitle("Visão geral", "Gerencie o conteúdo que forma o histórico do HLTPC.", false)}
+      <div class="stats">
+        <article class="stat"><span>♟</span><div><small>Jogadores</small><b>${state.players.length}</b></div></article>
+        <article class="stat"><span>◆</span><div><small>Times</small><b>${state.teams.length}</b></div></article>
+        <article class="stat"><span>★</span><div><small>Campeonatos</small><b>${state.tournaments.length}</b></div></article>
+        <article class="stat"><span>✓</span><div><small>Publicados</small><b>${published}</b></div></article>
+      </div>
+      <div class="dashboard-grid">
+        <section class="panel"><div class="panel-title">O que você poderá fazer</div>
+          ${[["✓","Cadastrar jogadores e aliases"],["✓","Criar times e selecionar logos"],["✓","Montar campeonatos e escalações"],["✓","Registrar partidas, mapas e resultados"],["✓","Publicar notícias compartilhadas"],["⇧","Enviar demos para processamento"]].map((item) => `<div class="activity"><span>${item[0]}</span><div><b>${item[1]}</b><small>Disponível para teste visual nesta demonstração</small></div></div>`).join("")}
+        </section>
+        <section class="panel"><div class="panel-title">Acesso rápido</div>
+          ${[["players","♟"],["teams","◆"],["tournaments","★"],["matches","◫"],["files","⇧"]].map(([key, icon]) => `<button class="quick" data-go="${key}"><i>${icon}</i><span><b>${labels[key]}</b><small>Abrir gerenciamento</small></span><em>›</em></button>`).join("")}
+        </section>
+      </div>`;
+    bindActions();
+  }
+
+  function listView() {
+    const items = state[section].filter((item) => (item.name || "").toLowerCase().includes(search.toLowerCase()));
+    const descriptions = {
+      players: "Cadastre nicks, aliases e fotos sem duplicar o histórico.",
+      teams: "Gerencie organizações e logos; elencos continuam ligados às edições.",
+      tournaments: "Crie edições, formato, status, campeão e identidade visual.",
+      matches: "Registre somente confrontos confirmados, fases, mapas e placares.",
+      news: "Prepare notícias compartilhadas e escolha quando publicar."
+    };
+    content.innerHTML = `${pageTitle(labels[section], descriptions[section])}
+      <div class="stats">
+        <article class="stat"><span>◉</span><div><small>Total</small><b>${state[section].length}</b></div></article>
+        <article class="stat"><span>✓</span><div><small>Publicados</small><b>${state[section].filter((item) => item.status === "published").length}</b></div></article>
+        <article class="stat"><span>◷</span><div><small>Rascunhos</small><b>${state[section].filter((item) => item.status === "draft").length}</b></div></article>
+        <article class="stat"><span>↻</span><div><small>Modo</small><b style="font-size:15px">Demo</b></div></article>
+      </div>
+      <div class="toolbar"><label class="search"><span>⌕</span><input id="adminSearch" value="${escapeHtml(search)}" placeholder="Buscar em ${labels[section].toLowerCase()}..." /></label><select><option>Todos os status</option><option>Publicados</option><option>Rascunhos</option></select><button>⇅ Ordenar</button><small>${items.length} resultados</small></div>
+      ${items.length ? `<div class="data-table"><div class="table-head"><span>NOME</span><span>DETALHE</span><span>ORIGEM / ATUALIZAÇÃO</span><span>STATUS</span><span></span></div>${items.map(tableRow).join("")}</div>` : `<div class="empty"><span>＋</span><h3>Nenhum registro</h3><p>Adicione o primeiro ${singular[section]} para testar o fluxo.</p></div>`}`;
+    bindActions();
+    document.querySelector("#adminSearch")?.addEventListener("input", (event) => { search = event.target.value; listView(); document.querySelector("#adminSearch")?.focus(); });
+  }
+
+  function tableRow(item) {
+    const image = item.photo || item.logo;
+    return `<div class="table-row" data-edit="${escapeHtml(item.id)}">
+      <div class="identity"><span class="avatar">${image ? `<img src="${escapeHtml(image)}" alt="" />` : initials(item.name)}</span><div><b>${escapeHtml(item.name)}</b><small>${escapeHtml(item.alias || item.acronym || singular[section])}</small></div></div>
+      <span>${escapeHtml(item.subtitle || item.acronym || "—")}</span><span>${escapeHtml(item.updated || "Agora")}</span>
+      <span class="badge ${item.status === "draft" ? "draft" : ""}">${item.status === "draft" ? "Rascunho" : "Publicado"}</span><button class="more">•••</button>
+    </div>`;
+  }
+
+  function filesView() {
+    content.innerHTML = `${pageTitle("Arquivos", "Teste a seleção de logos, imagens e demos. O upload real será feito pelo armazenamento do backend.", false)}
+      <div class="file-grid">
+        ${uploadCard("team-logo", "◆", "Logo de time", "PNG, JPG ou WebP para páginas e partidas.", "image/png,image/jpeg,image/webp")}
+        ${uploadCard("tournament-logo", "★", "Logo de campeonato", "Identidade de cada edição do HLTPC.", "image/png,image/jpeg,image/webp")}
+        ${uploadCard("demo", "▶", "Demo de partida", "Arquivo .dem para processamento futuro de estatísticas.", ".dem,application/octet-stream")}
+      </div>
+      <div class="panel" style="margin-top:13px"><div class="panel-title">Fila desta demonstração</div><div id="fileQueue">${state.files.length ? state.files.map((file) => `<div class="activity"><span>⇧</span><div><b>${escapeHtml(file.name)}</b><small>${escapeHtml(file.type)} · aguardando backend</small></div></div>`).join("") : `<div class="empty" style="border:0;padding:28px"><h3>Nenhum arquivo selecionado</h3><p>Use os campos acima para testar o fluxo.</p></div>`}</div></div>`;
+    document.querySelectorAll(".upload-card input").forEach((input) => input.addEventListener("change", () => {
+      const file = input.files[0];
+      if (!file) return;
+      state.files.unshift({ name: file.name, type: input.dataset.kind, size: file.size });
+      showToast(`${file.name} entrou na fila de demonstração`);
+      filesView();
+    }));
+  }
+
+  function uploadCard(id, icon, title, description, accept) {
+    return `<article class="upload-card"><span>${icon}</span><h3>${title}</h3><p>${description}</p><label for="${id}">Clique para selecionar um arquivo<input id="${id}" data-kind="${title}" type="file" accept="${accept}" /></label><small class="selected-file">Nenhum arquivo selecionado</small></article>`;
+  }
+
+  function openEditor(id = null) {
+    editingId = id;
+    const item = id ? state[section].find((record) => record.id === id) : null;
+    document.querySelector("#dialogEyebrow").textContent = item ? "EDITAR REGISTRO" : "NOVO REGISTRO";
+    document.querySelector("#dialogTitle").textContent = item ? item.name : `Adicionar ${singular[section]}`;
+    deleteButton.style.visibility = item ? "visible" : "hidden";
+    fields.innerHTML = formFields(item || {});
+    dialog.showModal();
+  }
+
+  function formFields(item) {
+    if (section === "players") return `${textField("name", "Nick principal", item.name, "Ex.: lanches", true)}<div class="field-row">${textField("alias", "Alias / variação", item.alias, "Ex.: John Weed")}${selectField("status", item.status)}</div>${fileField("photo", "Foto do jogador", "image/*")}<div class="helper">O histórico de times e títulos não será digitado aqui: ele será calculado pelas escalações dos campeonatos.</div>`;
+    if (section === "teams") return `${textField("name", "Nome oficial do time", item.name, "Ex.: Deftones", true)}<div class="field-row">${textField("acronym", "Sigla", item.acronym, "Ex.: DFT")}${selectField("status", item.status)}</div>${fileField("logo", "Logo do time", "image/*")}<div class="helper">O elenco mais recente e as formações históricas serão derivados de cada participação.</div>`;
+    if (section === "tournaments") return `${textField("name", "Nome do campeonato", item.name, "Ex.: PGL Major Abadia", true)}<div class="field-row">${textField("subtitle", "Ano", item.subtitle, "2026", true)}${selectField("status", item.status)}</div>${textField("format", "Formato", item.format, "Grupos, pontos corridos, chave...")}${fileField("logo", "Logo do campeonato", "image/*")}<div class="helper">Depois de criar a edição, o painel permitirá adicionar times e os cinco jogadores de cada escalação.</div>`;
+    if (section === "matches") return `<div class="field-row">${textField("teamA", "Time A", item.teamA, "Selecionar time", true)}${textField("teamB", "Time B", item.teamB, "Selecionar time", true)}</div><div class="field-row">${textField("name", "Fase", item.name, "Ex.: Semifinal", true)}${textField("subtitle", "Data e hora", item.subtitle, "2026-08-15 20:30")}</div><div class="field-row">${textField("score", "Placar / mapas", item.score, "Somente após confirmação")}${selectField("status", item.status)}</div>${fileField("demo", "Demo da partida", ".dem")}<div class="helper">Uma partida nunca será criada automaticamente a partir do campeão do evento.</div>`;
+    return `${textField("name", "Título", item.name, "Título da notícia", true)}<label>Texto / resumo<textarea name="subtitle" placeholder="Escreva a notícia...">${escapeHtml(item.subtitle)}</textarea></label><div class="field-row">${textField("author", "Autor", item.author, "HLTPC")}${selectField("status", item.status)}</div>${fileField("image", "Imagem de destaque", "image/*")}`;
+  }
+
+  function textField(name, label, value = "", placeholder = "", required = false) { return `<label>${label}<input name="${name}" value="${escapeHtml(value)}" placeholder="${placeholder}" ${required ? "required" : ""} /></label>`; }
+  function selectField(name, value = "draft") { return `<label>Status<select name="${name}"><option value="draft" ${value === "draft" ? "selected" : ""}>Rascunho</option><option value="published" ${value === "published" ? "selected" : ""}>Publicado</option></select></label>`; }
+  function fileField(name, label, accept) { return `<label>${label}<input class="file-field" name="${name}" type="file" accept="${accept}" /></label>`; }
+
+  function saveEditor() {
+    const values = Object.fromEntries(new FormData(form).entries());
+    const list = state[section];
+    const fallbackName = section === "matches" ? `${values.teamA} x ${values.teamB}` : "Novo registro";
+    const record = { ...values, name: values.name || fallbackName, id: editingId || `${section}-${Date.now()}`, updated: "Alterado nesta demonstração" };
+    const index = list.findIndex((item) => item.id === editingId);
+    if (index >= 0) list[index] = { ...list[index], ...record }; else list.unshift(record);
+    dialog.close();
+    showToast(`${record.name} foi salvo na demonstração`);
+    listView();
+  }
+
+  function deleteEditor() {
+    if (!editingId) return;
+    const index = state[section].findIndex((item) => item.id === editingId);
+    const [removed] = state[section].splice(index, 1);
+    dialog.close();
+    showToast(`${removed.name} foi removido da demonstração`);
+    listView();
+  }
+
+  function showToast(message) {
+    const toast = document.querySelector("#toast");
+    toast.querySelector("span").textContent = message;
+    toast.classList.add("show");
+    setTimeout(() => toast.classList.remove("show"), 2400);
+  }
+
+  function bindActions() {
+    document.querySelector("[data-add]")?.addEventListener("click", () => openEditor());
+    document.querySelectorAll("[data-edit]").forEach((row) => row.addEventListener("click", () => openEditor(row.dataset.edit)));
+    document.querySelectorAll("[data-go]").forEach((button) => button.addEventListener("click", () => go(button.dataset.go)));
+  }
+
+  function go(next) {
+    section = next;
+    search = "";
+    document.querySelector("#breadcrumb").textContent = labels[section];
+    document.querySelectorAll("#adminNav button").forEach((button) => button.classList.toggle("active", button.dataset.section === section));
+    document.querySelector(".sidebar").classList.remove("open");
+    if (section === "overview") overview(); else if (section === "files") filesView(); else listView();
+  }
+
+  document.querySelectorAll("#adminNav button").forEach((button) => button.addEventListener("click", () => go(button.dataset.section)));
+  document.querySelector("#mobileMenu").addEventListener("click", () => document.querySelector(".sidebar").classList.toggle("open"));
+  document.querySelector("#closeDialog").addEventListener("click", () => dialog.close());
+  document.querySelector("#cancelButton").addEventListener("click", () => dialog.close());
+  deleteButton.addEventListener("click", deleteEditor);
+  form.addEventListener("submit", (event) => { event.preventDefault(); if (form.reportValidity()) saveEditor(); });
+
+  overview();
+})();
