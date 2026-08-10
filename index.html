@@ -18,11 +18,9 @@
       </div>
       <nav class="navigation shell" aria-label="Navegação principal">
         <a href="#inicio" data-route="inicio">Início</a>
-        <a href="#partidas" data-route="partidas">Partidas</a>
         <a href="#campeonatos" data-route="campeonatos">Campeonatos</a>
         <a href="#jogadores" data-route="jogadores">Jogadores</a>
         <a href="#times" data-route="times">Times</a>
-        <a href="#noticias" data-route="noticias">Notícias</a>
       </nav>
     </header>
 
@@ -59,6 +57,10 @@
         <div id="tournaments" class="tournaments"></div>
       </section>
 
+      <section class="view" data-view="campeonato">
+        <div id="tournamentPage"></div>
+      </section>
+
       <section class="view" data-view="jogadores">
         <header class="page-heading"><span>PERFIS DERIVADOS</span><h1>Jogadores</h1><p>Participações e títulos calculados automaticamente a partir das escalações.</p></header>
         <label class="search"><span>⌕</span><input id="playerSearch" type="search" placeholder="Buscar jogador..." /></label>
@@ -72,6 +74,10 @@
       <section class="view" data-view="times">
         <header class="page-heading"><span>ORGANIZAÇÕES</span><h1>Times</h1><p>Não existe elenco permanente: cada formação está ligada ao campeonato em que jogou.</p></header>
         <div id="teams" class="card-grid teams-grid"></div>
+      </section>
+
+      <section class="view" data-view="time">
+        <div id="teamProfile"></div>
       </section>
 
       <section class="view" data-view="noticias">
