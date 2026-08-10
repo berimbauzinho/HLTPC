@@ -11,6 +11,21 @@
     <link rel="stylesheet" href="admin.css" />
   </head>
   <body>
+    <section class="login-screen" id="loginScreen">
+      <div class="login-brand">HLT<span>PC</span><small>ADMIN</small></div>
+      <form class="login-card" id="loginForm">
+        <span>ACESSO RESTRITO</span>
+        <h1>Entrar no painel</h1>
+        <p>Use o usuário e a senha cadastrados pelo owner.</p>
+        <label>Usuário<input name="username" autocomplete="username" required autofocus /></label>
+        <label>Senha<input name="password" type="password" autocomplete="current-password" required /></label>
+        <button class="primary" type="submit">Entrar</button>
+        <div class="login-error" id="loginError" role="alert"></div>
+        <a href="../">← Voltar ao site público</a>
+      </form>
+    </section>
+
+    <div class="admin-app" id="adminApp">
     <aside class="sidebar">
       <a class="brand" href="../">HLT<span>PC</span><small>ADMIN</small></a>
       <nav id="adminNav">
@@ -21,15 +36,16 @@
         <button data-section="matches"><i>◫</i>Partidas</button>
         <button data-section="news"><i>▤</i>Notícias</button>
         <button data-section="files"><i>⇧</i>Arquivos</button>
+        <button data-section="users"><i>♙</i>Usuários e acessos</button>
       </nav>
-      <div class="sidebar-footer"><a href="../">↗ Ver site público</a><button>⚙ Configurações</button></div>
+      <div class="sidebar-footer"><a href="../">↗ Ver site público</a><button id="logoutButton">⇥ Sair</button></div>
     </aside>
 
     <main class="workspace">
       <header class="topbar">
         <button class="mobile-menu" id="mobileMenu">☰</button>
         <div><span>HLTPC /</span><b id="breadcrumb">Visão geral</b></div>
-        <div class="admin-user"><span class="status-dot"></span><span>Modo demonstração</span><b>BF</b></div>
+        <div class="admin-user"><span class="status-dot"></span><span id="currentUser">Owner</span><b id="currentInitials">OW</b></div>
       </header>
 
       <div class="demo-banner"><b>Ambiente de teste</b><span>Você pode testar formulários, edição e seleção de arquivos. Nada será publicado ou enviado até conectarmos Supabase, login e armazenamento.</span></div>
@@ -46,8 +62,10 @@
     </dialog>
 
     <div class="toast" id="toast"><i>✓</i><span>Alteração salva na demonstração</span></div>
+    </div>
 
     <script src="../data.js"></script>
+    <script src="auth.js"></script>
     <script src="admin.js"></script>
   </body>
 </html>
