@@ -11,7 +11,7 @@
     files: []
   };
 
-  const labels = { overview: "Visão geral", players: "Jogadores", teams: "Times", tournaments: "Campeonatos", matches: "Partidas", news: "Notícias", files: "Arquivos" };
+  const labels = { overview: "Visão geral", players: "Jogadores", teams: "Times", tournaments: "Campeonatos", matches: "Partidas", news: "Notícias", files: "Arquivos", users: "Usuários e acessos" };
   const singular = { players: "jogador", teams: "time", tournaments: "campeonato", matches: "partida", news: "notícia" };
   let section = "overview";
   let editingId = null;
@@ -98,6 +98,15 @@
       showToast(`${file.name} entrou na fila de demonstração`);
       filesView();
     }));
+  }
+
+  function usersView() {
+    const user = window.HLTPC_CURRENT_USER || { username: "owner", role: "owner" };
+    content.innerHTML = `${pageTitle("Usuários e acessos", "Confira quem pode entrar e administrar o HLTPC.", false)}
+      <div class="panel access-panel"><div class="panel-title">Contas autorizadas</div>
+        <div class="access-user"><span>${initials(user.username)}</span><div><b>${escapeHtml(user.username)}</b><small>Conta principal do HLTPC</small></div><em>OWNER</em></div>
+        <div class="helper">Nesta primeira versão existe apenas o owner. A inclusão e remoção de outros administradores será habilitada junto com o banco de dados.</div>
+      </div>`;
   }
 
   function uploadCard(id, icon, title, description, accept) {
@@ -222,7 +231,7 @@
     document.querySelector("#breadcrumb").textContent = labels[section];
     document.querySelectorAll("#adminNav button").forEach((button) => button.classList.toggle("active", button.dataset.section === section));
     document.querySelector(".sidebar").classList.remove("open");
-    if (section === "overview") overview(); else if (section === "files") filesView(); else listView();
+    if (section === "overview") overview(); else if (section === "files") filesView(); else if (section === "users") usersView(); else listView();
   }
 
   document.querySelectorAll("#adminNav button").forEach((button) => button.addEventListener("click", () => go(button.dataset.section)));
