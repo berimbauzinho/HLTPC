@@ -100,13 +100,48 @@
     }));
   }
 
-  function usersView() {
-    const user = window.HLTPC_CURRENT_USER || { username: "owner", role: "owner" };
+  async function usersView() {
     content.innerHTML = `${pageTitle("Usuários e acessos", "Confira quem pode entrar e administrar o HLTPC.", false)}
-      <div class="panel access-panel"><div class="panel-title">Contas autorizadas</div>
-        <div class="access-user"><span>${initials(user.username)}</span><div><b>${escapeHtml(user.username)}</b><small>Conta principal do HLTPC</small></div><em>OWNER</em></div>
-        <div class="helper">Nesta primeira versão existe apenas o owner. A inclusão e remoção de outros administradores será habilitada junto com o banco de dados.</div>
-      </div>`;
+      <div class="access-grid"><div class="panel access-panel"><div class="panel-title">Contas autorizadas</div><div id="accessUsers"><div class="helper">Carregando usuários...</div></div></div>
+      <form class="panel access-create" id="createUserForm"><div class="panel-title">Liberar novo acesso</div><label>Nome de usuário<input name="username" minlength="3" maxlength="30" pattern="[A-Za-z0-9._-]+" placeholder="Ex.: romao" required /></label><button class="primary" type="submit">Criar usuário</button><div class="helper">O primeiro acesso será feito com <b>mudar1234</b>. Depois disso, a pessoa será obrigada a criar sua própria senha.</div></form></div>`;
+    document.querySelector("#createUserForm").addEventListener("submit", createAdminUser);
+    await loadAccessUsers();
+  }
+
+  async function accessRequest(options = {}) {
+    const response = await fetch("/api/admin/users", { credentials: "same-origin", ...options });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.error || "Não foi possível atualizar os acessos.");
+    return result;
+  }
+
+  async function loadAccessUsers() {
+    const target = document.querySelector("#accessUsers");
+    if (!target) return;
+    try {
+      const result = await accessRequest();
+      target.innerHTML = result.users.map((user) => `<div class="access-user"><span>${initials(user.username)}</span><div><b>${escapeHtml(user.username)}</b><small>${user.mustChangePassword ? "Aguardando troca da senha temporária" : user.role === "owner" ? "Conta principal do HLTPC" : "Acesso ativo"}</small></div><em>${user.role.toUpperCase()}</em>${user.role !== "owner" ? `<button class="ghost" data-reset-user="${escapeHtml(user.username)}">Redefinir senha</button><button class="danger" data-remove-user="${escapeHtml(user.username)}">Remover</button>` : ""}</div>`).join("");
+      target.querySelectorAll("[data-reset-user]").forEach((button) => button.addEventListener("click", () => updateAdminUser("reset", button.dataset.resetUser)));
+      target.querySelectorAll("[data-remove-user]").forEach((button) => button.addEventListener("click", () => updateAdminUser("delete", button.dataset.removeUser)));
+    } catch (reason) { target.innerHTML = `<div class="helper">${escapeHtml(reason.message)}</div>`; }
+  }
+
+  async function createAdminUser(event) {
+    event.preventDefault();
+    const formElement = event.currentTarget;
+    try {
+      const username = new FormData(formElement).get("username");
+      await accessRequest({ method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username }) });
+      formElement.reset(); showToast(`${username} foi liberado com a senha temporária mudar1234`); await loadAccessUsers();
+    } catch (reason) { showToast(reason.message); }
+  }
+
+  async function updateAdminUser(action, username) {
+    if (action === "delete" && !confirm(`Remover o acesso de ${username}?`)) return;
+    try {
+      await accessRequest({ method: action === "delete" ? "DELETE" : "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username }) });
+      showToast(action === "delete" ? `${username} perdeu o acesso` : `Senha de ${username} redefinida para mudar1234`); await loadAccessUsers();
+    } catch (reason) { showToast(reason.message); }
   }
 
   function uploadCard(id, icon, title, description, accept) {
