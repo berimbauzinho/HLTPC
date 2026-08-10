@@ -12,8 +12,16 @@ function owner(event) {
 exports.handler = async (event) => {
   const access = owner(event);
   if (!access) return json(403, { error: "Apenas o owner pode administrar usuários." });
-  const users = await listUsers(event);
-  if (event.httpMethod === "GET") return json(200, { users: [{ username: access.config.username, role: "owner", mustChangePassword: false }, ...users.map(({ username, role, mustChangePassword, active, createdAt }) => ({ username, role, mustChangePassword, active, createdAt }))] });
+  let users = [];
+  let storageError = null;
+  try {
+    users = await listUsers(event);
+  } catch (reason) {
+    console.error("HLTPC user storage error", reason);
+    storageError = `${reason?.name || "StorageError"}: ${reason?.message || "falha desconhecida"}`.slice(0, 300);
+  }
+  if (event.httpMethod === "GET") return json(200, { users: [{ username: access.config.username, role: "owner", mustChangePassword: false }, ...users.map(({ username, role, mustChangePassword, active, createdAt }) => ({ username, role, mustChangePassword, active, createdAt }))], storageError });
+  if (storageError) return json(503, { error: `Não foi possível acessar o armazenamento: ${storageError}` });
   let body;
   try { body = JSON.parse(event.body || "{}"); } catch (_) { return json(400, { error: "Dados inválidos." }); }
   const username = normalizeUsername(body.username);
