@@ -1,7 +1,25 @@
-(() => {
+(async () => {
   "use strict";
 
   const data = window.HLTPC_DATA;
+  let shared = {};
+  try {
+    const response = await fetch("/api/content", { cache: "no-store" });
+    if (response.ok) shared = await response.json();
+  } catch (_) {}
+  const playerMeta = new Map((shared.players || []).map((item) => [item.name, item]));
+  const teamMeta = new Map((shared.teams || []).map((item) => [item.name, item]));
+  const tournamentMeta = new Map((shared.tournaments || []).map((item) => [item.id, item]));
+  (shared.players || []).forEach((item) => { if (item.name && !data.players.includes(item.name)) data.players.push(item.name); });
+  data.tournaments.forEach((event) => {
+    const saved = tournamentMeta.get(event.id);
+    if (!saved) return;
+    if (saved.name) event.name = saved.name;
+    if (saved.subtitle && Number(saved.subtitle)) event.year = Number(saved.subtitle);
+    if (saved.format) event.format = saved.format;
+  });
+  if (Array.isArray(shared.matches)) data.matches = shared.matches.filter((item) => item.status === "published");
+  if (Array.isArray(shared.news) && shared.news.length) data.news = shared.news.filter((item) => item.status === "published").map((item) => ({ id: item.id, title: item.name, summary: item.subtitle, author: item.author || "HLTPC", date: /^\d{4}-\d{2}-\d{2}$/.test(item.date || "") ? item.date : new Date().toISOString().slice(0, 10), tournamentId: item.tournamentId || null }));
   const officialEvents = data.tournaments.filter((event) => event.category === "major");
   const playerHistory = new Map(data.players.map((player) => [player, []]));
   const teams = new Map();
@@ -17,12 +35,14 @@
       teams.get(entry.team).push({ event, players: entry.players });
     });
   });
+  (shared.teams || []).forEach((item) => { if (item.name && !teams.has(item.name)) teams.set(item.name, []); });
 
   const byNewest = (a, b) => b.event.year - a.event.year || b.event.id.localeCompare(a.event.id);
   const escapeHtml = (value) => String(value).replace(/[&<>'"]/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[character]));
   const formatDate = (value) => new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(`${value}T12:00:00`));
   const categoryLabel = (category) => category === "major" ? "Major oficial" : "Campeonato de resenha";
   const demoLabel = (demos) => ({ unavailable: "Sem demo", partial: "Demos parciais", future: "Aguardando campeonato" }[demos] || "Não informado");
+  const teamBadge = (team) => { const meta = teamMeta.get(team) || {}; return meta.logo ? `<img src="${escapeHtml(meta.logo)}" alt="" />` : escapeHtml((meta.acronym || team.split(/\s+/).map((part) => part[0]).join("").slice(0, 3)).toUpperCase()); };
 
   function titleCount(player, category) {
     return data.tournaments.filter((event) => event.category === category && event.champion && event.entries.some((entry) => entry.team === event.champion && entry.players.includes(player))).length;
@@ -126,9 +146,10 @@
     const visible = data.players.filter((player) => player.toLocaleLowerCase("pt-BR").includes(normalized));
     document.querySelector("#players").innerHTML = visible.map((player) => {
       const history = [...(playerHistory.get(player) || [])].sort(byNewest);
+      const meta = playerMeta.get(player) || {};
       return `<a class="profile-card player-card" href="#jogador/${encodeURIComponent(player)}">
-        <div class="player-card-head"><span>${escapeHtml(player.slice(0, 2).toUpperCase())}</span><div><h3>${escapeHtml(player)}</h3><p class="profile-meta">${history.length} participaç${history.length === 1 ? "ão" : "ões"}</p></div></div>
-        <div class="trophies"><div class="trophy-count"><b>${titleCount(player, "major")}</b><small>títulos oficiais</small></div><div class="trophy-count"><b>${titleCount(player, "resenha")}</b><small>títulos de resenha</small></div></div>
+        <div class="player-card-head"><span>${meta.photo ? `<img src="${escapeHtml(meta.photo)}" alt="" />` : escapeHtml(player.slice(0, 2).toUpperCase())}</span><div><h3>${escapeHtml(player)}</h3><p class="profile-meta">${history.length} participaç${history.length === 1 ? "ão" : "ões"}</p></div></div>
+        <div class="trophies"><div class="trophy-count"><b>${titleCount(player, "major")}</b><small>títulos oficiais</small></div><div class="trophy-count"><b>${history.length}</b><small>participações</small></div></div>
         <ul class="history">${history.map(({ event, team }) => `<li><b>${event.year} · ${escapeHtml(team)}</b>${escapeHtml(event.name)}</li>`).join("")}</ul>
       </a>`;
     }).join("");
@@ -137,11 +158,12 @@
   function renderPlayerProfile(player) {
     const history = [...(playerHistory.get(player) || [])].sort(byNewest);
     const current = history[0];
+    const meta = playerMeta.get(player) || {};
     const wins = data.tournaments.filter((event) => event.champion && event.entries.some((entry) => entry.team === event.champion && entry.players.includes(player)));
-    const uniqueTeams = [...new Set(history.map((item) => item.team))];
+    const uniqueTeams = [...new Set([...history.map((item) => item.team), ...(meta.teams || [])])];
     document.querySelector("#playerProfile").innerHTML = `<a class="profile-back" href="#jogadores">← Voltar aos jogadores</a>
       <article class="player-hero">
-        <div class="player-portrait"><span>${escapeHtml(player.slice(0, 2).toUpperCase())}</span><small>PLAYER</small></div>
+        <div class="player-portrait">${meta.photo ? `<img src="${escapeHtml(meta.photo)}" alt="${escapeHtml(player)}" />` : `<span>${escapeHtml(player.slice(0, 2).toUpperCase())}</span>`}<small>PLAYER</small></div>
         <div class="player-summary"><span>PERFIL HLTPC</span><h1>${escapeHtml(player)}</h1><p>Competidor do histórico oficial da turma</p>
           <dl><div><dt>Equipe mais recente</dt><dd>${current ? `<a class="entity-link" href="#time/${encodeURIComponent(current.team)}">${escapeHtml(current.team)}</a>` : "Sem equipe"}</dd></div><div><dt>Participações</dt><dd>${history.length}</dd></div><div><dt>Equipes defendidas</dt><dd>${uniqueTeams.length}</dd></div><div><dt>Títulos oficiais</dt><dd>${titleCount(player, "major")}</dd></div></dl>
         </div>
@@ -156,8 +178,9 @@
     document.querySelector("#teams").innerHTML = organizations.map(([team, appearances]) => {
       const history = [...appearances].sort(byNewest);
       const titles = officialEvents.filter((event) => event.champion === team).length;
+      const meta = teamMeta.get(team) || {};
       return `<a class="profile-card team-card" href="#time/${encodeURIComponent(team)}">
-        <h3>${escapeHtml(team)}</h3><p class="profile-meta">${history.length} participaç${history.length === 1 ? "ão" : "ões"} · ${titles} título${titles === 1 ? "" : "s"}</p>
+        <div class="team-card-head"><span>${meta.logo ? `<img src="${escapeHtml(meta.logo)}" alt="" />` : escapeHtml((meta.acronym || team.slice(0, 3)).toUpperCase())}</span><div><h3>${escapeHtml(team)}</h3><p class="profile-meta">${history.length} participaç${history.length === 1 ? "ão" : "ões"} · ${titles} título${titles === 1 ? "" : "s"}</p></div></div>
         <ul class="history">${history.map(({ event, players }) => `<li><b>${event.year} · ${escapeHtml(event.name)}</b>${players.map(escapeHtml).join(" · ")}</li>`).join("")}</ul>
       </a>`;
     }).join("");
@@ -167,8 +190,9 @@
     const appearances = [...(teams.get(team) || [])].sort(byNewest);
     const latest = appearances[0];
     const titles = officialEvents.filter((event) => event.champion === team);
+    const meta = teamMeta.get(team) || {};
     document.querySelector("#teamProfile").innerHTML = `<a class="profile-back" href="#times">← Voltar aos times</a>
-      <article class="entity-hero"><div class="entity-mark">${escapeHtml(team.split(/\s+/).map((part) => part[0]).join("").slice(0, 3))}</div><div><span>ORGANIZAÇÃO HLTPC</span><h1>${escapeHtml(team)}</h1><p>${appearances.length} participação${appearances.length === 1 ? "" : "ões"} oficial${appearances.length === 1 ? "" : "is"} · ${titles.length} título${titles.length === 1 ? "" : "s"}</p></div></article>
+      <article class="entity-hero"><div class="entity-mark">${meta.logo ? `<img src="${escapeHtml(meta.logo)}" alt="${escapeHtml(team)}" />` : escapeHtml(team.split(/\s+/).map((part) => part[0]).join("").slice(0, 3))}</div><div><span>ORGANIZAÇÃO HLTPC</span><h1>${escapeHtml(team)}</h1><p>${appearances.length} participação${appearances.length === 1 ? "" : "ões"} oficial${appearances.length === 1 ? "" : "is"} · ${titles.length} título${titles.length === 1 ? "" : "s"}</p></div></article>
       <div class="player-detail-grid"><section><div class="section-heading"><div><span>HISTÓRICO</span><h2>Campeonatos disputados</h2></div></div><div class="career-list">${appearances.map(({ event, players }) => `<article><time>${event.year}</time><div><b><a class="entity-link" href="#campeonato/${encodeURIComponent(event.id)}/overview">${escapeHtml(event.name)}</a></b><span>${players.map((player) => `<a class="entity-link" href="#jogador/${encodeURIComponent(player)}">${escapeHtml(player)}</a>`).join(" · ")}</span></div><em>${event.champion === team ? "CAMPEÃO" : event.status === "ongoing" ? "EM ANDAMENTO" : "PARTICIPANTE"}</em></article>`).join("")}</div></section><aside><div class="section-heading"><div><span>FORMAÇÃO</span><h2>Elenco mais recente</h2></div></div><div class="profile-teams">${(latest?.players || []).map((player) => `<a href="#jogador/${encodeURIComponent(player)}">${escapeHtml(player)}</a>`).join("")}</div></aside></div>`;
   }
 
@@ -181,13 +205,14 @@
   function renderTournamentPage(event, tab = "overview") {
     const validTab = ["overview", "matches", "participants"].includes(tab) ? tab : "overview";
     const eventMatches = data.matches.filter((match) => match.tournamentId === event.id);
+    const savedEvent = tournamentMeta.get(event.id) || {};
     const base = `#campeonato/${encodeURIComponent(event.id)}`;
     const tabs = `<nav class="event-tabs"><a class="${validTab === "overview" ? "active" : ""}" href="${base}/overview">Visão geral</a><a class="${validTab === "matches" ? "active" : ""}" href="${base}/matches">Partidas</a><a class="${validTab === "participants" ? "active" : ""}" href="${base}/participants">Participantes</a></nav>`;
     let body;
     if (validTab === "matches") body = `<section class="event-tab-body"><div class="section-heading"><div><span>CONFRONTOS</span><h2>Partidas do campeonato</h2></div></div>${eventMatches.length ? `<div class="event-matches">${eventMatches.map(matchMarkup).join("")}</div>` : `<div class="empty"><b>Calendário ainda não divulgado</b>Nenhum confronto foi cadastrado para esta edição. O painel administrativo só publicará partidas confirmadas.</div>`}</section>`;
-    else if (validTab === "participants") body = `<section class="event-tab-body"><div class="section-heading"><div><span>ESCALAÇÕES</span><h2>Times participantes</h2></div></div><div class="participant-grid">${event.entries.map((entry) => `<article><a class="participant-team" href="#time/${encodeURIComponent(entry.team)}"><span>${escapeHtml(entry.team.split(/\s+/).map((part) => part[0]).join("").slice(0, 3))}</span><b>${escapeHtml(entry.team)}</b></a><ul>${entry.players.map((player) => `<li><a href="#jogador/${encodeURIComponent(player)}">${escapeHtml(player)}</a></li>`).join("")}</ul></article>`).join("")}</div></section>`;
-    else body = `<section class="event-tab-body"><div class="event-overview-grid"><article><small>FORMATO</small><b>${escapeHtml(event.format)}</b><p>${escapeHtml(event.note)}</p></article><article><small>CAMPEÃO</small><b>${escapeHtml(event.champion || "A definir")}</b><p>${event.status === "ongoing" ? "Campeonato em andamento." : "Resultado histórico confirmado."}</p></article><article><small>DADOS DISPONÍVEIS</small><b>${demoLabel(event.demos)}</b><p>${event.demos === "partial" ? "Estatísticas futuras devem ser identificadas como parciais." : "Nenhuma estatística será inventada."}</p></article></div><div class="section-heading spaced"><div><span>RESUMO</span><h2>Participantes confirmados</h2></div><a href="${base}/participants">Ver escalações →</a></div><div class="participant-summary">${event.entries.map((entry) => `<a href="#time/${encodeURIComponent(entry.team)}"><span>${escapeHtml(entry.team.split(/\s+/).map((part) => part[0]).join("").slice(0, 3))}</span><b>${escapeHtml(entry.team)}</b><small>${entry.players.length} jogadores</small></a>`).join("")}</div></section>`;
-    document.querySelector("#tournamentPage").innerHTML = `<a class="profile-back" href="#campeonatos">← Voltar aos campeonatos</a><header class="event-hero"><span>${event.status === "ongoing" ? "EM ANDAMENTO" : "FINALIZADO"}</span><h1>${escapeHtml(event.name)} <b>${event.year}</b></h1><p>${categoryLabel(event.category)} · ${event.entries.length} times</p></header>${tabs}${body}`;
+    else if (validTab === "participants") body = `<section class="event-tab-body"><div class="section-heading"><div><span>ESCALAÇÕES</span><h2>Times participantes</h2></div></div><div class="participant-grid">${event.entries.map((entry) => `<article><a class="participant-team" href="#time/${encodeURIComponent(entry.team)}"><span>${teamBadge(entry.team)}</span><b>${escapeHtml(entry.team)}</b></a><ul>${entry.players.map((player) => `<li><a href="#jogador/${encodeURIComponent(player)}">${escapeHtml(player)}</a></li>`).join("")}</ul></article>`).join("")}</div></section>`;
+    else body = `<section class="event-tab-body"><div class="event-overview-grid"><article><small>FORMATO</small><b>${escapeHtml(event.format)}</b><p>${escapeHtml(event.note)}</p></article><article><small>CAMPEÃO</small><b>${escapeHtml(event.champion || "A definir")}</b><p>${event.status === "ongoing" ? "Campeonato em andamento." : "Resultado histórico confirmado."}</p></article><article><small>DADOS DISPONÍVEIS</small><b>${demoLabel(event.demos)}</b><p>${event.demos === "partial" ? "Estatísticas futuras devem ser identificadas como parciais." : "Nenhuma estatística será inventada."}</p></article></div><div class="section-heading spaced"><div><span>RESUMO</span><h2>Participantes confirmados</h2></div><a href="${base}/participants">Ver escalações →</a></div><div class="participant-summary">${event.entries.map((entry) => `<a href="#time/${encodeURIComponent(entry.team)}"><span>${teamBadge(entry.team)}</span><b>${escapeHtml(entry.team)}</b><small>${entry.players.length} jogadores</small></a>`).join("")}</div></section>`;
+    document.querySelector("#tournamentPage").innerHTML = `<a class="profile-back" href="#campeonatos">← Voltar aos campeonatos</a><header class="event-hero">${savedEvent.logo ? `<img class="event-logo" src="${escapeHtml(savedEvent.logo)}" alt="" />` : ""}<span>${event.status === "ongoing" ? "EM ANDAMENTO" : "FINALIZADO"}</span><h1>${escapeHtml(event.name)} <b>${event.year}</b></h1><p>${categoryLabel(event.category)} · ${event.entries.length} times</p></header>${tabs}${body}`;
   }
 
   function navigate() {
