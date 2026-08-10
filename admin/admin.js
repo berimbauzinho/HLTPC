@@ -5,7 +5,7 @@
   const state = {
     players: source.players.map((name, index) => ({ id: `player-${index}`, name, alias: "", status: "published", photo: "", updated: "Dados históricos" })),
     teams: [...new Set(source.tournaments.filter((event) => event.category === "major").flatMap((event) => event.entries.map((entry) => entry.team)))].map((name, index) => ({ id: `team-${index}`, name, acronym: initials(name), status: "published", logo: "", updated: "Derivado das edições" })),
-    tournaments: source.tournaments.map((event) => ({ id: event.id, name: event.name, subtitle: String(event.year), status: event.status === "ongoing" ? "published" : "published", logo: "", updated: event.status === "ongoing" ? "Em andamento" : `Campeão: ${event.champion}` })),
+    tournaments: source.tournaments.map((event) => ({ id: event.id, name: event.name, subtitle: String(event.year), status: "published", logo: "", format: event.format, formatType: "custom", teams: event.entries.map((entry) => entry.team), updated: event.status === "ongoing" ? "Em andamento" : `Campeão: ${event.champion}` })),
     matches: [],
     news: source.news.map((item) => ({ id: item.id, name: item.title, subtitle: item.summary, status: "published", updated: item.date })),
     files: []
@@ -112,13 +112,14 @@
     deleteButton.style.visibility = item ? "visible" : "hidden";
     fields.innerHTML = formFields(item || {});
     dialog.showModal();
+    bindEditorDynamics();
   }
 
   function formFields(item) {
     if (section === "players") return `${textField("name", "Nick principal", item.name, "Ex.: lanches", true)}<div class="field-row">${textField("alias", "Alias / variação", item.alias, "Ex.: John Weed")}${selectField("status", item.status)}</div>${fileField("photo", "Foto do jogador", "image/*")}<div class="helper">O histórico de times e títulos não será digitado aqui: ele será calculado pelas escalações dos campeonatos.</div>`;
     if (section === "teams") return `${textField("name", "Nome oficial do time", item.name, "Ex.: Deftones", true)}<div class="field-row">${textField("acronym", "Sigla", item.acronym, "Ex.: DFT")}${selectField("status", item.status)}</div>${fileField("logo", "Logo do time", "image/*")}<div class="helper">O elenco mais recente e as formações históricas serão derivados de cada participação.</div>`;
-    if (section === "tournaments") return `${textField("name", "Nome do campeonato", item.name, "Ex.: PGL Major Abadia", true)}<div class="field-row">${textField("subtitle", "Ano", item.subtitle, "2026", true)}${selectField("status", item.status)}</div>${textField("format", "Formato", item.format, "Grupos, pontos corridos, chave...")}${fileField("logo", "Logo do campeonato", "image/*")}<div class="helper">Depois de criar a edição, o painel permitirá adicionar times e os cinco jogadores de cada escalação.</div>`;
-    if (section === "matches") return `<div class="field-row">${textField("teamA", "Time A", item.teamA, "Selecionar time", true)}${textField("teamB", "Time B", item.teamB, "Selecionar time", true)}</div><div class="field-row">${textField("name", "Fase", item.name, "Ex.: Semifinal", true)}${textField("subtitle", "Data e hora", item.subtitle, "2026-08-15 20:30")}</div><div class="field-row">${textField("score", "Placar / mapas", item.score, "Somente após confirmação")}${selectField("status", item.status)}</div>${fileField("demo", "Demo da partida", ".dem")}<div class="helper">Uma partida nunca será criada automaticamente a partir do campeão do evento.</div>`;
+    if (section === "tournaments") return `${textField("name", "Nome do campeonato", item.name, "Ex.: PGL Major Abadia", true)}<div class="field-row">${textField("subtitle", "Ano", item.subtitle, "2026", true)}${selectField("status", item.status)}</div><label>Modelo de formato<select name="formatType" id="formatType">${formatOptions(item.formatType)}</select></label><label>Descrição do formato<input name="format" id="formatDescription" value="${escapeHtml(item.format || "")}" placeholder="Será preenchido pelo modelo escolhido" /></label><div class="format-preview" id="formatPreview"></div>${fileField("logo", "Logo do campeonato", "image/*")}<div class="helper">Depois de criar a edição, você adicionará os times e os cinco jogadores de cada escalação. O formato define como classificação e chave serão exibidas.</div>`;
+    if (section === "matches") return `<label>Campeonato<select name="tournamentId" id="matchTournament" required><option value="">Selecione primeiro o campeonato</option>${state.tournaments.map((event) => `<option value="${escapeHtml(event.id)}" ${item.tournamentId === event.id ? "selected" : ""}>${escapeHtml(event.name)} ${escapeHtml(event.subtitle)}</option>`).join("")}</select></label><div class="field-row"><label>Time A<select name="teamA" id="matchTeamA" required></select></label><label>Time B<select name="teamB" id="matchTeamB" required></select></label></div><div class="field-row">${textField("name", "Fase", item.name, "Ex.: Semifinal", true)}${textField("subtitle", "Data e hora", item.subtitle, "2026-08-15 20:30")}</div><div class="field-row">${textField("score", "Placar / mapas", item.score, "Somente após confirmação")}${selectField("status", item.status)}</div>${fileField("demo", "Demo da partida", ".dem")}<div class="helper" id="matchHelper">Escolha uma edição: os times serão limitados exclusivamente às escalações daquele campeonato.</div>`;
     return `${textField("name", "Título", item.name, "Título da notícia", true)}<label>Texto / resumo<textarea name="subtitle" placeholder="Escreva a notícia...">${escapeHtml(item.subtitle)}</textarea></label><div class="field-row">${textField("author", "Autor", item.author, "HLTPC")}${selectField("status", item.status)}</div>${fileField("image", "Imagem de destaque", "image/*")}`;
   }
 
@@ -126,9 +127,64 @@
   function selectField(name, value = "draft") { return `<label>Status<select name="${name}"><option value="draft" ${value === "draft" ? "selected" : ""}>Rascunho</option><option value="published" ${value === "published" ? "selected" : ""}>Publicado</option></select></label>`; }
   function fileField(name, label, accept) { return `<label>${label}<input class="file-field" name="${name}" type="file" accept="${accept}" /></label>`; }
 
+  function formatOptions(value = "custom") {
+    const options = [["round_robin", "Pontos corridos"], ["single_elimination", "Eliminação simples"], ["double_elimination", "Eliminação dupla"], ["groups_playoffs", "Grupos + playoffs"], ["custom", "Personalizado"]];
+    return options.map(([key, label]) => `<option value="${key}" ${value === key ? "selected" : ""}>${label}</option>`).join("");
+  }
+
+  function formatDefinition(type) {
+    return {
+      round_robin: { label: "Pontos corridos", description: "Todos jogam contra todos. Vitória vale 3 pontos; empate, 1.", steps: ["Liga", "Classificação", "Campeão"] },
+      single_elimination: { label: "Eliminação simples", description: "Quem perde é eliminado. Ideal para uma chave rápida.", steps: ["Semifinais", "Final", "Campeão"] },
+      double_elimination: { label: "Eliminação dupla", description: "Uma derrota envia o time à chave inferior; a segunda elimina.", steps: ["Chave superior", "Chave inferior", "Grande final"] },
+      groups_playoffs: { label: "Grupos + playoffs", description: "Fase de grupos classificatória seguida por mata-mata.", steps: ["Grupos", "Semifinais", "Final"] },
+      custom: { label: "Personalizado", description: "Descreva manualmente as regras do campeonato.", steps: ["Formato livre"] }
+    }[type];
+  }
+
+  function renderFormatPreview() {
+    const definition = formatDefinition(document.querySelector("#formatType")?.value || "custom");
+    const preview = document.querySelector("#formatPreview");
+    if (!preview) return;
+    preview.innerHTML = `<span>PRÉVIA DO FORMATO</span><h4>${definition.label}</h4><p>${definition.description}</p><div>${definition.steps.map((step, index) => `<b>${step}${index < definition.steps.length - 1 ? " →" : ""}</b>`).join("")}</div>`;
+  }
+
+  function populateMatchTeams(selectedA = "", selectedB = "") {
+    const tournament = state.tournaments.find((event) => event.id === document.querySelector("#matchTournament")?.value);
+    const teamA = document.querySelector("#matchTeamA");
+    const teamB = document.querySelector("#matchTeamB");
+    if (!teamA || !teamB) return;
+    const teams = tournament?.teams || [];
+    const options = teams.length ? `<option value="">Selecione</option>${teams.map((team) => `<option value="${escapeHtml(team)}">${escapeHtml(team)}</option>`).join("")}` : `<option value="">Nenhum time cadastrado nesta edição</option>`;
+    teamA.innerHTML = options; teamB.innerHTML = options;
+    teamA.value = selectedA; teamB.value = selectedB;
+    teamA.disabled = !teams.length; teamB.disabled = !teams.length;
+    const helper = document.querySelector("#matchHelper");
+    if (helper) helper.textContent = teams.length ? `${teams.length} times disponíveis em ${tournament.name} ${tournament.subtitle}. Times de outras edições não aparecem.` : "Cadastre as escalações desta edição antes de criar partidas.";
+  }
+
+  function bindEditorDynamics() {
+    if (section === "tournaments") {
+      const formatType = document.querySelector("#formatType");
+      formatType?.addEventListener("change", () => {
+        const definition = formatDefinition(formatType.value);
+        const description = document.querySelector("#formatDescription");
+        if (description && formatType.value !== "custom") description.value = definition.description;
+        renderFormatPreview();
+      });
+      renderFormatPreview();
+    }
+    if (section === "matches") {
+      const current = editingId ? state.matches.find((item) => item.id === editingId) : null;
+      document.querySelector("#matchTournament")?.addEventListener("change", () => populateMatchTeams());
+      populateMatchTeams(current?.teamA || "", current?.teamB || "");
+    }
+  }
+
   function saveEditor() {
     const values = Object.fromEntries(new FormData(form).entries());
     const list = state[section];
+    if (section === "matches" && values.teamA === values.teamB) { showToast("Escolha dois times diferentes"); return; }
     const fallbackName = section === "matches" ? `${values.teamA} x ${values.teamB}` : "Novo registro";
     const record = { ...values, name: values.name || fallbackName, id: editingId || `${section}-${Date.now()}`, updated: "Alterado nesta demonstração" };
     const index = list.findIndex((item) => item.id === editingId);
