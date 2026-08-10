@@ -32,8 +32,8 @@ O projeto não exige etapa de build nesta versão.
 
 O painel em `/admin/` usa usuário e senha por meio de Netlify Functions. Configure no Netlify:
 
-- `HLTPC_OWNER_USERNAME`: usuário principal;
-- `HLTPC_OWNER_PASSWORD`: senha do owner;
-- `HLTPC_SESSION_SECRET`: valor aleatório longo usado para assinar sessões.
+- `HLTPC_OWNER_PASSWORD`: senha do owner `lanches`.
+
+Opcionalmente, `HLTPC_OWNER_USERNAME` altera o usuário principal e `HLTPC_SESSION_SECRET` define manualmente o segredo usado para assinar sessões.
 
 O owner pode liberar outros nomes de usuário em **Usuários e acessos**. Novos administradores entram primeiro com `mudar1234` e precisam criar uma senha própria antes de acessar o painel. As contas e os hashes das senhas são persistidos no Netlify Blobs.
