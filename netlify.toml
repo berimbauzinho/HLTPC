@@ -17,6 +17,16 @@
   to = "/.netlify/functions/admin-logout"
   status = 200
 
+[[redirects]]
+  from = "/api/admin/change-password"
+  to = "/.netlify/functions/admin-change-password"
+  status = 200
+
+[[redirects]]
+  from = "/api/admin/users"
+  to = "/.netlify/functions/admin-users"
+  status = 200
+
 [[headers]]
   for = "/*"
   [headers.values]
