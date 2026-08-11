@@ -70,9 +70,9 @@ window.HLTPC_DATA = {
       category: "major",
       status: "ongoing",
       champion: null,
-      format: "A definir",
+      format: "3 times: ida e volta na fase de grupos; semifinal entre 2º e 3º; 1º colocado direto na final",
       demos: "future",
-      note: "Campeonato em andamento. O calendário e os confrontos ainda não foram divulgados.",
+      note: "Cada time enfrenta os outros duas vezes na fase de grupos. O 2º e o 3º colocados disputam a semifinal; o 1º colocado avança diretamente para a final.",
       entries: [
         { team: "BOCA DE FUMO Gaming", players: ["lanches", "hhh", "GJota", "PRIMO", "MECTREFF"] },
         { team: "RED PILL Gaming", players: ["LnW", "190", "fancy", "Downey", "PIRUVATO"] },
