@@ -704,10 +704,18 @@
 
   async function syncPendingLeetifyMatches() {
     let imported = 0;
-    for (const match of state.matches.filter((item) => item.leetifyUrl && !(item.statistics || []).length)) {
+    const needsIdentityMigration = (item) => item.leetifyUrl && (!(item.statistics || []).length || !item.leetifyInfo?.teamMapping);
+    for (const match of state.matches.filter(needsIdentityMigration)) {
       try {
-        Object.assign(match, await importLeetifyMatch(match.leetifyUrl, match, true));
-        match.updated = "Estatísticas sincronizadas pelo Leetify";
+        const importedMatch = await importLeetifyMatch(match.leetifyUrl, match, true);
+        if (match.statisticsSource === "demo" && (match.statistics || []).length) {
+          const { statistics: leetifyStatistics, statisticsSource: _, ...metadata } = importedMatch;
+          Object.assign(match, metadata);
+          match.statistics = mergeDemoWithLeetify(match.statistics, leetifyStatistics);
+          match.statisticsSource = "demo";
+          match.statisticsSecondarySource = "leetify";
+        } else Object.assign(match, importedMatch);
+        match.updated = match.statisticsSource === "demo" ? "Identidade revisada · demo principal" : "Identidade e estatísticas revisadas pelo Leetify";
         imported += 1;
       } catch (reason) {
         match.leetifySyncError = reason.message;
