@@ -5,7 +5,7 @@
   const state = {
     players: source.players.map((name, index) => ({ id: `player-${index}`, name, alias: "", status: "published", photo: "", teams: [...new Set(source.tournaments.flatMap((event) => event.entries.filter((entry) => entry.players.includes(name)).map((entry) => entry.team)))], updated: "Dados históricos" })),
     teams: [...new Set(source.tournaments.flatMap((event) => event.entries.map((entry) => entry.team)))].map((name, index) => ({ id: `team-${index}`, name, acronym: initials(name), status: "published", logo: "", updated: "Derivado das edições" })),
-    tournaments: source.tournaments.map((event) => ({ id: event.id, name: event.name, subtitle: String(event.year), status: "published", logo: "", format: event.format, formatType: "custom", teams: event.entries.map((entry) => entry.team), updated: event.status === "ongoing" ? "Em andamento" : `Campeão: ${event.champion}` })),
+    tournaments: source.tournaments.map((event) => ({ id: event.id, name: event.name, subtitle: String(event.year), status: "published", logo: "", format: event.format, formatType: event.id === "pgl-abadia-2026" ? "three_team_series" : "custom", teams: event.entries.map((entry) => entry.team), updated: event.status === "ongoing" ? "Em andamento" : `Campeão: ${event.champion}` })),
     matches: [],
     news: source.news.map((item) => ({ id: item.id, name: item.title, subtitle: item.summary, author: item.author, date: item.date, tournamentId: item.tournamentId, status: "published", updated: item.date }))
   };
@@ -15,6 +15,9 @@
   let section = "overview";
   let editingId = null;
   let search = "";
+  let demoParserPromise = null;
+  const DEMO_PARSER_MODULE = "https://cdn.jsdelivr.net/npm/@laihoe/demoparser2@0.42.0/wasm/pkg/demoparser2.js";
+  const DEMO_PARSER_WASM = "https://cdn.jsdelivr.net/npm/@laihoe/demoparser2@0.42.0/wasm/pkg/demoparser2_bg.wasm";
 
   const content = document.querySelector("#content");
   const dialog = document.querySelector("#editorDialog");
@@ -38,6 +41,8 @@
     try {
       const saved = await contentRequest();
       ["players", "teams", "tournaments", "matches", "news"].forEach((key) => { if (Array.isArray(saved[key])) state[key] = saved[key]; });
+      const structureChanged = normalizeTournamentStructures();
+      if (structureChanged) await persistContent();
       go(section);
       showToast("Conteúdo compartilhado carregado");
     } catch (reason) {
@@ -79,10 +84,10 @@
       players: "Cadastre nicks, aliases e fotos sem duplicar o histórico.",
       teams: "Gerencie organizações e logos; elencos continuam ligados às edições.",
       tournaments: "Crie edições, formato, status, campeão e identidade visual.",
-      matches: "Registre somente confrontos confirmados, fases, mapas e placares.",
+      matches: "Abra uma partida pré-gerada pelo formato para definir horário, publicar e anexar a demo.",
       news: "Prepare notícias compartilhadas e escolha quando publicar."
     };
-    content.innerHTML = `${pageTitle(labels[section], descriptions[section])}
+    content.innerHTML = `${pageTitle(labels[section], descriptions[section], section !== "matches")}
       <div class="stats">
         <article class="stat"><span>◉</span><div><small>Total</small><b>${state[section].length}</b></div></article>
         <article class="stat"><span>✓</span><div><small>Publicados</small><b>${state[section].filter((item) => item.status === "published").length}</b></div></article>
@@ -155,7 +160,7 @@
     const item = id ? state[section].find((record) => record.id === id) : null;
     document.querySelector("#dialogEyebrow").textContent = item ? "EDITAR REGISTRO" : "NOVO REGISTRO";
     document.querySelector("#dialogTitle").textContent = item ? item.name : `Adicionar ${singular[section]}`;
-    deleteButton.style.visibility = item ? "visible" : "hidden";
+    deleteButton.style.visibility = item && !(item.slotA || item.slotB) ? "visible" : "hidden";
     fields.innerHTML = formFields(item || {});
     dialog.showModal();
     bindEditorDynamics();
@@ -165,7 +170,14 @@
     if (section === "players") return `<div class="editor-tabs"><button type="button" class="active" data-editor-tab="profile">Dados do jogador</button><button type="button" data-editor-tab="teams">Equipes</button></div><div data-editor-panel="profile">${textField("name", "Nick principal", item.name, "Ex.: lanches", true)}<div class="field-row">${textField("alias", "Nome / alias", item.alias, "Ex.: Mathieu Herbaut")}${selectField("status", item.status)}</div>${fileField("photo", "Foto do jogador", "image/*")}<div class="helper">Títulos e participações são calculados pelas escalações dos campeonatos.</div></div><div data-editor-panel="teams" hidden><span class="field-title">Equipes defendidas</span><div class="team-checklist">${state.teams.map((team) => `<label><input type="checkbox" name="teams" value="${escapeHtml(team.name)}" ${(item.teams || []).includes(team.name) ? "checked" : ""} /><span><b>${escapeHtml(team.name)}</b><small>${escapeHtml(team.acronym)}</small></span></label>`).join("")}</div><div class="helper">As equipes encontradas nas escalações históricas já aparecem marcadas. Use esta área para complementar ou corrigir o perfil.</div></div>`;
     if (section === "teams") return `${textField("name", "Nome oficial do time", item.name, "Ex.: Deftones", true)}<div class="field-row">${textField("acronym", "Sigla", item.acronym, "Ex.: DFT")}${selectField("status", item.status)}</div>${fileField("logo", "Logo do time", "image/*")}<div class="helper">O elenco mais recente e as formações históricas serão derivados de cada participação.</div>`;
     if (section === "tournaments") return `${textField("name", "Nome do campeonato", item.name, "Ex.: PGL Major Abadia", true)}<div class="field-row">${textField("subtitle", "Ano", item.subtitle, "2026", true)}${selectField("status", item.status)}</div><label>Modelo de formato<select name="formatType" id="formatType">${formatOptions(item.formatType)}</select></label><label>Descrição do formato<input name="format" id="formatDescription" value="${escapeHtml(item.format || "")}" placeholder="Será preenchido pelo modelo escolhido" /></label><div class="format-preview" id="formatPreview"></div>${fileField("logo", "Logo do campeonato", "image/*")}<div class="helper">Depois de criar a edição, você adicionará os times e os cinco jogadores de cada escalação. O formato define como classificação e chave serão exibidas.</div>`;
-    if (section === "matches") return `<label>Campeonato<select name="tournamentId" id="matchTournament" required><option value="">Selecione primeiro o campeonato</option>${state.tournaments.map((event) => `<option value="${escapeHtml(event.id)}" ${item.tournamentId === event.id ? "selected" : ""}>${escapeHtml(event.name)} ${escapeHtml(event.subtitle)}</option>`).join("")}</select></label><div class="field-row"><label>Time A<select name="teamA" id="matchTeamA" required></select></label><label>Time B<select name="teamB" id="matchTeamB" required></select></label></div><div class="field-row">${textField("name", "Fase", item.name, "Ex.: Semifinal", true)}${textField("subtitle", "Data e hora", item.subtitle, "2026-08-15 20:30")}</div><div class="field-row">${textField("score", "Placar / mapas", item.score, "Somente após confirmação")}${selectField("status", item.status)}</div>${fileField("demo", "Demo da partida", ".dem")}<div class="helper" id="matchHelper">Escolha uma edição: os times serão limitados exclusivamente às escalações daquele campeonato.</div>`;
+    if (section === "matches") {
+      const generated = Boolean(item.slotA || item.slotB);
+      const lockedGroupMatch = item.round === "group" && item.teamA && item.teamB;
+      const tournament = state.tournaments.find((event) => event.id === item.tournamentId);
+      const tournamentField = generated ? `<input type="hidden" name="tournamentId" value="${escapeHtml(item.tournamentId)}" /><div class="fixture-source"><b>${escapeHtml(tournament?.name || "Campeonato")}</b><span>${escapeHtml(item.slotA || "Time A")} × ${escapeHtml(item.slotB || "Time B")}</span></div>` : `<label>Campeonato<select name="tournamentId" id="matchTournament" required><option value="">Selecione primeiro o campeonato</option>${state.tournaments.map((event) => `<option value="${escapeHtml(event.id)}" ${item.tournamentId === event.id ? "selected" : ""}>${escapeHtml(event.name)} ${escapeHtml(event.subtitle)}</option>`).join("")}</select></label>`;
+      const teamsField = lockedGroupMatch ? `<input type="hidden" name="teamA" value="${escapeHtml(item.teamA)}" /><input type="hidden" name="teamB" value="${escapeHtml(item.teamB)}" /><div class="locked-match-teams"><b>${escapeHtml(item.teamA)}</b><span>×</span><b>${escapeHtml(item.teamB)}</b></div>` : `<div class="field-row"><label>Time A<select name="teamA" id="matchTeamA" required></select></label><label>Time B<select name="teamB" id="matchTeamB" required></select></label></div>`;
+      return `${tournamentField}${teamsField}<div class="field-row">${textField("name", "Fase", item.name, "Ex.: Semifinal", true)}${textField("subtitle", "Data e hora", item.subtitle, "2026-08-15 20:30")}</div><div class="field-row">${textField("score", "Placar / mapas", item.score, "Somente após confirmação")}${selectField("status", item.status)}</div>${fileField("demo", "Ler demo e anexar estatísticas", ".dem")}${item.demoInfo ? `<div class="demo-result"><b>✓ Demo processada</b><span>${escapeHtml(item.demoInfo.fileName)} · ${escapeHtml(item.demoInfo.mapName || "mapa não identificado")} · ${item.demoInfo.rounds || 0} rounds</span><small>${(item.statistics || []).length} jogadores com estatísticas extraídas</small></div>` : ""}<div class="helper" id="matchHelper">${generated ? "Esta partida pertence à estrutura do campeonato. A demo será processada no navegador e as estatísticas ficarão ligadas exclusivamente a este confronto." : "Escolha uma edição: os times serão limitados exclusivamente às escalações daquele campeonato."}</div>`;
+    }
     return `${textField("name", "Título", item.name, "Título da notícia", true)}<label>Texto / resumo<textarea name="subtitle" placeholder="Escreva a notícia...">${escapeHtml(item.subtitle)}</textarea></label><div class="field-row">${textField("author", "Autor", item.author, "HLTPC")}${textField("date", "Data", item.date, "2026-08-10", true)}</div>${selectField("status", item.status)}${fileField("image", "Imagem de destaque", "image/*")}`;
   }
 
@@ -174,18 +186,52 @@
   function fileField(name, label, accept) { return `<label>${label}<input class="file-field" name="${name}" type="file" accept="${accept}" /></label>`; }
 
   function formatOptions(value = "custom") {
-    const options = [["round_robin", "Pontos corridos"], ["single_elimination", "Eliminação simples"], ["double_elimination", "Eliminação dupla"], ["groups_playoffs", "Grupos + playoffs"], ["custom", "Personalizado"]];
+    const options = [["three_team_series", "3 times: ida e volta + semifinal + final"], ["round_robin", "Pontos corridos"], ["single_elimination", "Eliminação simples"], ["double_elimination", "Eliminação dupla"], ["groups_playoffs", "Grupos + playoffs"], ["custom", "Personalizado"]];
     return options.map(([key, label]) => `<option value="${key}" ${value === key ? "selected" : ""}>${label}</option>`).join("");
   }
 
   function formatDefinition(type) {
     return {
+      three_team_series: { label: "3 times · série dupla + playoffs", description: "Cada time enfrenta os outros duas vezes. O 2º e o 3º jogam a semifinal; o 1º colocado avança direto para a final.", steps: ["6 jogos de grupos", "Semifinal: 2º × 3º", "Final: 1º × vencedor"] },
       round_robin: { label: "Pontos corridos", description: "Todos jogam contra todos. Vitória vale 3 pontos; empate, 1.", steps: ["Liga", "Classificação", "Campeão"] },
       single_elimination: { label: "Eliminação simples", description: "Quem perde é eliminado. Ideal para uma chave rápida.", steps: ["Semifinais", "Final", "Campeão"] },
       double_elimination: { label: "Eliminação dupla", description: "Uma derrota envia o time à chave inferior; a segunda elimina.", steps: ["Chave superior", "Chave inferior", "Grande final"] },
       groups_playoffs: { label: "Grupos + playoffs", description: "Fase de grupos classificatória seguida por mata-mata.", steps: ["Grupos", "Semifinais", "Final"] },
       custom: { label: "Personalizado", description: "Descreva manualmente as regras do campeonato.", steps: ["Formato livre"] }
     }[type];
+  }
+
+  function tournamentFixtures(tournament) {
+    if (tournament.formatType !== "three_team_series" || (tournament.teams || []).length !== 3) return [];
+    const [a, b, c] = tournament.teams;
+    const group = [[a, b], [a, c], [b, c], [b, a], [c, a], [c, b]];
+    return [
+      ...group.map(([teamA, teamB], index) => ({ id: `${tournament.id}-group-${index + 1}`, tournamentId: tournament.id, name: `Fase de grupos · Jogo ${index + 1}`, subtitle: "Data a definir", teamA, teamB, slotA: teamA, slotB: teamB, score: "", status: "draft", round: "group", order: index + 1, updated: "Gerada pelo formato do campeonato" })),
+      { id: `${tournament.id}-semifinal`, tournamentId: tournament.id, name: "Semifinal", subtitle: "Data a definir", teamA: "", teamB: "", slotA: "2º colocado", slotB: "3º colocado", score: "", status: "draft", round: "semifinal", order: 7, updated: "Aguardando classificação da fase de grupos" },
+      { id: `${tournament.id}-final`, tournamentId: tournament.id, name: "Final", subtitle: "Data a definir", teamA: "", teamB: "", slotA: "1º colocado", slotB: "Vencedor da semifinal", score: "", status: "draft", round: "final", order: 8, updated: "Aguardando classificação e semifinal" }
+    ];
+  }
+
+  function ensureTournamentFixtures(tournament) {
+    let changed = false;
+    tournamentFixtures(tournament).forEach((fixture) => {
+      if (!state.matches.some((match) => match.id === fixture.id)) { state.matches.push(fixture); changed = true; }
+    });
+    state.matches.sort((a, b) => (a.tournamentId || "").localeCompare(b.tournamentId || "") || (a.order || 999) - (b.order || 999));
+    return changed;
+  }
+
+  function normalizeTournamentStructures() {
+    let changed = false;
+    const pgl = state.tournaments.find((event) => event.id === "pgl-abadia-2026");
+    if (pgl && pgl.formatType !== "three_team_series") {
+      pgl.formatType = "three_team_series";
+      pgl.format = formatDefinition("three_team_series").description;
+      pgl.updated = "Formato e partidas pré-gerados";
+      changed = true;
+    }
+    state.tournaments.forEach((event) => { if (ensureTournamentFixtures(event)) changed = true; });
+    return changed;
   }
 
   function renderFormatPreview() {
@@ -196,7 +242,8 @@
   }
 
   function populateMatchTeams(selectedA = "", selectedB = "") {
-    const tournament = state.tournaments.find((event) => event.id === document.querySelector("#matchTournament")?.value);
+    const tournamentId = document.querySelector("#matchTournament")?.value || document.querySelector('input[name="tournamentId"]')?.value;
+    const tournament = state.tournaments.find((event) => event.id === tournamentId);
     const teamA = document.querySelector("#matchTeamA");
     const teamB = document.querySelector("#matchTeamB");
     if (!teamA || !teamB) return;
@@ -235,6 +282,82 @@
     return new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = reject; reader.readAsDataURL(file); });
   }
 
+  async function loadDemoParser() {
+    if (!demoParserPromise) {
+      demoParserPromise = import(DEMO_PARSER_MODULE).then(async (parser) => {
+        await parser.default(DEMO_PARSER_WASM);
+        return parser;
+      }).catch((reason) => { demoParserPromise = null; throw reason; });
+    }
+    return demoParserPromise;
+  }
+
+  function demoRows(value) {
+    return (Array.isArray(value) ? value : []).map((row) => row instanceof Map ? Object.fromEntries(row) : row);
+  }
+
+  function numberValue(value) {
+    const number = Number(value);
+    return Number.isFinite(number) ? number : 0;
+  }
+
+  function booleanValue(value) {
+    return value === true || value === 1 || String(value).toLowerCase() === "true";
+  }
+
+  function canonicalPlayerName(name) {
+    const normalized = String(name || "").trim().toLocaleLowerCase("pt-BR");
+    const player = state.players.find((item) => [item.name, item.alias].some((value) => String(value || "").trim().toLocaleLowerCase("pt-BR") === normalized));
+    return player?.name || String(name || "Desconhecido");
+  }
+
+  async function parseDemoFile(file) {
+    if (!file.name.toLowerCase().endsWith(".dem")) throw new Error("Selecione um arquivo .dem do Counter-Strike 2.");
+    if (file.size > 500 * 1024 * 1024) throw new Error("A demo ultrapassa 500 MB e pode esgotar a memória do navegador.");
+    showToast("Lendo a demo no seu navegador…");
+    const parser = await loadDemoParser();
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    const headerValue = parser.parseHeader(bytes);
+    const header = headerValue instanceof Map ? Object.fromEntries(headerValue) : (headerValue || {});
+    const allEvents = demoRows(parser.parseEvents(bytes, ["begin_new_match", "round_end", "player_death", "player_hurt"], ["team_name"], ["total_rounds_played", "is_warmup_period"]));
+    const matchStartTick = numberValue(allEvents.find((event) => event.event_name === "begin_new_match")?.tick);
+    const matchEvents = allEvents.filter((event) => numberValue(event.tick) >= matchStartTick && !booleanValue(event.is_warmup_period));
+    const deaths = matchEvents.filter((event) => event.event_name === "player_death");
+    const hurts = matchEvents.filter((event) => event.event_name === "player_hurt");
+    const roundEnds = matchEvents.filter((event) => event.event_name === "round_end");
+    const stats = new Map();
+    const getPlayer = (steamid, name, team) => {
+      const id = String(steamid || name || "desconhecido");
+      if (!stats.has(id)) stats.set(id, { steamid: String(steamid || ""), name: canonicalPlayerName(name), demoName: String(name || ""), team: String(team || ""), kills: 0, deaths: 0, assists: 0, headshots: 0, damage: 0 });
+      const player = stats.get(id);
+      if (!player.team && team) player.team = String(team);
+      return player;
+    };
+    deaths.forEach((event) => {
+      const samePlayer = String(event.attacker_steamid || "") === String(event.user_steamid || "");
+      const teamKill = event.attacker_team_name && event.user_team_name && event.attacker_team_name === event.user_team_name;
+      const victim = getPlayer(event.user_steamid, event.user_name, event.user_team_name);
+      if (!samePlayer && !teamKill) {
+        victim.deaths += 1;
+        const attacker = getPlayer(event.attacker_steamid, event.attacker_name, event.attacker_team_name);
+        attacker.kills += 1;
+        if (booleanValue(event.headshot)) attacker.headshots += 1;
+        if (event.assister_name && String(event.assister_steamid || "") !== "0") getPlayer(event.assister_steamid, event.assister_name, event.assister_team_name).assists += 1;
+      }
+    });
+    hurts.forEach((event) => {
+      const teamKill = event.attacker_team_name && event.user_team_name && event.attacker_team_name === event.user_team_name;
+      if (!teamKill && event.attacker_name && String(event.attacker_steamid || "") !== String(event.user_steamid || "")) getPlayer(event.attacker_steamid, event.attacker_name, event.attacker_team_name).damage += numberValue(event.dmg_health ?? event.health_damage);
+    });
+    const observedRounds = [...deaths, ...hurts].map((event) => numberValue(event.total_rounds_played)).filter((round) => round >= 0);
+    const rounds = roundEnds.length || (observedRounds.length ? Math.max(...observedRounds) + 1 : 0);
+    const statistics = [...stats.values()].map((player) => ({ ...player, adr: rounds ? Number((player.damage / rounds).toFixed(1)) : null, kd: player.deaths ? Number((player.kills / player.deaths).toFixed(2)) : player.kills })).sort((a, b) => b.kills - a.kills || b.damage - a.damage);
+    return {
+      demoInfo: { fileName: file.name, fileSize: file.size, mapName: String(header.map_name || ""), serverName: String(header.server_name || ""), rounds, processedAt: new Date().toISOString(), parser: "demoparser2 0.42.0", rawFileStored: false },
+      statistics
+    };
+  }
+
   async function saveEditor() {
     const formData = new FormData(form);
     const values = {};
@@ -249,11 +372,17 @@
     if (section === "matches" && values.teamA === values.teamB) { showToast("Escolha dois times diferentes"); return; }
     const fallbackName = section === "matches" ? `${values.teamA} x ${values.teamB}` : "Novo registro";
     const record = { ...values, name: values.name || fallbackName, id: editingId || `${section}-${Date.now()}`, updated: "Atualizado pelo painel" };
+    const demoFile = section === "matches" ? formData.get("demo") : null;
+    if (demoFile?.size) {
+      Object.assign(record, await parseDemoFile(demoFile));
+      record.updated = "Demo processada pelo painel";
+    }
     const index = list.findIndex((item) => item.id === editingId);
     if (index >= 0) list[index] = { ...list[index], ...record }; else list.unshift(record);
+    if (section === "tournaments") ensureTournamentFixtures(index >= 0 ? list[index] : record);
     await persistContent();
     dialog.close();
-    showToast(`${record.name} foi salvo e publicado`);
+    showToast(demoFile?.size ? `${record.name}: demo lida e estatísticas anexadas` : `${record.name} foi salvo`);
     listView();
   }
 
