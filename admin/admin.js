@@ -15,6 +15,7 @@
   let section = "overview";
   let editingId = null;
   let returnSection = null;
+  const expandedTournaments = new Set();
   let search = "";
   let demoParserPromise = null;
   const DEMO_PARSER_MODULE = "https://cdn.jsdelivr.net/npm/@laihoe/demoparser2@0.42.0/wasm/pkg/demoparser2.js";
@@ -136,14 +137,25 @@
         const definition = formatDefinition(tournament.formatType);
         const matches = state.matches.filter((match) => match.tournamentId === tournament.id).sort((a, b) => (a.order || 999) - (b.order || 999));
         const completed = matches.filter((match) => match.score || match.status === "finished").length;
-        return `<article class="admin-championship">
-          <header><div class="championship-identity">${tournament.logo ? `<img src="${escapeHtml(tournament.logo)}" alt="" />` : `<span>${initials(tournament.name)}</span>`}<div><small>${escapeHtml(tournament.subtitle || "ANO A DEFINIR")}</small><h2>${escapeHtml(tournament.name)}</h2><p>${definition ? escapeHtml(definition.label) : "Formato a definir"} · ${(tournament.teams || []).length} times</p></div></div><div class="championship-actions"><span class="badge ${tournament.status === "draft" ? "draft" : ""}">${tournament.status === "draft" ? "Rascunho" : "Publicado"}</span><a class="ghost" href="../#campeonato/${encodeURIComponent(tournament.id)}/overview" target="_blank">Ver público ↗</a><button class="ghost" data-edit-event="${escapeHtml(tournament.id)}">Editar campeonato</button></div></header>
-          <div class="championship-progress"><span><b>${completed}/${matches.length}</b> partidas concluídas</span><span>${matches.length ? "Clique em qualquer partida para lançar os dados" : "Salve um formato válido para gerar o bracket"}</span></div>
-          ${matches.length ? adminBracket(tournament, matches) : `<div class="empty compact"><h3>Estrutura ainda não gerada</h3><p>Edite o campeonato e selecione o formato e os participantes.</p></div>`}
+        const expanded = expandedTournaments.has(tournament.id);
+        return `<article class="admin-championship ${expanded ? "expanded" : ""}" data-championship="${escapeHtml(tournament.id)}">
+          <header><div class="championship-identity">${tournament.logo ? `<img src="${escapeHtml(tournament.logo)}" alt="" />` : `<span>${initials(tournament.name)}</span>`}<div><small>${escapeHtml(tournament.subtitle || "ANO A DEFINIR")}</small><h2>${escapeHtml(tournament.name)}</h2><p>${definition ? escapeHtml(definition.label) : "Formato a definir"} · ${(tournament.teams || []).length} times</p></div></div><div class="championship-actions"><span class="championship-count"><b>${completed}/${matches.length}</b> concluídas</span><span class="badge ${tournament.status === "draft" ? "draft" : ""}">${tournament.status === "draft" ? "Rascunho" : "Publicado"}</span><a class="ghost" href="../#campeonato/${encodeURIComponent(tournament.id)}/overview" target="_blank">Ver público ↗</a><button class="ghost" data-edit-event="${escapeHtml(tournament.id)}">Editar</button><button class="primary championship-toggle" data-toggle-event="${escapeHtml(tournament.id)}" aria-expanded="${expanded}">${expanded ? "Recolher" : "Expandir estrutura"} <i>⌄</i></button></div></header>
+          <div class="championship-details" ${expanded ? "" : "hidden"}><div class="championship-progress"><span><b>${completed}/${matches.length}</b> partidas concluídas</span><span>${matches.length ? "Clique em qualquer partida para lançar os dados" : "Salve um formato válido para gerar o bracket"}</span></div>
+          ${matches.length ? adminBracket(tournament, matches) : `<div class="empty compact"><h3>Estrutura ainda não gerada</h3><p>Edite o campeonato e selecione o formato e os participantes.</p></div>`}</div>
         </article>`;
       }).join("")}</div>`;
     bindActions();
     document.querySelectorAll("[data-edit-event]").forEach((button) => button.addEventListener("click", () => openEditor(button.dataset.editEvent)));
+    document.querySelectorAll("[data-toggle-event]").forEach((button) => button.addEventListener("click", () => {
+      const card = button.closest("[data-championship]");
+      const details = card.querySelector(".championship-details");
+      const expanded = !card.classList.contains("expanded");
+      card.classList.toggle("expanded", expanded);
+      details.hidden = !expanded;
+      button.setAttribute("aria-expanded", String(expanded));
+      button.innerHTML = `${expanded ? "Recolher" : "Expandir estrutura"} <i>⌄</i>`;
+      if (expanded) expandedTournaments.add(button.dataset.toggleEvent); else expandedTournaments.delete(button.dataset.toggleEvent);
+    }));
     document.querySelectorAll("[data-edit-match]").forEach((button) => button.addEventListener("click", () => {
       returnSection = "tournaments";
       section = "matches";
