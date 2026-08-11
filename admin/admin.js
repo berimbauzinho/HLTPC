@@ -536,8 +536,11 @@
         let winsB = 0;
         document.querySelectorAll("[data-manual-map]").forEach((row) => {
           const index = row.dataset.manualMap;
-          const scoreA = Number(document.querySelector(`[name="manualMapScoreA_${index}"]`)?.value);
-          const scoreB = Number(document.querySelector(`[name="manualMapScoreB_${index}"]`)?.value);
+          const rawA = document.querySelector(`[name="manualMapScoreA_${index}"]`)?.value || "";
+          const rawB = document.querySelector(`[name="manualMapScoreB_${index}"]`)?.value || "";
+          if (rawA === "" || rawB === "") return;
+          const scoreA = Number(rawA);
+          const scoreB = Number(rawB);
           if (!Number.isFinite(scoreA) || !Number.isFinite(scoreB) || scoreA === scoreB) return;
           if (scoreA > scoreB) winsA += 1; else winsB += 1;
         });
@@ -971,6 +974,10 @@
           if (!rawA && !rawB) {
             if (original.demoUrl || original.leetifyUrl || (original.statistics || []).length) maps.push({ ...original, name: mapName });
             continue;
+          }
+          if (!rawA || !rawB) {
+            showToast(`Preencha os dois lados do placar no ${mapName}`);
+            return;
           }
           const scoreA = Number(rawA);
           const scoreB = Number(rawB);
