@@ -66,6 +66,10 @@
     try { const url = new URL(String(value || "")); return url.protocol === "https:" && /(^|\.)leetify\.com$/i.test(url.hostname) ? url.href : ""; }
     catch (_) { return ""; }
   };
+  const safeDriveUrl = (value) => {
+    try { const url = new URL(String(value || "")); return url.protocol === "https:" && /(^|\.)drive\.google\.com$/i.test(url.hostname) ? url.href : ""; }
+    catch (_) { return ""; }
+  };
   const safeScoreboardImage = (value) => /^data:image\/(png|jpe?g|webp|gif);base64,/i.test(String(value || "")) ? String(value) : "";
   const normalizedNick = (value) => String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("pt-BR").replace(/[^a-z0-9]/g, "");
 
@@ -149,9 +153,11 @@
   function matchSourcesMarkup(match, compact = false) {
     const stats = Array.isArray(match.statistics) ? match.statistics : [];
     const leetifyUrl = safeLeetifyUrl(match.leetifyUrl);
+    const demoUrl = safeDriveUrl(match.demoUrl);
     const scoreboardImage = safeScoreboardImage(match.scoreboardImage);
     const demoHasStats = Boolean(match.demoInfo && match.statisticsSource !== "leetify" && stats.length);
-    const demo = match.demoInfo ? `<span class="match-source ${demoHasStats ? "verified" : "partial"}"><b>${demoHasStats ? "◉ Demo confirmada" : "◌ Demo anexada"}</b>${compact ? "" : `<small>${demoHasStats ? `${stats.length} jogadores extraídos` : "Extração automática pendente"}</small>`}</span>` : "";
+    const demoContent = `<b>${demoUrl ? "↗ Demo no Drive" : demoHasStats ? "◉ Demo confirmada" : "◌ Demo anexada"}</b>${compact ? "" : `<small>${demoHasStats ? `${stats.length} jogadores extraídos` : demoUrl ? "Abrir arquivo original" : "Extração automática pendente"}</small>`}`;
+    const demo = match.demoInfo || demoUrl ? (demoUrl ? `<a class="match-source ${demoHasStats ? "verified" : "partial"}" href="${escapeHtml(demoUrl)}" target="_blank" rel="noopener noreferrer">${demoContent}</a>` : `<span class="match-source ${demoHasStats ? "verified" : "partial"}">${demoContent}</span>`) : "";
     const leetify = leetifyUrl ? `<a class="match-source verified" href="${escapeHtml(leetifyUrl)}" target="_blank" rel="noopener noreferrer"><b>↗ Leetify</b>${compact ? "" : "<small>Conferir fonte secundária</small>"}</a>` : "";
     const screenshot = scoreboardImage ? `<a class="match-source verified" href="${escapeHtml(scoreboardImage)}" target="_blank" rel="noopener noreferrer"><b>▣ Print do placar</b>${compact ? "" : "<small>Abrir comprovação visual</small>"}</a>` : "";
     const content = `${demo}${leetify}${screenshot}`;
@@ -343,7 +349,7 @@
   }
 
   function groupStandingsMarkup(matches, event) {
-    const blankRow = (team) => ({ team, played: 0, wins: 0, losses: 0, roundsFor: 0, roundsAgainst: 0, points: 0 });
+    const blankRow = (team) => ({ team, played: 0, wins: 0, losses: 0, roundsFor: 0, roundsAgainst: 0 });
     const table = new Map((event?.entries || []).map((entry) => [entry.team, blankRow(entry.team)]));
 
     matches.forEach((match) => {
@@ -363,20 +369,18 @@
       rowB.roundsAgainst += scores[0];
       if (scores[0] > scores[1]) {
         rowA.wins += 1;
-        rowA.points += 3;
         rowB.losses += 1;
       } else {
         rowB.wins += 1;
-        rowB.points += 3;
         rowA.losses += 1;
       }
     });
 
     const rows = [...table.values()].map((row) => ({ ...row, roundDiff: row.roundsFor - row.roundsAgainst })).sort((a, b) =>
-      b.points - a.points || b.roundDiff - a.roundDiff || b.roundsFor - a.roundsFor || a.team.localeCompare(b.team, "pt-BR")
+      b.wins - a.wins || b.roundDiff - a.roundDiff || b.roundsFor - a.roundsFor || a.team.localeCompare(b.team, "pt-BR")
     );
     if (!rows.length) return "";
-    return `<section class="group-standings"><header><div><span>CLASSIFICAÇÃO</span><h4>Tabela da fase de grupos</h4></div><small>3 pontos por vitória · desempate por saldo de rounds</small></header><div class="group-standings-scroll"><div class="group-standings-head"><span>#</span><span>Equipe</span><span title="Jogos / mapas jogados">J</span><span title="Vitórias">V</span><span title="Derrotas">D</span><span title="Rounds pró">RP</span><span title="Rounds contra">RC</span><span title="Saldo de rounds">SR</span><span title="Pontos">PTS</span></div>${rows.map((row, index) => `<div class="group-standing-row"><strong>${index + 1}</strong><a href="#time/${encodeURIComponent(row.team)}"><span>${teamBadge(row.team)}</span><b>${escapeHtml(row.team)}</b></a><span>${row.played}</span><span>${row.wins}</span><span>${row.losses}</span><span>${row.roundsFor}</span><span>${row.roundsAgainst}</span><span class="${row.roundDiff > 0 ? "positive" : row.roundDiff < 0 ? "negative" : ""}">${row.roundDiff > 0 ? "+" : ""}${row.roundDiff}</span><strong>${row.points}</strong></div>`).join("")}</div></section>`;
+    return `<section class="group-standings"><header><div><span>CLASSIFICAÇÃO</span><h4>Tabela da fase de grupos</h4></div><small>Classificação por campanha · desempate por saldo de rounds</small></header><div class="group-standings-scroll"><div class="group-standings-head"><span>#</span><span>Equipe</span><span title="Jogos / mapas jogados">J</span><span title="Vitórias e derrotas">Campanha</span><span title="Rounds pró">RP</span><span title="Rounds contra">RC</span><span title="Saldo de rounds">SR</span></div>${rows.map((row, index) => `<div class="group-standing-row"><strong>${index + 1}</strong><a href="#time/${encodeURIComponent(row.team)}"><span>${teamBadge(row.team)}</span><b>${escapeHtml(row.team)}</b></a><span>${row.played}</span><strong class="campaign">${row.wins}–${row.losses}</strong><span>${row.roundsFor}</span><span>${row.roundsAgainst}</span><span class="${row.roundDiff > 0 ? "positive" : row.roundDiff < 0 ? "negative" : ""}">${row.roundDiff > 0 ? "+" : ""}${row.roundDiff}</span></div>`).join("")}</div></section>`;
   }
 
   function eventBracketMarkup(matches, event) {
@@ -411,7 +415,7 @@
     document.querySelector("#tournamentPage").innerHTML = `<a class="profile-back" href="#campeonatos">← Voltar aos campeonatos</a><header class="event-hero">${savedEvent.logo ? `<img class="event-logo" src="${escapeHtml(savedEvent.logo)}" alt="" />` : ""}<span>${event.status === "ongoing" ? "EM ANDAMENTO" : "FINALIZADO"}</span><h1>${escapeHtml(event.name)} <b>${event.year}</b></h1><p>${categoryLabel(event.category)} · ${event.entries.length} times</p></header>${tabs}${body}`;
   }
 
-  const mapLabel = (value) => ({ de_inferno: "Inferno", de_mirage: "Mirage", de_nuke: "Nuke", de_anubis: "Anubis", de_ancient: "Ancient", de_dust2: "Dust II", de_vertigo: "Vertigo", de_overpass: "Overpass", de_train: "Train" }[String(value || "").toLowerCase()] || String(value || "Mapa a definir").replace(/^de_/, ""));
+  const mapLabel = (value) => ({ de_inferno: "Inferno", de_mirage: "Mirage", de_nuke: "Nuke", de_anubis: "Anubis", de_ancient: "Ancient", de_dust2: "Dust II", de_vertigo: "Vertigo", de_overpass: "Overpass", de_train: "Train", de_cache: "Cache" }[String(value || "").toLowerCase()] || String(value || "Mapa a definir").replace(/^de_/, ""));
   const teamLogoMarkup = (team) => `<span class="match-team-logo">${teamBadge(team)}</span>`;
   const ratingTone = (rating) => Number(rating) >= 1.1 ? "high" : Number(rating) < .9 ? "low" : "mid";
 
@@ -444,10 +448,10 @@
     const scoreboardImage = safeScoreboardImage(match.scoreboardImage);
     const mvp = [...stats].sort((a, b) => Number(b.rating || 0) - Number(a.rating || 0) || Number(b.kills || 0) - Number(a.kills || 0))[0];
     const mvpMeta = mvp && playerMeta.get(mvp.name) || {};
-    const sourceLabel = match.statisticsSource === "leetify" ? "Leetify" : match.statisticsSource === "demo" ? "Demo" : "Aguardando extração";
+    const sourceLabel = match.statisticsSource === "leetify" ? `Leetify${match.statisticsStatus === "partial" ? " · parcial" : ""}` : match.statisticsSource === "demo" ? "Demo" : "Aguardando extração";
     const back = event ? `#campeonato/${encodeURIComponent(event.id)}/matches` : "#campeonatos";
     const statsBody = stats.length ? `${matchStatsTable(teamA, stats)}${matchStatsTable(teamB, stats)}` : `<div class="match-loading"><b>${options.loading ? "Buscando os números no Leetify…" : "Estatísticas ainda não disponíveis"}</b><span>${options.error ? escapeHtml(options.error) : "A demo e as fontes continuam anexadas à partida."}</span></div>`;
-    document.querySelector("#matchPage").innerHTML = `<a class="profile-back" href="${back}">← Voltar ao campeonato</a><article class="match-detail-page"><header class="match-detail-hero"><a class="match-event-link" href="#campeonato/${encodeURIComponent(event?.id || "")}/overview">${escapeHtml(event?.name || "Campeonato HLTPC")} ${event?.year || ""}</a><div class="match-detail-team team-a">${teamLogoMarkup(teamA)}<a href="#time/${encodeURIComponent(teamA)}">${escapeHtml(teamA)}</a></div><div class="match-detail-score"><time>${escapeHtml(match.subtitle || "Data a definir")}</time><strong>${scores.length ? `${scores[0]} <i>:</i> ${scores[1]}` : "VS"}</strong><span>${escapeHtml(match.name || "Partida")} · MD${match.bestOf || 1}</span></div><div class="match-detail-team team-b">${teamLogoMarkup(teamB)}<a href="#time/${encodeURIComponent(teamB)}">${escapeHtml(teamB)}</a></div></header><nav class="match-detail-tabs"><span class="active">Overview</span><a href="#campeonato/${encodeURIComponent(event?.id || "")}/matches">Campeonato</a></nav><div class="match-detail-grid"><section class="match-map-panel"><header><span>MAPA</span><b>${escapeHtml(mapName)}</b></header><div><a href="#time/${encodeURIComponent(teamA)}">${escapeHtml(teamA)}</a><strong>${scores[0] ?? "—"}</strong></div><div><a href="#time/${encodeURIComponent(teamB)}">${escapeHtml(teamB)}</a><strong>${scores[1] ?? "—"}</strong></div><small>${match.leetifyInfo?.rounds || match.demoInfo?.rounds || 0} rounds registrados</small></section><section class="match-proof-panel"><header><span>FONTES</span><b>Conferência dos dados</b></header>${matchSourcesMarkup(match)}${scoreboardImage ? `<a class="scoreboard-evidence" href="${escapeHtml(scoreboardImage)}" target="_blank" rel="noopener"><img src="${escapeHtml(scoreboardImage)}" alt="Print do placar final" /><span>Abrir print do placar ↗</span></a>` : ""}${leetifyUrl ? `<a class="external-source" href="${escapeHtml(leetifyUrl)}" target="_blank" rel="noopener">Abrir partida no Leetify ↗</a>` : ""}</section></div><section class="match-stats-section"><header><div><span>DESEMPENHO</span><h2>Estatísticas da partida</h2></div><small>Fonte: ${sourceLabel}</small></header>${statsBody}</section>${stats.length ? `<section class="match-lineups-section"><header><span>ESCALAÇÕES</span><h2>Lineups</h2></header><div>${matchLineup(teamA, event, stats)}${matchLineup(teamB, event, stats)}</div></section>` : ""}${mvp ? `<section class="match-mvp"><div class="match-mvp-photo">${mvpMeta.photo ? `<img src="${escapeHtml(mvpMeta.photo)}" alt="" />` : escapeHtml((mvp.name || "MVP").slice(0, 2).toUpperCase())}</div><div><span>DESTAQUE DA PARTIDA</span><h2>${playerHistory.has(mvp.name) ? `<a href="#jogador/${encodeURIComponent(mvp.name)}">${escapeHtml(mvp.name)}</a>` : escapeHtml(mvp.demoName || mvp.name)}</h2><p>${mvp.kills}-${mvp.deaths} · ${mvp.adr} ADR · ${mvp.kast}% KAST</p></div><strong>${mvp.rating}<small>Rating</small></strong></section>` : ""}</article>`;
+    document.querySelector("#matchPage").innerHTML = `<a class="profile-back" href="${back}">← Voltar ao campeonato</a><article class="match-detail-page"><header class="match-detail-hero"><a class="match-event-link" href="#campeonato/${encodeURIComponent(event?.id || "")}/overview">${escapeHtml(event?.name || "Campeonato HLTPC")} ${event?.year || ""}</a><div class="match-detail-team team-a">${teamLogoMarkup(teamA)}<a href="#time/${encodeURIComponent(teamA)}">${escapeHtml(teamA)}</a></div><div class="match-detail-score"><time>${escapeHtml(match.subtitle || "Data a definir")}</time><strong>${scores.length ? `${scores[0]} <i>:</i> ${scores[1]}` : "VS"}</strong><span>${escapeHtml(match.name || "Partida")} · MD${match.bestOf || 1}</span></div><div class="match-detail-team team-b">${teamLogoMarkup(teamB)}<a href="#time/${encodeURIComponent(teamB)}">${escapeHtml(teamB)}</a></div></header><nav class="match-detail-tabs"><span class="active">Overview</span><a href="#campeonato/${encodeURIComponent(event?.id || "")}/matches">Campeonato</a></nav><div class="match-detail-grid"><section class="match-map-panel"><header><span>MAPA</span><b>${escapeHtml(mapName)}</b></header><div><a href="#time/${encodeURIComponent(teamA)}">${escapeHtml(teamA)}</a><strong>${scores[0] ?? "—"}</strong></div><div><a href="#time/${encodeURIComponent(teamB)}">${escapeHtml(teamB)}</a><strong>${scores[1] ?? "—"}</strong></div><small>${match.leetifyInfo?.rounds || match.demoInfo?.rounds || 0} rounds registrados</small></section><section class="match-proof-panel"><header><span>FONTES</span><b>Conferência dos dados</b></header>${matchSourcesMarkup(match)}${match.evidenceNote ? `<p class="match-evidence-note">${escapeHtml(match.evidenceNote)}</p>` : ""}${scoreboardImage ? `<a class="scoreboard-evidence" href="${escapeHtml(scoreboardImage)}" target="_blank" rel="noopener"><img src="${escapeHtml(scoreboardImage)}" alt="Print do placar final" /><span>Abrir print do placar ↗</span></a>` : ""}${leetifyUrl ? `<a class="external-source" href="${escapeHtml(leetifyUrl)}" target="_blank" rel="noopener">Abrir partida no Leetify ↗</a>` : ""}</section></div><section class="match-stats-section"><header><div><span>DESEMPENHO</span><h2>Estatísticas da partida</h2></div><small>Fonte: ${sourceLabel}</small></header>${statsBody}</section>${stats.length ? `<section class="match-lineups-section"><header><span>ESCALAÇÕES</span><h2>Lineups</h2></header><div>${matchLineup(teamA, event, stats)}${matchLineup(teamB, event, stats)}</div></section>` : ""}${mvp ? `<section class="match-mvp"><div class="match-mvp-photo">${mvpMeta.photo ? `<img src="${escapeHtml(mvpMeta.photo)}" alt="" />` : escapeHtml((mvp.name || "MVP").slice(0, 2).toUpperCase())}</div><div><span>DESTAQUE DA PARTIDA</span><h2>${playerHistory.has(mvp.name) ? `<a href="#jogador/${encodeURIComponent(mvp.name)}">${escapeHtml(mvp.name)}</a>` : escapeHtml(mvp.demoName || mvp.name)}</h2><p>${mvp.kills}-${mvp.deaths} · ${mvp.adr} ADR · ${mvp.kast}% KAST</p></div><strong>${mvp.rating}<small>Rating</small></strong></section>` : ""}</article>`;
   }
 
   let matchRenderToken = 0;
