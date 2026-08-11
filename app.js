@@ -2,6 +2,11 @@
   "use strict";
 
   const data = window.HLTPC_DATA;
+  if (window.HLTPC_LOGO) {
+    document.querySelectorAll("[data-hltpc-logo]").forEach((image) => { image.src = window.HLTPC_LOGO; });
+    const icon = document.querySelector("#siteIcon");
+    if (icon) icon.href = window.HLTPC_LOGO;
+  }
   let shared = {};
   try {
     const response = await fetch("/api/content", { cache: "no-store" });
