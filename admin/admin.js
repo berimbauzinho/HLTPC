@@ -243,7 +243,7 @@
       const tournament = state.tournaments.find((event) => event.id === item.tournamentId);
       const tournamentField = generated ? `<input type="hidden" name="tournamentId" value="${escapeHtml(item.tournamentId)}" /><div class="fixture-source"><b>${escapeHtml(tournament?.name || "Campeonato")}</b><span>${escapeHtml(item.slotA || "Time A")} × ${escapeHtml(item.slotB || "Time B")}</span></div>` : `<label>Campeonato<select name="tournamentId" id="matchTournament" required><option value="">Selecione primeiro o campeonato</option>${state.tournaments.map((event) => `<option value="${escapeHtml(event.id)}" ${item.tournamentId === event.id ? "selected" : ""}>${escapeHtml(event.name)} ${escapeHtml(event.subtitle)}</option>`).join("")}</select></label>`;
       const teamsField = lockedGroupMatch ? `<input type="hidden" name="teamA" value="${escapeHtml(item.teamA)}" /><input type="hidden" name="teamB" value="${escapeHtml(item.teamB)}" /><div class="locked-match-teams"><b>${escapeHtml(item.teamA)}</b><span>×</span><b>${escapeHtml(item.teamB)}</b></div>` : `<div class="field-row"><label>Time A<select name="teamA" id="matchTeamA" required></select></label><label>Time B<select name="teamB" id="matchTeamB" required></select></label></div>`;
-      return `${tournamentField}${teamsField}<div class="field-row">${textField("name", "Fase", item.name, "Ex.: Semifinal", true)}${textField("subtitle", "Data e hora", item.subtitle, "2026-08-15 20:30")}</div><div class="field-row">${textField("score", "Placar / mapas", item.score, "Somente após confirmação")}${selectField("status", item.status)}</div>${fileField("demo", "Ler demo e anexar estatísticas", ".dem")}${item.demoInfo ? `<div class="demo-result"><b>✓ Demo processada</b><span>${escapeHtml(item.demoInfo.fileName)} · ${escapeHtml(item.demoInfo.mapName || "mapa não identificado")} · ${item.demoInfo.rounds || 0} rounds</span><small>${(item.statistics || []).length} jogadores com estatísticas extraídas</small></div>` : ""}<div class="helper" id="matchHelper">${generated ? "Esta partida pertence à estrutura do campeonato. A demo será processada no navegador e as estatísticas ficarão ligadas exclusivamente a este confronto." : "Escolha uma edição: os times serão limitados exclusivamente às escalações daquele campeonato."}</div>`;
+      return `${tournamentField}${teamsField}${textField("name", "Fase", item.name, "Ex.: Semifinal", true)}<div class="field-row">${textField("score", "Placar / mapas", item.score, "Somente após confirmação")}${selectField("status", item.status)}</div>${fileField("demo", "Ler demo e anexar estatísticas", ".dem")}${item.demoInfo ? `<div class="demo-result ${item.demoInfo.warnings?.length ? "partial" : ""}"><b>${item.demoInfo.warnings?.length ? "⚠ Demo processada parcialmente" : "✓ Demo processada"}</b><span>${escapeHtml(item.demoInfo.fileName)} · ${escapeHtml(item.demoInfo.mapName || "mapa não identificado")} · ${item.demoInfo.rounds || 0} rounds</span><small>${escapeHtml(item.demoInfo.playedAtLabel || item.subtitle || "Data não identificada")} · ${(item.statistics || []).length} jogadores extraídos</small>${item.demoInfo.warnings?.length ? `<small>${escapeHtml(item.demoInfo.warnings.join(" · "))}</small>` : ""}</div>` : ""}<div class="helper" id="matchHelper">${generated ? "A data e a hora serão extraídas automaticamente do nome da demo. As estatísticas ficarão ligadas exclusivamente a este confronto." : "Escolha uma edição: os times serão limitados exclusivamente às escalações daquele campeonato."}</div>`;
     }
     return `${textField("name", "Título", item.name, "Título da notícia", true)}<label>Texto / resumo<textarea name="subtitle" placeholder="Escreva a notícia...">${escapeHtml(item.subtitle)}</textarea></label><div class="field-row">${textField("author", "Autor", item.author, "HLTPC")}${textField("date", "Data", item.date, "2026-08-10", true)}</div>${selectField("status", item.status)}${fileField("image", "Imagem de destaque", "image/*")}`;
   }
@@ -422,6 +422,16 @@
     return value === true || value === 1 || String(value).toLowerCase() === "true";
   }
 
+  function demoPlayedAt(file) {
+    const named = file.name.match(/(20\d{2})[-_](\d{2})[-_](\d{2})[T_ -](\d{2})[-:](\d{2})[-:](\d{2})/);
+    const date = named ? new Date(Number(named[1]), Number(named[2]) - 1, Number(named[3]), Number(named[4]), Number(named[5]), Number(named[6])) : new Date(file.lastModified || Date.now());
+    const valid = !Number.isNaN(date.getTime());
+    return {
+      iso: valid ? date.toISOString() : "",
+      label: valid ? new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(date) : "Data não identificada"
+    };
+  }
+
   function canonicalPlayerName(name) {
     const normalized = String(name || "").trim().toLocaleLowerCase("pt-BR");
     const player = state.players.find((item) => [item.name, item.alias].some((value) => String(value || "").trim().toLocaleLowerCase("pt-BR") === normalized));
@@ -434,9 +444,25 @@
     showToast("Lendo a demo no seu navegador…");
     const parser = await loadDemoParser();
     const bytes = new Uint8Array(await file.arrayBuffer());
-    const headerValue = parser.parseHeader(bytes);
-    const header = headerValue instanceof Map ? Object.fromEntries(headerValue) : (headerValue || {});
-    const allEvents = demoRows(parser.parseEvents(bytes, ["begin_new_match", "round_end", "player_death", "player_hurt"], ["team_name"], ["total_rounds_played", "is_warmup_period"]));
+    const warnings = [];
+    let header = {};
+    try {
+      const headerValue = parser.parseHeader(bytes);
+      header = headerValue instanceof Map ? Object.fromEntries(headerValue) : (headerValue || {});
+    } catch (reason) { warnings.push(`cabeçalho: ${reason.message || reason}`); }
+    const parseEventSafely = (eventName, playerProps = [], otherProps = []) => {
+      try { return demoRows(parser.parseEvent(bytes, eventName, playerProps, otherProps)); }
+      catch (reason) {
+        try { return demoRows(parser.parseEvent(bytes, eventName)); }
+        catch (_) { warnings.push(`${eventName}: ${reason.message || reason}`); return []; }
+      }
+    };
+    const allEvents = [
+      ...parseEventSafely("begin_new_match"),
+      ...parseEventSafely("round_end", [], ["total_rounds_played"]),
+      ...parseEventSafely("player_death", ["team_name"], ["total_rounds_played", "is_warmup_period"]),
+      ...parseEventSafely("player_hurt", ["team_name"], ["total_rounds_played", "is_warmup_period"])
+    ];
     const matchStartTick = numberValue(allEvents.find((event) => event.event_name === "begin_new_match")?.tick);
     const matchEvents = allEvents.filter((event) => numberValue(event.tick) >= matchStartTick && !booleanValue(event.is_warmup_period));
     const deaths = matchEvents.filter((event) => event.event_name === "player_death");
@@ -469,8 +495,9 @@
     const observedRounds = [...deaths, ...hurts].map((event) => numberValue(event.total_rounds_played)).filter((round) => round >= 0);
     const rounds = roundEnds.length || (observedRounds.length ? Math.max(...observedRounds) + 1 : 0);
     const statistics = [...stats.values()].map((player) => ({ ...player, adr: rounds ? Number((player.damage / rounds).toFixed(1)) : null, kd: player.deaths ? Number((player.kills / player.deaths).toFixed(2)) : player.kills })).sort((a, b) => b.kills - a.kills || b.damage - a.damage);
+    const playedAt = demoPlayedAt(file);
     return {
-      demoInfo: { fileName: file.name, fileSize: file.size, mapName: String(header.map_name || ""), serverName: String(header.server_name || ""), rounds, processedAt: new Date().toISOString(), parser: "demoparser2 0.42.0", rawFileStored: false },
+      demoInfo: { fileName: file.name, fileSize: file.size, mapName: String(header.map_name || ""), serverName: String(header.server_name || ""), rounds, playedAt: playedAt.iso, playedAtLabel: playedAt.label, processedAt: new Date().toISOString(), parser: "demoparser2 0.42.0", rawFileStored: false, warnings: [...new Set(warnings)] },
       statistics
     };
   }
@@ -498,6 +525,7 @@
     const demoFile = section === "matches" ? formData.get("demo") : null;
     if (demoFile?.size) {
       Object.assign(record, await parseDemoFile(demoFile));
+      record.subtitle = record.demoInfo.playedAtLabel;
       record.updated = "Demo processada pelo painel";
     }
     const index = list.findIndex((item) => item.id === editingId);
@@ -505,7 +533,7 @@
     if (section === "tournaments") ensureTournamentFixtures(index >= 0 ? list[index] : record);
     await persistContent();
     dialog.close();
-    showToast(demoFile?.size ? `${record.name}: demo lida e estatísticas anexadas` : `${record.name} foi salvo`);
+    showToast(demoFile?.size ? (record.statistics?.length ? `${record.name}: demo lida e ${record.statistics.length} jogadores extraídos` : `${record.name}: data extraída, mas a demo não retornou estatísticas`) : `${record.name} foi salvo`);
     if (returnSection) { const destination = returnSection; returnSection = null; go(destination); }
     else if (section === "tournaments") tournamentsView();
     else listView();
