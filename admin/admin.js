@@ -2,9 +2,12 @@
   "use strict";
 
   const source = window.HLTPC_DATA;
+  const baselineTeamNames = [...new Set(source.tournaments.flatMap((event) => event.entries.map((entry) => entry.team)))];
+  const baselineTeams = baselineTeamNames.map((name, index) => ({ id: `team-${index}`, name, acronym: initials(name), aliases: [], status: "published", logo: "", updated: "Derivado das edições" }));
+  const baselineTeamNameById = new Map(baselineTeams.map((team) => [team.id, team.name]));
   const state = {
     players: source.players.map((name, index) => ({ id: `player-${index}`, name, alias: "", status: "published", photo: "", teams: [...new Set(source.tournaments.flatMap((event) => event.entries.filter((entry) => entry.players.includes(name)).map((entry) => entry.team)))], updated: "Dados históricos" })),
-    teams: [...new Set(source.tournaments.flatMap((event) => event.entries.map((entry) => entry.team)))].map((name, index) => ({ id: `team-${index}`, name, acronym: initials(name), status: "published", logo: "", updated: "Derivado das edições" })),
+    teams: baselineTeams.map((team) => ({ ...team })),
     tournaments: source.tournaments.map((event) => ({ id: event.id, name: event.name, subtitle: String(event.year), status: "published", logo: "", format: event.format, formatType: event.entries.length === 2 ? "two_team_md3" : event.entries.length === 3 ? "three_team_series" : "four_team_groups", teams: event.entries.map((entry) => entry.team), updated: event.status === "ongoing" ? "Em andamento" : `Campeão: ${event.champion}` })),
     matches: [],
     news: source.news.map((item) => ({ id: item.id, name: item.title, subtitle: item.summary, author: item.author, date: item.date, tournamentId: item.tournamentId, status: "published", updated: item.date }))
@@ -32,6 +35,64 @@
     return value.replace(/gaming|e-sports/ig, "").trim().split(/\s+/).map((part) => part[0]).join("").slice(0, 3).toUpperCase();
   }
 
+  function normalizedTeamName(value) {
+    return String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("pt-BR").replace(/[^a-z0-9]/g, "");
+  }
+
+  function normalizeTeamReferences() {
+    let changed = false;
+    const byId = new Map(state.teams.map((team) => [team.id, team]));
+    const idByName = new Map();
+    state.teams.forEach((team) => {
+      const aliases = [...new Set([...(team.aliases || []), baselineTeamNameById.get(team.id)].filter((name) => name && name !== team.name))];
+      if (JSON.stringify(aliases) !== JSON.stringify(team.aliases || [])) { team.aliases = aliases; changed = true; }
+      [team.name, ...aliases].forEach((name) => idByName.set(normalizedTeamName(name), team.id));
+    });
+    const resolveId = (id, name) => byId.has(id) ? id : idByName.get(normalizedTeamName(name)) || "";
+    const currentName = (id, fallback) => byId.get(id)?.name || fallback || "";
+    const normalizeList = (record, namesKey, idsKey) => {
+      const names = Array.isArray(record[namesKey]) ? record[namesKey] : [];
+      const ids = Array.isArray(record[idsKey]) ? record[idsKey] : [];
+      const nextIds = names.map((name, index) => resolveId(ids[index], name));
+      const nextNames = names.map((name, index) => currentName(nextIds[index], name));
+      if (JSON.stringify(nextIds) !== JSON.stringify(ids)) { record[idsKey] = nextIds; changed = true; }
+      if (JSON.stringify(nextNames) !== JSON.stringify(names)) { record[namesKey] = nextNames; changed = true; }
+    };
+    state.tournaments.forEach((event) => normalizeList(event, "teams", "teamIds"));
+    state.players.forEach((player) => normalizeList(player, "teams", "teamIds"));
+    state.matches.forEach((match) => {
+      ["A", "B"].forEach((side) => {
+        const nameKey = `team${side}`;
+        const idKey = `team${side}Id`;
+        const id = resolveId(match[idKey], match[nameKey]);
+        if (!id) return;
+        const oldName = match[nameKey];
+        const name = currentName(id, oldName);
+        if (match[idKey] !== id) { match[idKey] = id; changed = true; }
+        if (oldName !== name) {
+          match[nameKey] = name;
+          if (match[`slot${side}`] === oldName) match[`slot${side}`] = name;
+          (match.statistics || []).forEach((player) => { if (player.team === oldName) player.team = name; });
+          changed = true;
+        }
+      });
+      const winnerId = resolveId(match.winnerId, match.winner);
+      if (winnerId && (match.winnerId !== winnerId || match.winner !== currentName(winnerId, match.winner))) {
+        match.winnerId = winnerId;
+        match.winner = currentName(winnerId, match.winner);
+        changed = true;
+      }
+    });
+    return changed;
+  }
+
+  function migrateTeamRename(teamId, oldName, newName) {
+    const team = state.teams.find((item) => item.id === teamId);
+    if (!team || !oldName || oldName === newName) return;
+    team.aliases = [...new Set([...(team.aliases || []), oldName].filter((name) => name && name !== newName))];
+    normalizeTeamReferences();
+  }
+
   async function contentRequest(options = {}) {
     const response = await fetch("/api/admin/content", { credentials: "same-origin", ...options });
     const result = await response.json().catch(() => ({}));
@@ -43,9 +104,10 @@
     try {
       const saved = await contentRequest();
       ["players", "teams", "tournaments", "matches", "news"].forEach((key) => { if (Array.isArray(saved[key])) state[key] = saved[key]; });
+      const referencesChanged = normalizeTeamReferences();
       const structureChanged = normalizeTournamentStructures();
       const leetifyImported = await syncPendingLeetifyMatches();
-      if (structureChanged || leetifyImported) await persistContent();
+      if (referencesChanged || structureChanged || leetifyImported) await persistContent();
       go(section);
       showToast(leetifyImported ? `${leetifyImported} partida sincronizada com o Leetify` : "Conteúdo compartilhado carregado");
     } catch (reason) {
@@ -653,6 +715,12 @@
     delete values.removeScoreboardImage;
     const list = state[section];
     if (section === "matches" && values.teamA === values.teamB) { showToast("Escolha dois times diferentes"); return; }
+    const previousTeam = section === "teams" && editingId ? state.teams.find((item) => item.id === editingId) : null;
+    if (section === "teams") {
+      const duplicate = state.teams.find((item) => item.id !== editingId && [item.name, ...(item.aliases || [])].some((name) => normalizedTeamName(name) === normalizedTeamName(values.name)));
+      if (duplicate) { showToast(`Esse nome já pertence ao time ${duplicate.name}`); return; }
+      values.aliases = [...new Set([...(previousTeam?.aliases || []), previousTeam?.name].filter((name) => name && name !== values.name))];
+    }
     const fallbackName = section === "matches" ? `${values.teamA} x ${values.teamB}` : "Novo registro";
     const record = { ...values, name: values.name || fallbackName, id: editingId || `${section}-${Date.now()}`, updated: "Atualizado pelo painel" };
     const demoFile = section === "matches" ? formData.get("demo") : null;
@@ -669,7 +737,9 @@
     }
     const index = list.findIndex((item) => item.id === editingId);
     if (index >= 0) list[index] = { ...list[index], ...record }; else list.unshift(record);
+    if (section === "teams" && previousTeam) migrateTeamRename(record.id, previousTeam.name, record.name);
     if (section === "tournaments") ensureTournamentFixtures(index >= 0 ? list[index] : record);
+    normalizeTeamReferences();
     await persistContent();
     dialog.close();
     showToast(leetifyImported ? `${record.name}: ${record.statistics.length} jogadores e placar importados do Leetify` : demoFile?.size ? (record.statistics?.length ? `${record.name}: demo lida e ${record.statistics.length} jogadores extraídos` : `${record.name}: demo anexada; use Leetify ou print enquanto a extração estiver pendente`) : `${record.name} foi salvo`);
