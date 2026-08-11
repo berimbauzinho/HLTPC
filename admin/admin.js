@@ -889,11 +889,18 @@
     const rounds = roundEnds.length || (observedRounds.length ? Math.max(...observedRounds) + 1 : 0);
     let statistics = [...stats.values()].filter((player) => player.steamid && player.steamid !== "0").map((player) => ({ ...player, adr: rounds ? Number((player.damage / rounds).toFixed(1)) : null, kd: player.deaths ? Number((player.kills / player.deaths).toFixed(2)) : player.kills })).sort((a, b) => b.kills - a.kills || b.damage - a.damage);
     const lastRoundTick = roundEnds.length ? Math.max(...roundEnds.map((event) => numberValue(event.tick))) : 0;
+    let finalTeamScores = null;
     if (lastRoundTick) {
       try {
         const scoreboard = demoRows(parser.parseTicks(bytes, ["kills_total", "deaths_total", "assists_total", "headshot_kills_total", "damage_total", "team_name"], new Int32Array([lastRoundTick]))).filter((player) => player.steamid && String(player.steamid) !== "0");
         if (scoreboard.length) statistics = scoreboard.map((player) => ({ steamid: String(player.steamid), name: canonicalPlayerName(player.name, player.steamid, true), demoName: String(player.name || ""), team: String(player.team_name || ""), kills: numberValue(player.kills_total), deaths: numberValue(player.deaths_total), assists: numberValue(player.assists_total), headshots: numberValue(player.headshot_kills_total), damage: numberValue(player.damage_total), adr: rounds ? Number((numberValue(player.damage_total) / rounds).toFixed(1)) : null, kd: numberValue(player.deaths_total) ? Number((numberValue(player.kills_total) / numberValue(player.deaths_total)).toFixed(2)) : numberValue(player.kills_total) })).sort((a, b) => b.kills - a.kills || b.damage - a.damage);
       } catch (reason) { warnings.push(`placar final: ${reason.message || reason}`); }
+      try {
+        const teamRows = demoRows(parser.parseTicks(bytes, ["team_name", "team_score"], new Int32Array([lastRoundTick, lastRoundTick + 1]))).filter((row) => row.team_name);
+        const byTeam = new Map();
+        teamRows.forEach((row) => byTeam.set(String(row.team_name), Math.max(byTeam.get(String(row.team_name)) || 0, numberValue(row.team_score))));
+        if (byTeam.size >= 2) finalTeamScores = byTeam;
+      } catch (reason) { warnings.push(`scoreboard do último round: ${reason.message || reason}`); }
     }
     let teamMapping = null;
     if (statistics.length && match?.teamA && match?.teamB) {
@@ -905,10 +912,23 @@
       }
     }
     const playedAt = demoPlayedAt(file);
+    let officialResult = {};
+    if (teamMapping && finalTeamScores?.has(teamMapping.groupA) && finalTeamScores?.has(teamMapping.groupB)) {
+      const scoreA = finalTeamScores.get(teamMapping.groupA);
+      const scoreB = finalTeamScores.get(teamMapping.groupB);
+      if (scoreA !== scoreB && Math.max(scoreA, scoreB) > 0) officialResult = {
+        score: `${scoreA} - ${scoreB}`,
+        winner: scoreA > scoreB ? match.teamA : match.teamB,
+        winnerId: scoreA > scoreB ? match.teamAId || "" : match.teamBId || "",
+        resultSource: "demo-final-scoreboard",
+        evidenceNote: "Placar extraído do scoreboard exibido no último round da demo. Pode ser substituído pelo placar oficial manual por mapa."
+      };
+    }
     return {
-      demoInfo: { fileName: file.name, fileSize: file.size, mapName: String(header.map_name || ""), serverName: String(header.server_name || ""), rounds, playedAt: playedAt.iso, playedAtLabel: playedAt.label, processedAt: new Date().toISOString(), parser: "demoparser2 0.42.0", rawFileStored: false, extractionStatus: statistics.length ? "complete" : "pending", teamMapping: teamMapping ? { rawTeamA: teamMapping.groupA, rawTeamB: teamMapping.groupB, confidence: teamMapping.confidence, matchedBySteamId: teamMapping.matchedBySteamId } : null, warnings: [...new Set(warnings)] },
+      demoInfo: { fileName: file.name, fileSize: file.size, mapName: String(header.map_name || ""), serverName: String(header.server_name || ""), rounds, playedAt: playedAt.iso, playedAtLabel: playedAt.label, processedAt: new Date().toISOString(), parser: "demoparser2 0.42.0", rawFileStored: false, extractionStatus: statistics.length ? "complete" : "pending", finalScoreRead: Boolean(officialResult.score), teamMapping: teamMapping ? { rawTeamA: teamMapping.groupA, rawTeamB: teamMapping.groupB, confidence: teamMapping.confidence, matchedBySteamId: teamMapping.matchedBySteamId } : null, warnings: [...new Set(warnings)] },
       statistics,
-      statisticsSource: statistics.length ? "demo" : ""
+      statisticsSource: statistics.length ? "demo" : "",
+      ...officialResult
     };
   }
 
