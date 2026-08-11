@@ -216,7 +216,8 @@
   }
 
   function orderedEventMatches(event) {
-    return data.matches.filter((match) => match.tournamentId === event.id && !match.legacyFormat).sort((a, b) => (Number(a.order) || 999) - (Number(b.order) || 999));
+    const structural = data.matches.filter((match) => match.tournamentId === event.id && !match.legacyFormat && Number.isFinite(Number(match.order)) && ["group", "semifinal", "final"].includes(match.round));
+    return structural.sort((a, b) => Number(a.order) - Number(b.order));
   }
 
   function nextMatchForEvent(event) {
