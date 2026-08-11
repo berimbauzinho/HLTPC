@@ -99,6 +99,33 @@
     normalizeTeamReferences();
   }
 
+  function applyHistoricalImport2025() {
+    const historical = window.HLTPC_IMPORT_2025;
+    if (!historical) return 0;
+    const version = Number(historical.version || 1);
+    let changed = 0;
+    (historical.players || []).forEach((imported) => {
+      const player = state.players.find((item) => item.id === imported.id) || state.players.find((item) => normalizedNick(item.name) === normalizedNick(imported.name));
+      if (!player || Number(player.identityImportVersion || 0) >= version) return;
+      const aliases = [...new Set([
+        ...String(player.alias || "").split(/[,;|]/),
+        ...(Array.isArray(player.aliases) ? player.aliases : []),
+        ...(imported.aliases || [])
+      ].map((value) => String(value || "").trim()).filter(Boolean))];
+      Object.assign(player, { steamId: imported.steamId, alias: aliases.join(", "), aliases, identityImportVersion: version, updated: "SteamID64 e aliases importados do histórico de 2025" });
+      changed += 1;
+    });
+    (historical.matches || []).forEach((imported) => {
+      const index = state.matches.findIndex((item) => item.id === imported.id);
+      const current = index >= 0 ? state.matches[index] : null;
+      if (current && Number(current.importVersion || 0) >= version) return;
+      const record = { ...(current || {}), ...imported, importVersion: version };
+      if (index >= 0) state.matches[index] = record; else state.matches.push(record);
+      changed += 1;
+    });
+    return changed;
+  }
+
   async function contentRequest(options = {}) {
     const response = await fetch("/api/admin/content", { credentials: "same-origin", ...options });
     const result = await response.json().catch(() => ({}));
@@ -110,12 +137,13 @@
     try {
       const saved = await contentRequest();
       ["players", "teams", "tournaments", "matches", "news"].forEach((key) => { if (Array.isArray(saved[key])) state[key] = saved[key]; });
+      const historicalImported = applyHistoricalImport2025();
       const referencesChanged = normalizeTeamReferences();
       const structureChanged = normalizeTournamentStructures();
       const leetifyImported = await syncPendingLeetifyMatches();
-      if (referencesChanged || structureChanged || leetifyImported) await persistContent();
+      if (historicalImported || referencesChanged || structureChanged || leetifyImported) await persistContent();
       go(section);
-      showToast(leetifyImported ? `${leetifyImported} partida sincronizada com o Leetify` : "Conteúdo compartilhado carregado");
+      showToast(historicalImported ? `Histórico de 2025 importado: ${historicalImported} registros atualizados` : leetifyImported ? `${leetifyImported} partida sincronizada com o Leetify` : "Conteúdo compartilhado carregado");
     } catch (reason) {
       showToast(reason.message);
     }
@@ -317,9 +345,10 @@
       const leetifyHasStats = Boolean(item.leetifyInfo && item.statisticsSource === "leetify" && (item.statistics || []).length);
       const savedScores = String(item.score || "").match(/\d+/g) || [];
       const manualResult = item.manualResult === true || item.manualResult === "true" || item.resultSource === "manual";
+      const seriesMaps = Array.isArray(item.maps) && item.maps.length ? `<section class="admin-series-maps"><header><span>MAPAS DA SÉRIE</span><b>${item.maps.filter((map) => map.score).length}/${item.maps.length} com placar</b></header>${item.maps.map((map, index) => `<article class="${map.statisticsSource === "missing" ? "missing" : ""}"><span><b>${escapeHtml(map.name || map.mapName || `Mapa ${index + 1}`)}</b><small>${escapeHtml(map.statisticsSource === "missing" ? "Demo perdida · preenchimento manual pendente" : map.statisticsSource === "leetify" ? "Leetify + demo vinculada" : "Demo processada")}</small></span><strong>${escapeHtml(map.score || "A confirmar")}</strong></article>`).join("")}</section>` : "";
       const sourceSummary = item.demoInfo || item.leetifyUrl || item.scoreboardImage || manualResult ? `<div class="match-source-summary"><span class="${demoHasStats ? "verified" : item.demoInfo ? "partial" : "muted"}"><b>${demoHasStats ? "1 · Demo confirmada" : item.demoInfo?.extractionStatus === "skipped-large" ? "1 · Demo grande" : item.demoInfo ? "1 · Demo anexada" : "1 · Sem demo"}</b><small>${item.demoInfo ? `${escapeHtml(item.demoInfo.fileName)}${demoHasStats ? ` · ${(item.statistics || []).length} jogadores` : item.demoInfo.extractionStatus === "skipped-large" ? " · leitura local ignorada" : " · extração pendente"}` : "Fonte primária opcional"}</small></span><span class="${leetifyHasStats ? "verified" : item.leetifyUrl ? "partial" : "muted"}"><b>2 · Leetify</b><small>${leetifyHasStats ? `${(item.statistics || []).length} jogadores · ${escapeHtml(item.leetifyInfo.mapName || "mapa identificado")}` : item.leetifySyncError ? escapeHtml(item.leetifySyncError) : item.leetifyUrl ? "Link salvo · aguarda importação" : "Fonte secundária opcional"}</small></span><span class="${item.scoreboardImage ? "verified" : "muted"}"><b>3 · Print</b><small>${item.scoreboardImage ? "Imagem salva como comprovação" : "Evidência visual opcional"}</small></span><span class="${manualResult ? "verified" : "muted"}"><b>4 · Manual</b><small>${manualResult ? `Resultado confirmado: ${escapeHtml(item.score || "—")}` : "Disponível mesmo sem arquivos"}</small></span></div>` : "";
       const manualFields = `<fieldset class="manual-result"><legend>Resultado manual</legend><label class="manual-result-toggle"><input type="checkbox" name="manualResult" value="true" ${manualResult ? "checked" : ""} /><span><b>Informar o placar manualmente</b><small>Use quando não houver demo, Leetify ou print completo. O placar manual sempre tem prioridade sobre a importação.</small></span></label><div class="manual-score-fields" ${manualResult ? "" : "hidden"}><label>${escapeHtml(item.teamA || "Time A")}<input type="number" name="manualScoreA" min="0" max="99" step="1" value="${escapeHtml(savedScores[0] || "")}" /></label><i>×</i><label>${escapeHtml(item.teamB || "Time B")}<input type="number" name="manualScoreB" min="0" max="99" step="1" value="${escapeHtml(savedScores[1] || "")}" /></label></div></fieldset>`;
-      return `${tournamentField}${teamsField}${textField("name", "Fase", item.name, "Ex.: Semifinal", true)}${selectField("status", item.status)}${manualFields}<fieldset class="match-evidence"><legend>Fontes dos dados</legend><div class="evidence-order"><b>1</b><span><strong>Demo · fonte principal</strong><small>Até 500 MB, o painel tenta extrair data e estatísticas. Acima disso, ignora somente a leitura local e continua salvando as outras fontes.</small></span></div>${fileField("demo", "Selecionar arquivo .dem", ".dem")}${urlField("demoUrl", "Ou link da demo no Google Drive", item.demoUrl, "https://drive.google.com/file/d/...")}${item.demoInfo ? `<div class="demo-result ${demoHasStats ? "" : "partial"}"><b>${demoHasStats ? "✓ Demo processada" : item.demoInfo.extractionStatus === "skipped-large" ? "⚠ Demo grande registrada; leitura local ignorada" : item.demoUrl ? "✓ Demo vinculada pelo Drive" : "⚠ Demo anexada, sem estatísticas automáticas"}</b><span>${escapeHtml(item.demoInfo.fileName)} · ${escapeHtml(item.demoInfo.mapName || "mapa não identificado")} · ${item.demoInfo.rounds || 0} rounds</span><small>${escapeHtml(item.demoInfo.playedAtLabel || item.subtitle || "Data não identificada")} · ${(item.statistics || []).length} jogadores extraídos</small>${item.demoInfo.warnings?.length ? `<small>${escapeHtml(item.demoInfo.warnings.join(" · "))}</small>` : ""}</div>` : ""}<div class="evidence-order"><b>2</b><span><strong>Leetify · fonte secundária</strong><small>Use sozinho ou para complementar rating/KAST quando a demo estiver disponível.</small></span></div>${urlField("leetifyUrl", "Link da partida no Leetify", item.leetifyUrl, "https://leetify.com/app/match-details/...")}<div class="evidence-order"><b>3</b><span><strong>Print do placar · comprovação visual</strong><small>Envie a tela final quando a demo ou o Leetify não trouxerem tudo.</small></span></div>${fileField("scoreboardImage", item.scoreboardImage ? "Substituir print do placar" : "Enviar print do placar", "image/*")}${item.scoreboardImage ? `<div class="scoreboard-preview"><img src="${escapeHtml(item.scoreboardImage)}" alt="Print do placar salvo" /><span><b>Print salvo</b><small>Um novo arquivo substituirá esta imagem.</small><label><input type="checkbox" name="removeScoreboardImage" value="true" /> Remover print atual</label></span></div>` : ""}</fieldset>${sourceSummary}<div class="helper" id="matchHelper">${generated ? "A data será extraída do nome da demo quando ela puder ser lida. Cada fonte funciona de forma independente e fica ligada somente a este confronto." : "Escolha uma edição: os times serão limitados exclusivamente às escalações daquele campeonato."}</div>`;
+      return `${tournamentField}${teamsField}${textField("name", "Fase", item.name, "Ex.: Semifinal", true)}${selectField("status", item.status)}${seriesMaps}${manualFields}<fieldset class="match-evidence"><legend>Fontes dos dados</legend><div class="evidence-order"><b>1</b><span><strong>Demo · fonte principal</strong><small>Até 500 MB, o painel tenta extrair data e estatísticas. Acima disso, ignora somente a leitura local e continua salvando as outras fontes.</small></span></div>${fileField("demo", "Selecionar arquivo .dem", ".dem")}${urlField("demoUrl", "Ou link da demo no Google Drive", item.demoUrl, "https://drive.google.com/file/d/...")}${item.demoInfo ? `<div class="demo-result ${demoHasStats ? "" : "partial"}"><b>${demoHasStats ? "✓ Demo processada" : item.demoInfo.extractionStatus === "skipped-large" ? "⚠ Demo grande registrada; leitura local ignorada" : item.demoUrl ? "✓ Demo vinculada pelo Drive" : "⚠ Demo anexada, sem estatísticas automáticas"}</b><span>${escapeHtml(item.demoInfo.fileName)} · ${escapeHtml(item.demoInfo.mapName || "mapa não identificado")} · ${item.demoInfo.rounds || 0} rounds</span><small>${escapeHtml(item.demoInfo.playedAtLabel || item.subtitle || "Data não identificada")} · ${(item.statistics || []).length} jogadores extraídos</small>${item.demoInfo.warnings?.length ? `<small>${escapeHtml(item.demoInfo.warnings.join(" · "))}</small>` : ""}</div>` : ""}<div class="evidence-order"><b>2</b><span><strong>Leetify · fonte secundária</strong><small>Use sozinho ou para complementar rating/KAST quando a demo estiver disponível.</small></span></div>${urlField("leetifyUrl", "Link da partida no Leetify", item.leetifyUrl, "https://leetify.com/app/match-details/...")}<div class="evidence-order"><b>3</b><span><strong>Print do placar · comprovação visual</strong><small>Envie a tela final quando a demo ou o Leetify não trouxerem tudo.</small></span></div>${fileField("scoreboardImage", item.scoreboardImage ? "Substituir print do placar" : "Enviar print do placar", "image/*")}${item.scoreboardImage ? `<div class="scoreboard-preview"><img src="${escapeHtml(item.scoreboardImage)}" alt="Print do placar salvo" /><span><b>Print salvo</b><small>Um novo arquivo substituirá esta imagem.</small><label><input type="checkbox" name="removeScoreboardImage" value="true" /> Remover print atual</label></span></div>` : ""}</fieldset>${sourceSummary}<div class="helper" id="matchHelper">${generated ? "A data será extraída do nome da demo quando ela puder ser lida. Cada fonte funciona de forma independente e fica ligada somente a este confronto." : "Escolha uma edição: os times serão limitados exclusivamente às escalações daquele campeonato."}</div>`;
     }
     return `${textField("name", "Título", item.name, "Título da notícia", true)}<label>Texto / resumo<textarea name="subtitle" placeholder="Escreva a notícia...">${escapeHtml(item.subtitle)}</textarea></label><div class="field-row">${textField("author", "Autor", item.author, "HLTPC")}${textField("date", "Data", item.date, "2026-08-10", true)}</div>${selectField("status", item.status)}${fileField("image", "Imagem de destaque", "image/*")}`;
   }
