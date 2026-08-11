@@ -202,3 +202,232 @@
     text-align: left;
   }
 }
+
+/* Championship directory links directly to each event. */
+.tournament-link {
+  min-height: 98px;
+  padding: 18px 22px;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  color: var(--text);
+  text-decoration: none;
+  transition: background .16s, border-color .16s;
+}
+
+.tournament-link:hover {
+  background: #20232b;
+}
+
+.tournament-link .event-main {
+  min-width: 0;
+}
+
+.event-enter {
+  margin-left: 2px;
+  padding: 6px 8px;
+  border: 1px solid #3b404b;
+  color: #a9adb7;
+  font: 700 7px JetBrains Mono, monospace;
+  white-space: nowrap;
+}
+
+.event-enter i {
+  color: var(--amber);
+  font-style: normal;
+}
+
+/* Clean tournament overview: retrospective, news and rosters only. */
+.event-retrospective {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 11px;
+}
+
+.event-retrospective > article {
+  min-height: 112px;
+  padding: 17px;
+  background: #202a34;
+  border: 1px solid #394756;
+}
+
+.event-retrospective small {
+  color: #91a0ad;
+  font: 700 7px JetBrains Mono, monospace;
+}
+
+.event-retrospective b {
+  display: block;
+  margin: 8px 0 4px;
+  color: #fff;
+  font: 600 23px Oswald, sans-serif;
+}
+
+.event-retrospective p {
+  margin: 0;
+  color: #96a3af;
+  font-size: 9px;
+}
+
+.event-overview-matches {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.event-overview-match {
+  min-width: 0;
+  background: #202a34;
+  border: 1px solid #394756;
+  overflow: hidden;
+}
+
+.event-overview-match > header {
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 11px;
+  background: #18212a;
+  border-bottom: 1px solid #394756;
+}
+
+.event-overview-match > header span {
+  color: var(--amber);
+  font: 700 7px JetBrains Mono, monospace;
+}
+
+.event-overview-match > header time {
+  color: #8e9ba7;
+  font: 600 7px JetBrains Mono, monospace;
+}
+
+.event-overview-match > div {
+  min-height: 88px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 56px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+}
+
+.event-overview-match > div > a {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: #fff;
+  text-decoration: none;
+  font: 600 11px Oswald, sans-serif;
+}
+
+.event-overview-match > div > a:last-child {
+  flex-direction: row-reverse;
+  text-align: right;
+}
+
+.event-overview-match > div > a > span {
+  width: 34px;
+  height: 34px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  background: #17212a;
+  border: 1px solid #3b4854;
+  color: var(--amber2);
+  font: 700 7px JetBrains Mono, monospace;
+  overflow: hidden;
+}
+
+.event-overview-match > div > a > span img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.event-overview-match > div > a > b {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.event-overview-match > div > strong {
+  color: #fff;
+  text-align: center;
+  font: 700 19px Oswald, sans-serif;
+}
+
+.event-overview-match > div > strong i {
+  color: var(--amber);
+  font-style: normal;
+}
+
+.event-overview-match > footer {
+  min-height: 31px;
+  padding: 8px 11px;
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  background: #111820;
+  color: #8795a2;
+  font: 600 7px JetBrains Mono, monospace;
+}
+
+.event-overview-match > footer em {
+  color: var(--amber2);
+  font-style: normal;
+}
+
+.event-overview-match.empty-match {
+  min-height: 153px;
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.event-overview-match.empty-match > span {
+  color: var(--amber);
+  font: 700 7px JetBrains Mono, monospace;
+}
+
+.event-overview-match.empty-match > b {
+  margin: 7px 0 4px;
+  font: 600 16px Oswald, sans-serif;
+}
+
+.event-overview-match.empty-match > small {
+  color: #8e9ba7;
+  font-size: 8px;
+}
+
+.event-news {
+  padding: 0 14px;
+  background: #171d24;
+  border: 1px solid #34404c;
+}
+
+@media (max-width: 760px) {
+  .tournament-link {
+    min-height: 88px;
+    padding: 15px;
+    gap: 10px;
+  }
+
+  .tournament-link .event-year {
+    width: 48px;
+  }
+
+  .event-enter {
+    font-size: 0;
+  }
+
+  .event-enter i {
+    font-size: 12px;
+  }
+
+  .event-retrospective,
+  .event-overview-matches {
+    grid-template-columns: 1fr;
+  }
+}
