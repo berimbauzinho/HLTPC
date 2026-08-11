@@ -62,6 +62,22 @@
   const categoryLabel = (category) => ({ major: "Major", official: "Campeonato oficial", resenha: "Campeonato de resenha" }[category] || "Campeonato");
   const demoLabel = (demos) => ({ unavailable: "Sem demo", partial: "Demos parciais", future: "Aguardando campeonato" }[demos] || "Não informado");
   const teamBadge = (team) => { const meta = teamMeta.get(team) || {}; return meta.logo ? `<img src="${escapeHtml(meta.logo)}" alt="" />` : escapeHtml((meta.acronym || team.split(/\s+/).map((part) => part[0]).join("").slice(0, 3)).toUpperCase()); };
+  const safeLeetifyUrl = (value) => {
+    try { const url = new URL(String(value || "")); return url.protocol === "https:" && /(^|\.)leetify\.com$/i.test(url.hostname) ? url.href : ""; }
+    catch (_) { return ""; }
+  };
+  const safeScoreboardImage = (value) => /^data:image\/(png|jpe?g|webp|gif);base64,/i.test(String(value || "")) ? String(value) : "";
+
+  function matchSourcesMarkup(match, compact = false) {
+    const stats = Array.isArray(match.statistics) ? match.statistics : [];
+    const leetifyUrl = safeLeetifyUrl(match.leetifyUrl);
+    const scoreboardImage = safeScoreboardImage(match.scoreboardImage);
+    const demo = match.demoInfo ? `<span class="match-source ${stats.length ? "verified" : "partial"}"><b>${stats.length ? "◉ Demo confirmada" : "◌ Demo anexada"}</b>${compact ? "" : `<small>${stats.length ? `${stats.length} jogadores extraídos` : "Extração automática pendente"}</small>`}</span>` : "";
+    const leetify = leetifyUrl ? `<a class="match-source verified" href="${escapeHtml(leetifyUrl)}" target="_blank" rel="noopener noreferrer"><b>↗ Leetify</b>${compact ? "" : "<small>Conferir fonte secundária</small>"}</a>` : "";
+    const screenshot = scoreboardImage ? `<a class="match-source verified" href="${escapeHtml(scoreboardImage)}" target="_blank" rel="noopener noreferrer"><b>▣ Print do placar</b>${compact ? "" : "<small>Abrir comprovação visual</small>"}</a>` : "";
+    const content = `${demo}${leetify}${screenshot}`;
+    return content ? `<div class="match-sources ${compact ? "compact" : ""}">${content}</div>` : "";
+  }
 
   function titleCount(player, category) {
     return data.tournaments.filter((event) => event.category === category && event.champion && event.entries.some((entry) => entry.team === event.champion && entry.players.includes(player))).length;
@@ -244,7 +260,7 @@
     const teamB = match.teamB || match.teams?.[1] || match.slotB || "A decidir";
     const stats = Array.isArray(match.statistics) ? match.statistics : [];
     const teamLink = (team, confirmed) => confirmed && teams.has(team) ? `<a href="#time/${encodeURIComponent(team)}">${escapeHtml(team)}</a>` : `<span class="pending-team">${escapeHtml(team)}</span>`;
-    return `<article class="event-match-card"><div class="event-match"><span>${escapeHtml(match.name || match.phase || "Partida")}${match.bestOf ? `<i>MD${match.bestOf}</i>` : ""}</span><div>${teamLink(teamA, Boolean(match.teamA))}<b>${escapeHtml(match.score || "—")}</b>${teamLink(teamB, Boolean(match.teamB))}</div><small>${escapeHtml(match.subtitle || match.date || "Data a definir")}</small></div>${match.demoInfo ? `<details class="demo-analysis"><summary><span>◉ Demo analisada</span><b>${escapeHtml(match.demoInfo.mapName || "Mapa não identificado")} · ${match.demoInfo.rounds || 0} rounds</b></summary>${stats.length ? `<div class="demo-stats"><div class="demo-stats-head"><span>Jogador</span><span>K</span><span>D</span><span>A</span><span>ADR</span><span>HS</span></div>${stats.map((player) => `<div>${playerHistory.has(player.name) ? `<a href="#jogador/${encodeURIComponent(player.name)}">${escapeHtml(player.name)}</a>` : `<strong>${escapeHtml(player.name)}</strong>`}<span>${player.kills}</span><span>${player.deaths}</span><span>${player.assists}</span><span>${player.adr ?? "—"}</span><span>${player.headshots}</span></div>`).join("")}</div>` : `<p>A demo foi reconhecida, mas não retornou estatísticas individuais.</p>`}</details>` : ""}</article>`;
+    return `<article class="event-match-card"><div class="event-match"><span>${escapeHtml(match.name || match.phase || "Partida")}${match.bestOf ? `<i>MD${match.bestOf}</i>` : ""}</span><div>${teamLink(teamA, Boolean(match.teamA))}<b>${escapeHtml(match.score || "—")}</b>${teamLink(teamB, Boolean(match.teamB))}</div><small>${escapeHtml(match.subtitle || match.date || "Data a definir")}</small></div>${matchSourcesMarkup(match)}${match.demoInfo ? `<details class="demo-analysis"><summary><span>${stats.length ? "◉ Estatísticas da demo" : "◌ Extração da demo pendente"}</span><b>${escapeHtml(match.demoInfo.mapName || "Mapa não identificado")} · ${match.demoInfo.rounds || 0} rounds</b></summary>${stats.length ? `<div class="demo-stats"><div class="demo-stats-head"><span>Jogador</span><span>K</span><span>D</span><span>A</span><span>ADR</span><span>HS</span></div>${stats.map((player) => `<div>${playerHistory.has(player.name) ? `<a href="#jogador/${encodeURIComponent(player.name)}">${escapeHtml(player.name)}</a>` : `<strong>${escapeHtml(player.name)}</strong>`}<span>${player.kills}</span><span>${player.deaths}</span><span>${player.assists}</span><span>${player.adr ?? "—"}</span><span>${player.headshots}</span></div>`).join("")}</div>` : `<p>A data da demo foi reconhecida, mas o leitor do navegador não conseguiu extrair os números. Confira o Leetify ou o print do placar, quando disponíveis.</p>`}</details>` : ""}</article>`;
   }
 
   function eventBracketMarkup(matches) {
@@ -256,7 +272,7 @@
       const teamB = match.teamB || match.slotB || "A decidir";
       const scores = String(match.score || "").match(/\d+/g) || [];
       const teamRow = (team, confirmed, score, side) => `<div class="stage-team ${match.winner === team ? "winner" : ""}"><span>${confirmed && teams.has(team) ? teamBadge(team) : "?"}</span>${confirmed && teams.has(team) ? `<a href="#time/${encodeURIComponent(team)}">${escapeHtml(team)}</a>` : `<b>${escapeHtml(team)}</b>`}<strong>${score ?? (match.score ? "—" : "")}</strong><i>${side}</i></div>`;
-      return `<article class="stage-match"><header><time>${escapeHtml(match.subtitle || "Data a definir")}</time><em>MD${match.bestOf || 1}</em></header>${teamRow(teamA, Boolean(match.teamA), scores[0], "A")}${teamRow(teamB, Boolean(match.teamB), scores[1], "B")}<footer><span>${escapeHtml(match.name || "Partida")}</span>${match.demoInfo ? `<b>◉ Demo analisada</b>` : `<small>${match.score ? "Finalizada" : "Aguardando"}</small>`}</footer></article>`;
+      return `<article class="stage-match"><header><time>${escapeHtml(match.subtitle || "Data a definir")}</time><em>MD${match.bestOf || 1}</em></header>${teamRow(teamA, Boolean(match.teamA), scores[0], "A")}${teamRow(teamB, Boolean(match.teamB), scores[1], "B")}<footer><span>${escapeHtml(match.name || "Partida")}</span>${matchSourcesMarkup(match, true) || `<small>${match.score ? "Finalizada" : "Aguardando"}</small>`}</footer></article>`;
     };
     const playoffColumns = [];
     if (semifinals.length) playoffColumns.push(`<section><header><b>Semifinal${semifinals.length > 1 ? "is" : ""}</b><small>${semifinals.length} confronto${semifinals.length > 1 ? "s" : ""}</small></header>${semifinals.map(stageMatch).join("")}</section>`);
