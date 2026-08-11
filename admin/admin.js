@@ -44,9 +44,10 @@
       const saved = await contentRequest();
       ["players", "teams", "tournaments", "matches", "news"].forEach((key) => { if (Array.isArray(saved[key])) state[key] = saved[key]; });
       const structureChanged = normalizeTournamentStructures();
-      if (structureChanged) await persistContent();
+      const leetifyImported = await syncPendingLeetifyMatches();
+      if (structureChanged || leetifyImported) await persistContent();
       go(section);
-      showToast("Conteúdo compartilhado carregado");
+      showToast(leetifyImported ? `${leetifyImported} partida sincronizada com o Leetify` : "Conteúdo compartilhado carregado");
     } catch (reason) {
       showToast(reason.message);
     }
@@ -231,7 +232,7 @@
   }
 
   function formFields(item) {
-    if (section === "players") return `<div class="editor-tabs"><button type="button" class="active" data-editor-tab="profile">Dados do jogador</button><button type="button" data-editor-tab="teams">Equipes</button></div><div data-editor-panel="profile">${textField("name", "Nick principal", item.name, "Ex.: lanches", true)}<div class="field-row">${textField("alias", "Nome / alias", item.alias, "Ex.: Mathieu Herbaut")}${selectField("status", item.status)}</div>${fileField("photo", "Foto do jogador", "image/*")}<div class="helper">Títulos e participações são calculados pelas escalações dos campeonatos.</div></div><div data-editor-panel="teams" hidden><span class="field-title">Equipes defendidas</span><div class="team-checklist">${state.teams.map((team) => `<label><input type="checkbox" name="teams" value="${escapeHtml(team.name)}" ${(item.teams || []).includes(team.name) ? "checked" : ""} /><span><b>${escapeHtml(team.name)}</b><small>${escapeHtml(team.acronym)}</small></span></label>`).join("")}</div><div class="helper">As equipes encontradas nas escalações históricas já aparecem marcadas. Use esta área para complementar ou corrigir o perfil.</div></div>`;
+    if (section === "players") return `<div class="editor-tabs"><button type="button" class="active" data-editor-tab="profile">Dados do jogador</button><button type="button" data-editor-tab="teams">Equipes</button></div><div data-editor-panel="profile">${textField("name", "Nick principal", item.name, "Ex.: lanches", true)}<div class="field-row">${textField("alias", "Nome / alias", item.alias, "Ex.: Mathieu Herbaut")}${selectField("status", item.status)}</div>${textField("steamId", "SteamID64", item.steamId, "Ex.: 76561198300371519")}${fileField("photo", "Foto do jogador", "image/*")}<div class="helper">O SteamID64 conecta automaticamente o nick usado na demo ou no Leetify ao perfil correto.</div></div><div data-editor-panel="teams" hidden><span class="field-title">Equipes defendidas</span><div class="team-checklist">${state.teams.map((team) => `<label><input type="checkbox" name="teams" value="${escapeHtml(team.name)}" ${(item.teams || []).includes(team.name) ? "checked" : ""} /><span><b>${escapeHtml(team.name)}</b><small>${escapeHtml(team.acronym)}</small></span></label>`).join("")}</div><div class="helper">As equipes encontradas nas escalações históricas já aparecem marcadas. Use esta área para complementar ou corrigir o perfil.</div></div>`;
     if (section === "teams") return `${textField("name", "Nome oficial do time", item.name, "Ex.: Deftones", true)}<div class="field-row">${textField("acronym", "Sigla", item.acronym, "Ex.: DFT")}${selectField("status", item.status)}</div>${fileField("logo", "Logo do time", "image/*")}<div class="helper">O elenco mais recente e as formações históricas serão derivados de cada participação.</div>`;
     if (section === "tournaments") {
       const selectedFormat = item.formatType || "three_team_series";
@@ -244,8 +245,9 @@
       const tournament = state.tournaments.find((event) => event.id === item.tournamentId);
       const tournamentField = generated ? `<input type="hidden" name="tournamentId" value="${escapeHtml(item.tournamentId)}" /><div class="fixture-source"><b>${escapeHtml(tournament?.name || "Campeonato")}</b><span>${escapeHtml(item.slotA || "Time A")} × ${escapeHtml(item.slotB || "Time B")}</span></div>` : `<label>Campeonato<select name="tournamentId" id="matchTournament" required><option value="">Selecione primeiro o campeonato</option>${state.tournaments.map((event) => `<option value="${escapeHtml(event.id)}" ${item.tournamentId === event.id ? "selected" : ""}>${escapeHtml(event.name)} ${escapeHtml(event.subtitle)}</option>`).join("")}</select></label>`;
       const teamsField = lockedGroupMatch ? `<input type="hidden" name="teamA" value="${escapeHtml(item.teamA)}" /><input type="hidden" name="teamB" value="${escapeHtml(item.teamB)}" /><div class="locked-match-teams"><b>${escapeHtml(item.teamA)}</b><span>×</span><b>${escapeHtml(item.teamB)}</b></div>` : `<div class="field-row"><label>Time A<select name="teamA" id="matchTeamA" required></select></label><label>Time B<select name="teamB" id="matchTeamB" required></select></label></div>`;
-      const demoHasStats = Boolean(item.demoInfo && (item.statistics || []).length);
-      const sourceSummary = item.demoInfo || item.leetifyUrl || item.scoreboardImage ? `<div class="match-source-summary"><span class="${demoHasStats ? "verified" : item.demoInfo ? "partial" : "muted"}"><b>${demoHasStats ? "1 · Demo confirmada" : item.demoInfo ? "1 · Demo anexada" : "1 · Sem demo"}</b><small>${item.demoInfo ? `${escapeHtml(item.demoInfo.fileName)}${demoHasStats ? ` · ${(item.statistics || []).length} jogadores` : " · extração automática pendente"}` : "Fonte primária"}</small></span><span class="${item.leetifyUrl ? "verified" : "muted"}"><b>2 · Leetify</b><small>${item.leetifyUrl ? "Link salvo como conferência" : "Fonte secundária opcional"}</small></span><span class="${item.scoreboardImage ? "verified" : "muted"}"><b>3 · Print do placar</b><small>${item.scoreboardImage ? "Imagem salva como comprovação" : "Evidência visual opcional"}</small></span></div>` : "";
+      const demoHasStats = Boolean(item.demoInfo && item.statisticsSource !== "leetify" && (item.statistics || []).length);
+      const leetifyHasStats = Boolean(item.leetifyInfo && item.statisticsSource === "leetify" && (item.statistics || []).length);
+      const sourceSummary = item.demoInfo || item.leetifyUrl || item.scoreboardImage ? `<div class="match-source-summary"><span class="${demoHasStats ? "verified" : item.demoInfo ? "partial" : "muted"}"><b>${demoHasStats ? "1 · Demo confirmada" : item.demoInfo ? "1 · Demo anexada" : "1 · Sem demo"}</b><small>${item.demoInfo ? `${escapeHtml(item.demoInfo.fileName)}${demoHasStats ? ` · ${(item.statistics || []).length} jogadores` : " · extração automática pendente"}` : "Fonte primária"}</small></span><span class="${leetifyHasStats ? "verified" : item.leetifyUrl ? "partial" : "muted"}"><b>2 · Leetify</b><small>${leetifyHasStats ? `${(item.statistics || []).length} jogadores · ${escapeHtml(item.leetifyInfo.mapName || "mapa identificado")}` : item.leetifyUrl ? "Link salvo · aguarda importação" : "Fonte secundária opcional"}</small></span><span class="${item.scoreboardImage ? "verified" : "muted"}"><b>3 · Print do placar</b><small>${item.scoreboardImage ? "Imagem salva como comprovação" : "Evidência visual opcional"}</small></span></div>` : "";
       return `${tournamentField}${teamsField}${textField("name", "Fase", item.name, "Ex.: Semifinal", true)}<div class="field-row">${textField("score", "Placar / mapas", item.score, "Somente após confirmação")}${selectField("status", item.status)}</div><fieldset class="match-evidence"><legend>Fontes dos dados</legend><div class="evidence-order"><b>1</b><span><strong>Demo · fonte principal</strong><small>O painel tenta extrair data e estatísticas automaticamente.</small></span></div>${fileField("demo", "Selecionar arquivo .dem", ".dem")}${item.demoInfo ? `<div class="demo-result ${demoHasStats ? "" : "partial"}"><b>${demoHasStats ? "✓ Demo processada" : "⚠ Demo anexada, sem estatísticas automáticas"}</b><span>${escapeHtml(item.demoInfo.fileName)} · ${escapeHtml(item.demoInfo.mapName || "mapa não identificado")} · ${item.demoInfo.rounds || 0} rounds</span><small>${escapeHtml(item.demoInfo.playedAtLabel || item.subtitle || "Data não identificada")} · ${(item.statistics || []).length} jogadores extraídos</small>${item.demoInfo.warnings?.length ? `<small>${escapeHtml(item.demoInfo.warnings.join(" · "))}</small>` : ""}</div>` : ""}<div class="evidence-order"><b>2</b><span><strong>Leetify · fonte secundária</strong><small>Use para conferir placar e números quando a demo estiver incompleta.</small></span></div>${urlField("leetifyUrl", "Link da partida no Leetify", item.leetifyUrl, "https://leetify.com/app/match-details/...")}<div class="evidence-order"><b>3</b><span><strong>Print do placar · comprovação visual</strong><small>Envie a tela final quando a demo ou o Leetify não trouxerem tudo.</small></span></div>${fileField("scoreboardImage", item.scoreboardImage ? "Substituir print do placar" : "Enviar print do placar", "image/*")}${item.scoreboardImage ? `<div class="scoreboard-preview"><img src="${escapeHtml(item.scoreboardImage)}" alt="Print do placar salvo" /><span><b>Print salvo</b><small>Um novo arquivo substituirá esta imagem.</small><label><input type="checkbox" name="removeScoreboardImage" value="true" /> Remover print atual</label></span></div>` : ""}</fieldset>${sourceSummary}<div class="helper" id="matchHelper">${generated ? "A data e a hora serão extraídas automaticamente do nome da demo. As três fontes ficam ligadas exclusivamente a este confronto." : "Escolha uma edição: os times serão limitados exclusivamente às escalações daquele campeonato."}</div>`;
     }
     return `${textField("name", "Título", item.name, "Título da notícia", true)}<label>Texto / resumo<textarea name="subtitle" placeholder="Escreva a notícia...">${escapeHtml(item.subtitle)}</textarea></label><div class="field-row">${textField("author", "Autor", item.author, "HLTPC")}${textField("date", "Data", item.date, "2026-08-10", true)}</div>${selectField("status", item.status)}${fileField("image", "Imagem de destaque", "image/*")}`;
@@ -448,10 +450,101 @@
     };
   }
 
-  function canonicalPlayerName(name) {
-    const normalized = String(name || "").trim().toLocaleLowerCase("pt-BR");
-    const player = state.players.find((item) => [item.name, item.alias].some((value) => String(value || "").trim().toLocaleLowerCase("pt-BR") === normalized));
+  function normalizedNick(value) {
+    return String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("pt-BR").replace(/[^a-z0-9]/g, "");
+  }
+
+  function canonicalPlayerName(name, steamId = "") {
+    const normalized = normalizedNick(name);
+    const player = state.players.find((item) => String(item.steamId || "") === String(steamId || "") && steamId)
+      || state.players.find((item) => [item.name, item.alias].some((value) => {
+        const candidate = normalizedNick(value);
+        return candidate && (candidate === normalized || (candidate.length >= 4 && normalized.startsWith(candidate)));
+      }));
     return player?.name || String(name || "Desconhecido");
+  }
+
+  function leetifyMatchId(value) {
+    const match = String(value || "").match(/match-details\/([0-9a-f-]{20,})/i);
+    return match?.[1] || "";
+  }
+
+  function tournamentEntries(tournamentId) {
+    return source.tournaments.find((event) => event.id === tournamentId)?.entries || [];
+  }
+
+  function leetifyTeamMapping(match, players) {
+    const entries = tournamentEntries(match.tournamentId);
+    const roster = (team) => new Set((entries.find((entry) => entry.team === team)?.players || []).map(normalizedNick));
+    const rosterA = roster(match.teamA);
+    const rosterB = roster(match.teamB);
+    const numbers = [...new Set(players.map((player) => numberValue(player.initialTeamNumber)).filter(Boolean))];
+    const scoreFor = (number, playerRoster) => players.filter((player) => numberValue(player.initialTeamNumber) === number).reduce((score, player) => score + (playerRoster.has(normalizedNick(canonicalPlayerName(player.name, player.steam64Id))) ? 1 : 0), 0);
+    const numberA = numbers.sort((a, b) => scoreFor(b, rosterA) - scoreFor(a, rosterA))[0];
+    const numberB = numbers.find((number) => number !== numberA);
+    return { numberA, numberB };
+  }
+
+  async function importLeetifyMatch(url, match, quiet = false) {
+    const matchId = leetifyMatchId(url);
+    if (!matchId) throw new Error("O link do Leetify não contém um identificador de partida.");
+    if (!quiet) showToast("Importando os dados do Leetify…");
+    const response = await fetch(`https://api.cs-prod.leetify.com/api/games/${encodeURIComponent(matchId)}`);
+    if (!response.ok) throw new Error(`O Leetify respondeu ${response.status}.`);
+    const payload = await response.json();
+    if (!Array.isArray(payload.playerStats) || !payload.playerStats.length) throw new Error("O Leetify ainda não retornou estatísticas desta partida.");
+    const roundsForTeam = (number) => {
+      const player = payload.playerStats.find((item) => numberValue(item.initialTeamNumber) === number);
+      return player ? numberValue(player.ctRoundsWon) + numberValue(player.tRoundsWon) : 0;
+    };
+    const { numberA, numberB } = leetifyTeamMapping(match, payload.playerStats);
+    const scoreA = roundsForTeam(numberA);
+    const scoreB = roundsForTeam(numberB);
+    const rounds = scoreA + scoreB;
+    const statistics = payload.playerStats.map((player) => {
+      const kills = numberValue(player.totalKills);
+      const deaths = numberValue(player.totalDeaths);
+      const teamNumber = numberValue(player.initialTeamNumber);
+      return {
+        steamid: String(player.steam64Id || ""),
+        name: canonicalPlayerName(player.name, player.steam64Id),
+        demoName: String(player.name || ""),
+        teamNumber,
+        team: teamNumber === numberA ? match.teamA : teamNumber === numberB ? match.teamB : "",
+        kills,
+        deaths,
+        assists: numberValue(player.totalAssists),
+        damage: numberValue(player.totalDamage),
+        adr: Number(numberValue(player.dpr || (rounds ? player.totalDamage / rounds : 0)).toFixed(1)),
+        kd: deaths ? Number((kills / deaths).toFixed(2)) : kills,
+        kast: Number((numberValue(player.kast) * 100).toFixed(1)),
+        rating: Number(numberValue(player.hltvRating).toFixed(2)),
+        leetifyRating: Number(numberValue(player.leetifyRating).toFixed(4)),
+        headshots: Math.round(kills * numberValue(player.hsp)),
+        hsPercent: Number((numberValue(player.hsp) * 100).toFixed(1))
+      };
+    }).sort((a, b) => b.rating - a.rating || b.kills - a.kills);
+    return {
+      statistics,
+      statisticsSource: "leetify",
+      score: scoreA || scoreB ? `${scoreA} - ${scoreB}` : match.score,
+      winner: scoreA > scoreB ? match.teamA : scoreB > scoreA ? match.teamB : "",
+      leetifyInfo: { matchId, importedAt: new Date().toISOString(), finishedAt: payload.finishedAt || "", mapName: payload.mapName || "", rounds, scoreA, scoreB, status: payload.status || "ready" }
+    };
+  }
+
+  async function syncPendingLeetifyMatches() {
+    let imported = 0;
+    for (const match of state.matches.filter((item) => item.leetifyUrl && !(item.statistics || []).length)) {
+      try {
+        Object.assign(match, await importLeetifyMatch(match.leetifyUrl, match, true));
+        match.updated = "Estatísticas sincronizadas pelo Leetify";
+        imported += 1;
+      } catch (reason) {
+        match.leetifySyncError = reason.message;
+      }
+    }
+    return imported;
   }
 
   async function parseDemoFile(file) {
@@ -528,7 +621,8 @@
     const playedAt = demoPlayedAt(file);
     return {
       demoInfo: { fileName: file.name, fileSize: file.size, mapName: String(header.map_name || ""), serverName: String(header.server_name || ""), rounds, playedAt: playedAt.iso, playedAtLabel: playedAt.label, processedAt: new Date().toISOString(), parser: "demoparser2 0.42.0", rawFileStored: false, extractionStatus: statistics.length ? "complete" : "pending", warnings: [...new Set(warnings)] },
-      statistics
+      statistics,
+      statisticsSource: statistics.length ? "demo" : ""
     };
   }
 
@@ -562,17 +656,23 @@
     const fallbackName = section === "matches" ? `${values.teamA} x ${values.teamB}` : "Novo registro";
     const record = { ...values, name: values.name || fallbackName, id: editingId || `${section}-${Date.now()}`, updated: "Atualizado pelo painel" };
     const demoFile = section === "matches" ? formData.get("demo") : null;
+    let leetifyImported = false;
     if (demoFile?.size) {
       Object.assign(record, await parseDemoFile(demoFile));
       record.subtitle = record.demoInfo.playedAtLabel;
       record.updated = "Demo processada pelo painel";
+    }
+    if (section === "matches" && record.leetifyUrl) {
+      Object.assign(record, await importLeetifyMatch(record.leetifyUrl, record));
+      leetifyImported = true;
+      record.updated = "Estatísticas conferidas pelo Leetify";
     }
     const index = list.findIndex((item) => item.id === editingId);
     if (index >= 0) list[index] = { ...list[index], ...record }; else list.unshift(record);
     if (section === "tournaments") ensureTournamentFixtures(index >= 0 ? list[index] : record);
     await persistContent();
     dialog.close();
-    showToast(demoFile?.size ? (record.statistics?.length ? `${record.name}: demo lida e ${record.statistics.length} jogadores extraídos` : `${record.name}: demo anexada; use Leetify ou print enquanto a extração estiver pendente`) : `${record.name} foi salvo`);
+    showToast(leetifyImported ? `${record.name}: ${record.statistics.length} jogadores e placar importados do Leetify` : demoFile?.size ? (record.statistics?.length ? `${record.name}: demo lida e ${record.statistics.length} jogadores extraídos` : `${record.name}: demo anexada; use Leetify ou print enquanto a extração estiver pendente`) : `${record.name} foi salvo`);
     if (returnSection) { const destination = returnSection; returnSection = null; go(destination); }
     else if (section === "tournaments") tournamentsView();
     else listView();
