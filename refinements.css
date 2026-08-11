@@ -1095,3 +1095,60 @@ footer p {
     min-height: 58px;
   }
 }
+
+.match-series-panel > .match-series-team {
+  display: grid;
+  grid-template-columns: 1fr 48px;
+}
+
+.match-series-panel > ol {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  border-top: 1px solid #394754;
+}
+
+.match-series-panel > ol > li {
+  min-height: 54px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 10px 14px;
+  border-bottom: 1px solid #394754;
+}
+
+.match-series-panel > ol > li > span {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.match-series-panel > ol b {
+  font: 600 14px Oswald, sans-serif;
+  color: #fff;
+}
+
+.match-series-panel > ol small {
+  color: #8e9ba7;
+  font: 700 8px "JetBrains Mono", monospace;
+}
+
+.match-series-panel > ol strong {
+  color: var(--amber2);
+  font: 700 15px "JetBrains Mono", monospace;
+  white-space: nowrap;
+}
+
+.match-series-panel > ol > li.missing {
+  background: #382d1d;
+}
+
+.match-series-panel > ol > li.missing strong,
+.match-series-panel > ol > li.missing small {
+  color: var(--amber2);
+}
+
+.series-sources .match-source {
+  flex: 1 1 190px;
+}
