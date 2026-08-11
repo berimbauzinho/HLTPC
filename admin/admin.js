@@ -18,8 +18,8 @@
   const expandedTournaments = new Set();
   let search = "";
   let demoParserPromise = null;
-  const DEMO_PARSER_MODULE = "https://cdn.jsdelivr.net/npm/@laihoe/demoparser2@0.42.0/wasm/pkg/demoparser2.js";
-  const DEMO_PARSER_WASM = "https://cdn.jsdelivr.net/npm/@laihoe/demoparser2@0.42.0/wasm/pkg/demoparser2_bg.wasm";
+  const DEMO_PARSER_MODULE = new URL("./vendor/demoparser2.js", window.location.href).href;
+  const DEMO_PARSER_WASM_PARTS = [1, 2, 3].map((part) => new URL(`./vendor/demoparser2_bg.wasm.part${part}`, window.location.href).href);
 
   const content = document.querySelector("#content");
   const dialog = document.querySelector("#editorDialog");
@@ -392,9 +392,19 @@
   async function loadDemoParser() {
     if (!demoParserPromise) {
       demoParserPromise = import(DEMO_PARSER_MODULE).then(async (parser) => {
-        await parser.default(DEMO_PARSER_WASM);
+        const responses = await Promise.all(DEMO_PARSER_WASM_PARTS.map((url) => fetch(url, { cache: "force-cache" })));
+        const failed = responses.find((response) => !response.ok);
+        if (failed) throw new Error(`arquivo local do parser respondeu ${failed.status}`);
+        const parts = await Promise.all(responses.map((response) => response.arrayBuffer()));
+        const bytes = new Uint8Array(parts.reduce((total, part) => total + part.byteLength, 0));
+        let offset = 0;
+        parts.forEach((part) => { bytes.set(new Uint8Array(part), offset); offset += part.byteLength; });
+        await parser.default(bytes);
         return parser;
-      }).catch((reason) => { demoParserPromise = null; throw reason; });
+      }).catch((reason) => {
+        demoParserPromise = null;
+        throw new Error(`Não foi possível carregar o leitor local da demo: ${reason.message || "erro desconhecido"}`);
+      });
     }
     return demoParserPromise;
   }
