@@ -16,7 +16,7 @@
     if (!saved) return;
     if (saved.name) event.name = saved.name;
     if (saved.subtitle && Number(saved.subtitle)) event.year = Number(saved.subtitle);
-    if (saved.format) event.format = saved.format;
+    if (saved.format && saved.format !== "A definir") event.format = saved.format;
   });
   if (Array.isArray(shared.matches)) data.matches = shared.matches.filter((item) => item.status === "published");
   if (Array.isArray(shared.news) && shared.news.length) data.news = shared.news.filter((item) => item.status === "published").map((item) => ({ id: item.id, title: item.name, summary: item.subtitle, author: item.author || "HLTPC", date: /^\d{4}-\d{2}-\d{2}$/.test(item.date || "") ? item.date : new Date().toISOString().slice(0, 10), tournamentId: item.tournamentId || null, image: item.image || "" }));
@@ -56,15 +56,23 @@
   function renderHero() {
     const news = [...data.news].sort((a, b) => b.date.localeCompare(a.date));
     let index = 0;
+    let timer = null;
     const draw = () => {
       const item = news[index];
       document.querySelector("#hero").innerHTML = item ? `<article class="hero news-hero" ${item.image ? `style="--hero-image:url('${escapeHtml(item.image)}')"` : ""}>
         <div class="hero-content"><span class="hero-tag">NOTÍCIA EM DESTAQUE</span><h1>${escapeHtml(item.title)}</h1><p>${escapeHtml(item.summary)}</p><div class="hero-news-meta"><time>${formatDate(item.date)}</time><span>por ${escapeHtml(item.author)}</span><a href="#noticias">Ver todas as notícias →</a></div></div>
-        ${news.length > 1 ? `<div class="hero-progress" aria-label="Notícia ${index + 1} de ${news.length}">${news.map((_, dot) => `<i class="${dot === index ? "active" : ""}"></i>`).join("")}</div>` : ""}
+        ${news.length > 1 ? `<div class="hero-progress" aria-label="Notícia ${index + 1} de ${news.length}">${news.map((_, dot) => `<button type="button" class="${dot === index ? "active" : ""}" data-hero-index="${dot}" aria-label="Mostrar notícia ${dot + 1}"></button>`).join("")}</div>` : ""}
       </article>` : `<article class="hero"><div class="hero-content"><span class="hero-tag">HLTPC</span><h1>Histórias da turma</h1><p>As notícias publicadas pelo painel administrativo aparecerão aqui.</p></div></article>`;
+      document.querySelectorAll("[data-hero-index]").forEach((button) => button.addEventListener("click", () => select(Number(button.dataset.heroIndex))));
+    };
+    const select = (next) => {
+      index = next;
+      draw();
+      if (timer) window.clearInterval(timer);
+      if (news.length > 1) timer = window.setInterval(() => { index = (index + 1) % news.length; draw(); }, 20000);
     };
     draw();
-    if (news.length > 1) window.setInterval(() => { index = (index + 1) % news.length; draw(); }, 20000);
+    if (news.length > 1) timer = window.setInterval(() => { index = (index + 1) % news.length; draw(); }, 20000);
   }
 
   function renderTicker() {
@@ -216,7 +224,8 @@
   function matchMarkup(match) {
     const teamA = match.teamA || match.teams?.[0] || "A definir";
     const teamB = match.teamB || match.teams?.[1] || "A definir";
-    return `<article class="event-match"><span>${escapeHtml(match.name || match.phase || "Partida")}</span><div><a href="#time/${encodeURIComponent(teamA)}">${escapeHtml(teamA)}</a><b>${escapeHtml(match.score || "—")}</b><a href="#time/${encodeURIComponent(teamB)}">${escapeHtml(teamB)}</a></div><small>${escapeHtml(match.subtitle || match.date || "Data a definir")}</small></article>`;
+    const stats = Array.isArray(match.statistics) ? match.statistics : [];
+    return `<article class="event-match-card"><div class="event-match"><span>${escapeHtml(match.name || match.phase || "Partida")}</span><div><a href="#time/${encodeURIComponent(teamA)}">${escapeHtml(teamA)}</a><b>${escapeHtml(match.score || "—")}</b><a href="#time/${encodeURIComponent(teamB)}">${escapeHtml(teamB)}</a></div><small>${escapeHtml(match.subtitle || match.date || "Data a definir")}</small></div>${match.demoInfo ? `<details class="demo-analysis"><summary><span>◉ Demo analisada</span><b>${escapeHtml(match.demoInfo.mapName || "Mapa não identificado")} · ${match.demoInfo.rounds || 0} rounds</b></summary>${stats.length ? `<div class="demo-stats"><div class="demo-stats-head"><span>Jogador</span><span>K</span><span>D</span><span>A</span><span>ADR</span><span>HS</span></div>${stats.map((player) => `<div>${playerHistory.has(player.name) ? `<a href="#jogador/${encodeURIComponent(player.name)}">${escapeHtml(player.name)}</a>` : `<strong>${escapeHtml(player.name)}</strong>`}<span>${player.kills}</span><span>${player.deaths}</span><span>${player.assists}</span><span>${player.adr ?? "—"}</span><span>${player.headshots}</span></div>`).join("")}</div>` : `<p>A demo foi reconhecida, mas não retornou estatísticas individuais.</p>`}</details>` : ""}</article>`;
   }
 
   function renderTournamentPage(event, tab = "overview") {
