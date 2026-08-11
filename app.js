@@ -251,11 +251,19 @@
     const groups = matches.filter((match) => match.round === "group");
     const semifinals = matches.filter((match) => match.round === "semifinal");
     const finals = matches.filter((match) => match.round === "final");
-    const columns = [];
-    if (groups.length) columns.push(`<section><header><b>Fase de grupos</b><small>${groups.length} partidas</small></header>${groups.map(matchMarkup).join("")}</section>`);
-    if (semifinals.length) columns.push(`<section><header><b>Semifinal${semifinals.length > 1 ? "is" : ""}</b><small>${semifinals.length} partida${semifinals.length > 1 ? "s" : ""}</small></header>${semifinals.map(matchMarkup).join("")}</section>`);
-    if (finals.length) columns.push(`<section><header><b>Final</b><small>Decisão do título</small></header>${finals.map(matchMarkup).join("")}</section>`);
-    return columns.length ? `<div class="public-bracket ${columns.length === 1 ? "single" : ""}>${columns.join(`<i class="public-bracket-arrow">→</i>`)}</div>` : "";
+    const stageMatch = (match) => {
+      const teamA = match.teamA || match.slotA || "A decidir";
+      const teamB = match.teamB || match.slotB || "A decidir";
+      const scores = String(match.score || "").match(/\d+/g) || [];
+      const teamRow = (team, confirmed, score, side) => `<div class="stage-team ${match.winner === team ? "winner" : ""}"><span>${confirmed && teams.has(team) ? teamBadge(team) : "?"}</span>${confirmed && teams.has(team) ? `<a href="#time/${encodeURIComponent(team)}">${escapeHtml(team)}</a>` : `<b>${escapeHtml(team)}</b>`}<strong>${score ?? (match.score ? "—" : "")}</strong><i>${side}</i></div>`;
+      return `<article class="stage-match"><header><time>${escapeHtml(match.subtitle || "Data a definir")}</time><em>MD${match.bestOf || 1}</em></header>${teamRow(teamA, Boolean(match.teamA), scores[0], "A")}${teamRow(teamB, Boolean(match.teamB), scores[1], "B")}<footer><span>${escapeHtml(match.name || "Partida")}</span>${match.demoInfo ? `<b>◉ Demo analisada</b>` : `<small>${match.score ? "Finalizada" : "Aguardando"}</small>`}</footer></article>`;
+    };
+    const playoffColumns = [];
+    if (semifinals.length) playoffColumns.push(`<section><header><b>Semifinal${semifinals.length > 1 ? "is" : ""}</b><small>${semifinals.length} confronto${semifinals.length > 1 ? "s" : ""}</small></header>${semifinals.map(stageMatch).join("")}</section>`);
+    if (finals.length) playoffColumns.push(`<section><header><b>Grande final</b><small>Decisão do título</small></header>${finals.map(stageMatch).join("")}</section>`);
+    const playoffs = playoffColumns.length ? `<section class="event-stage-block"><header><div><span>CHAVE</span><h3>Playoffs</h3></div><small>Os classificados avançam da esquerda para a direita</small></header><div class="playoff-bracket ${playoffColumns.length === 1 ? "single" : ""}">${playoffColumns.join(`<i class="stage-arrow">→</i>`)}</div></section>` : "";
+    const groupStage = groups.length ? `<section class="event-stage-block"><header><div><span>PRIMEIRA FASE</span><h3>Fase de grupos</h3></div><small>${groups.length} partidas previstas</small></header><div class="group-match-grid">${groups.map(stageMatch).join("")}</div></section>` : "";
+    return `<div class="event-competition">${playoffs}${groupStage}</div>`;
   }
 
   function renderTournamentPage(event, tab = "overview") {
