@@ -202,7 +202,7 @@
       document.querySelector("#hero").innerHTML = item ? `<article class="hero news-hero" ${item.image ? `style="--hero-image:url('${escapeHtml(item.image)}')"` : ""}>
         <div class="hero-content"><span class="hero-tag">NOTÍCIA EM DESTAQUE</span><h1>${escapeHtml(item.title)}</h1><p>${escapeHtml(item.summary)}</p><div class="hero-news-meta"><time>${formatDate(item.date)}</time><span>por ${escapeHtml(item.author)}</span><a href="#noticias">Ver todas as notícias →</a></div></div>
         ${news.length > 1 ? `<div class="hero-progress" aria-label="Notícia ${index + 1} de ${news.length}">${news.map((_, dot) => `<button type="button" class="${dot === index ? "active" : ""}" data-hero-index="${dot}" aria-label="Mostrar notícia ${dot + 1}"></button>`).join("")}</div>` : ""}
-      </article>` : `<article class="hero"><div class="hero-content"><span class="hero-tag">HLTPC</span><h1>Histórias da turma</h1><p>As notícias publicadas pelo painel administrativo aparecerão aqui.</p></div></article>`;
+      </article>` : `<article class="hero"><div class="hero-content"><span class="hero-tag">HLTPC</span><h1>A Plataforma Oficial do <span>TAMPICOUNTERS</span></h1><p>Campeonatos, equipes, jogadores e partidas reunidos em um só lugar.</p></div></article>`;
       document.querySelectorAll("[data-hero-index]").forEach((button) => button.addEventListener("click", () => select(Number(button.dataset.heroIndex))));
     };
     const select = (next) => {
