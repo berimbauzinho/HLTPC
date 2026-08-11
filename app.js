@@ -67,12 +67,91 @@
     catch (_) { return ""; }
   };
   const safeScoreboardImage = (value) => /^data:image\/(png|jpe?g|webp|gif);base64,/i.test(String(value || "")) ? String(value) : "";
+  const normalizedNick = (value) => String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("pt-BR").replace(/[^a-z0-9]/g, "");
+
+  function canonicalPublicPlayer(name, steamId = "") {
+    const bySteam = [...playerMeta.entries()].find(([, meta]) => steamId && String(meta.steamId || "") === String(steamId));
+    if (bySteam) return bySteam[0];
+    const normalized = normalizedNick(name);
+    const found = data.players.find((player) => {
+      const meta = playerMeta.get(player) || {};
+      return [player, meta.alias].some((value) => {
+        const candidate = normalizedNick(value);
+        return candidate && (candidate === normalized || (candidate.length >= 4 && normalized.startsWith(candidate)));
+      });
+    });
+    return found || String(name || "Desconhecido");
+  }
+
+  function leetifyId(value) {
+    return String(value || "").match(/match-details\/([0-9a-f-]{20,})/i)?.[1] || "";
+  }
+
+  function leetifyTeamMap(match, players, event) {
+    const roster = (team) => new Set((event?.entries.find((entry) => entry.team === team)?.players || []).map(normalizedNick));
+    const rosterA = roster(match.teamA);
+    const numbers = [...new Set(players.map((player) => Number(player.initialTeamNumber)).filter(Boolean))];
+    const matchesRoster = (number) => players.filter((player) => Number(player.initialTeamNumber) === number).reduce((total, player) => total + (rosterA.has(normalizedNick(canonicalPublicPlayer(player.name, player.steam64Id))) ? 1 : 0), 0);
+    const numberA = numbers.sort((a, b) => matchesRoster(b) - matchesRoster(a))[0];
+    return { numberA, numberB: numbers.find((number) => number !== numberA) };
+  }
+
+  function normalizeLeetifyMatch(match, payload) {
+    const event = data.tournaments.find((item) => item.id === match.tournamentId);
+    const players = Array.isArray(payload.playerStats) ? payload.playerStats : [];
+    const { numberA, numberB } = leetifyTeamMap(match, players, event);
+    const teamRounds = (number) => {
+      const player = players.find((item) => Number(item.initialTeamNumber) === number);
+      return player ? Number(player.ctRoundsWon || 0) + Number(player.tRoundsWon || 0) : 0;
+    };
+    const scoreA = teamRounds(numberA);
+    const scoreB = teamRounds(numberB);
+    const rounds = scoreA + scoreB;
+    const statistics = players.map((player) => {
+      const kills = Number(player.totalKills || 0);
+      const deaths = Number(player.totalDeaths || 0);
+      const teamNumber = Number(player.initialTeamNumber);
+      return {
+        steamid: String(player.steam64Id || ""),
+        name: canonicalPublicPlayer(player.name, player.steam64Id),
+        demoName: String(player.name || ""),
+        teamNumber,
+        team: teamNumber === numberA ? match.teamA : teamNumber === numberB ? match.teamB : "",
+        kills,
+        deaths,
+        assists: Number(player.totalAssists || 0),
+        adr: Number(Number(player.dpr || (rounds ? player.totalDamage / rounds : 0)).toFixed(1)),
+        kast: Number((Number(player.kast || 0) * 100).toFixed(1)),
+        rating: Number(Number(player.hltvRating || 0).toFixed(2)),
+        leetifyRating: Number(Number(player.leetifyRating || 0).toFixed(4)),
+        headshots: Math.round(kills * Number(player.hsp || 0)),
+        hsPercent: Number((Number(player.hsp || 0) * 100).toFixed(1))
+      };
+    }).sort((a, b) => b.rating - a.rating || b.kills - a.kills);
+    return {
+      ...match,
+      score: match.score || (scoreA || scoreB ? `${scoreA} - ${scoreB}` : ""),
+      winner: match.winner || (scoreA > scoreB ? match.teamA : scoreB > scoreA ? match.teamB : ""),
+      statistics,
+      statisticsSource: "leetify",
+      leetifyInfo: { ...(match.leetifyInfo || {}), matchId: payload.id, finishedAt: payload.finishedAt, mapName: payload.mapName, rounds, scoreA, scoreB, status: payload.status }
+    };
+  }
+
+  async function fetchLeetifyMatch(match) {
+    const matchId = leetifyId(match.leetifyUrl);
+    if (!matchId) return match;
+    const response = await fetch(`https://api.cs-prod.leetify.com/api/games/${encodeURIComponent(matchId)}`);
+    if (!response.ok) throw new Error(`Leetify respondeu ${response.status}`);
+    return normalizeLeetifyMatch(match, await response.json());
+  }
 
   function matchSourcesMarkup(match, compact = false) {
     const stats = Array.isArray(match.statistics) ? match.statistics : [];
     const leetifyUrl = safeLeetifyUrl(match.leetifyUrl);
     const scoreboardImage = safeScoreboardImage(match.scoreboardImage);
-    const demo = match.demoInfo ? `<span class="match-source ${stats.length ? "verified" : "partial"}"><b>${stats.length ? "◉ Demo confirmada" : "◌ Demo anexada"}</b>${compact ? "" : `<small>${stats.length ? `${stats.length} jogadores extraídos` : "Extração automática pendente"}</small>`}</span>` : "";
+    const demoHasStats = Boolean(match.demoInfo && match.statisticsSource !== "leetify" && stats.length);
+    const demo = match.demoInfo ? `<span class="match-source ${demoHasStats ? "verified" : "partial"}"><b>${demoHasStats ? "◉ Demo confirmada" : "◌ Demo anexada"}</b>${compact ? "" : `<small>${demoHasStats ? `${stats.length} jogadores extraídos` : "Extração automática pendente"}</small>`}</span>` : "";
     const leetify = leetifyUrl ? `<a class="match-source verified" href="${escapeHtml(leetifyUrl)}" target="_blank" rel="noopener noreferrer"><b>↗ Leetify</b>${compact ? "" : "<small>Conferir fonte secundária</small>"}</a>` : "";
     const screenshot = scoreboardImage ? `<a class="match-source verified" href="${escapeHtml(scoreboardImage)}" target="_blank" rel="noopener noreferrer"><b>▣ Print do placar</b>${compact ? "" : "<small>Abrir comprovação visual</small>"}</a>` : "";
     const content = `${demo}${leetify}${screenshot}`;
@@ -260,7 +339,7 @@
     const teamB = match.teamB || match.teams?.[1] || match.slotB || "A decidir";
     const stats = Array.isArray(match.statistics) ? match.statistics : [];
     const teamLink = (team, confirmed) => confirmed && teams.has(team) ? `<a href="#time/${encodeURIComponent(team)}">${escapeHtml(team)}</a>` : `<span class="pending-team">${escapeHtml(team)}</span>`;
-    return `<article class="event-match-card"><div class="event-match"><span>${escapeHtml(match.name || match.phase || "Partida")}${match.bestOf ? `<i>MD${match.bestOf}</i>` : ""}</span><div>${teamLink(teamA, Boolean(match.teamA))}<b>${escapeHtml(match.score || "—")}</b>${teamLink(teamB, Boolean(match.teamB))}</div><small>${escapeHtml(match.subtitle || match.date || "Data a definir")}</small></div>${matchSourcesMarkup(match)}${match.demoInfo ? `<details class="demo-analysis"><summary><span>${stats.length ? "◉ Estatísticas da demo" : "◌ Extração da demo pendente"}</span><b>${escapeHtml(match.demoInfo.mapName || "Mapa não identificado")} · ${match.demoInfo.rounds || 0} rounds</b></summary>${stats.length ? `<div class="demo-stats"><div class="demo-stats-head"><span>Jogador</span><span>K</span><span>D</span><span>A</span><span>ADR</span><span>HS</span></div>${stats.map((player) => `<div>${playerHistory.has(player.name) ? `<a href="#jogador/${encodeURIComponent(player.name)}">${escapeHtml(player.name)}</a>` : `<strong>${escapeHtml(player.name)}</strong>`}<span>${player.kills}</span><span>${player.deaths}</span><span>${player.assists}</span><span>${player.adr ?? "—"}</span><span>${player.headshots}</span></div>`).join("")}</div>` : `<p>A data da demo foi reconhecida, mas o leitor do navegador não conseguiu extrair os números. Confira o Leetify ou o print do placar, quando disponíveis.</p>`}</details>` : ""}</article>`;
+    return `<article class="event-match-card clickable-match" data-open-match="${escapeHtml(match.id)}" role="link" tabindex="0"><div class="event-match"><span>${escapeHtml(match.name || match.phase || "Partida")}${match.bestOf ? `<i>MD${match.bestOf}</i>` : ""}</span><div>${teamLink(teamA, Boolean(match.teamA))}<b>${escapeHtml(match.score || "—")}</b>${teamLink(teamB, Boolean(match.teamB))}</div><small>${escapeHtml(match.subtitle || match.date || "Data a definir")}</small></div>${matchSourcesMarkup(match)}${match.demoInfo ? `<details class="demo-analysis"><summary><span>${stats.length ? "◉ Estatísticas disponíveis" : "◌ Extração da demo pendente"}</span><b>${escapeHtml(match.demoInfo.mapName || match.leetifyInfo?.mapName || "Mapa não identificado")} · ${match.demoInfo.rounds || match.leetifyInfo?.rounds || 0} rounds</b></summary>${stats.length ? `<div class="demo-stats"><div class="demo-stats-head"><span>Jogador</span><span>K</span><span>D</span><span>A</span><span>ADR</span><span>HS</span></div>${stats.map((player) => `<div>${playerHistory.has(player.name) ? `<a href="#jogador/${encodeURIComponent(player.name)}">${escapeHtml(player.name)}</a>` : `<strong>${escapeHtml(player.name)}</strong>`}<span>${player.kills}</span><span>${player.deaths}</span><span>${player.assists}</span><span>${player.adr ?? "—"}</span><span>${player.headshots}</span></div>`).join("")}</div>` : `<p>A data da demo foi reconhecida, mas o leitor do navegador não conseguiu extrair os números. Confira o Leetify ou o print do placar, quando disponíveis.</p>`}</details>` : ""}</article>`;
   }
 
   function eventBracketMarkup(matches) {
@@ -272,7 +351,7 @@
       const teamB = match.teamB || match.slotB || "A decidir";
       const scores = String(match.score || "").match(/\d+/g) || [];
       const teamRow = (team, confirmed, score, side) => `<div class="stage-team ${match.winner === team ? "winner" : ""}"><span>${confirmed && teams.has(team) ? teamBadge(team) : "?"}</span>${confirmed && teams.has(team) ? `<a href="#time/${encodeURIComponent(team)}">${escapeHtml(team)}</a>` : `<b>${escapeHtml(team)}</b>`}<strong>${score ?? (match.score ? "—" : "")}</strong><i>${side}</i></div>`;
-      return `<article class="stage-match"><header><time>${escapeHtml(match.subtitle || "Data a definir")}</time><em>MD${match.bestOf || 1}</em></header>${teamRow(teamA, Boolean(match.teamA), scores[0], "A")}${teamRow(teamB, Boolean(match.teamB), scores[1], "B")}<footer><span>${escapeHtml(match.name || "Partida")}</span>${matchSourcesMarkup(match, true) || `<small>${match.score ? "Finalizada" : "Aguardando"}</small>`}</footer></article>`;
+      return `<article class="stage-match clickable-match" data-open-match="${escapeHtml(match.id)}" role="link" tabindex="0"><header><time>${escapeHtml(match.subtitle || "Data a definir")}</time><em>MD${match.bestOf || 1}</em></header>${teamRow(teamA, Boolean(match.teamA), scores[0], "A")}${teamRow(teamB, Boolean(match.teamB), scores[1], "B")}<footer><span>${escapeHtml(match.name || "Partida")}</span>${matchSourcesMarkup(match, true) || `<small>${match.score ? "Finalizada" : "Aguardando"}</small>`}</footer></article>`;
     };
     const playoffColumns = [];
     if (semifinals.length) playoffColumns.push(`<section><header><b>Semifinal${semifinals.length > 1 ? "is" : ""}</b><small>${semifinals.length} confronto${semifinals.length > 1 ? "s" : ""}</small></header>${semifinals.map(stageMatch).join("")}</section>`);
@@ -295,6 +374,60 @@
     document.querySelector("#tournamentPage").innerHTML = `<a class="profile-back" href="#campeonatos">← Voltar aos campeonatos</a><header class="event-hero">${savedEvent.logo ? `<img class="event-logo" src="${escapeHtml(savedEvent.logo)}" alt="" />` : ""}<span>${event.status === "ongoing" ? "EM ANDAMENTO" : "FINALIZADO"}</span><h1>${escapeHtml(event.name)} <b>${event.year}</b></h1><p>${categoryLabel(event.category)} · ${event.entries.length} times</p></header>${tabs}${body}`;
   }
 
+  const mapLabel = (value) => ({ de_inferno: "Inferno", de_mirage: "Mirage", de_nuke: "Nuke", de_anubis: "Anubis", de_ancient: "Ancient", de_dust2: "Dust II", de_vertigo: "Vertigo", de_overpass: "Overpass", de_train: "Train" }[String(value || "").toLowerCase()] || String(value || "Mapa a definir").replace(/^de_/, ""));
+  const teamLogoMarkup = (team) => `<span class="match-team-logo">${teamBadge(team)}</span>`;
+  const ratingTone = (rating) => Number(rating) >= 1.1 ? "high" : Number(rating) < .9 ? "low" : "mid";
+
+  function matchStatsTable(team, stats) {
+    const rows = stats.filter((player) => player.team === team);
+    if (!rows.length) return "";
+    return `<section class="match-stat-team"><header>${teamLogoMarkup(team)}<a href="#time/${encodeURIComponent(team)}">${escapeHtml(team)}</a><span>${rows.length} jogadores</span></header><div class="match-stat-head"><span>Jogador</span><span>K-D</span><span>+/-</span><span>ADR</span><span>KAST</span><span>Rating</span></div>${rows.map((player) => {
+      const difference = Number(player.kills || 0) - Number(player.deaths || 0);
+      const known = playerHistory.has(player.name);
+      return `<div class="match-stat-row"><span>${known ? `<a href="#jogador/${encodeURIComponent(player.name)}">${escapeHtml(player.name)}</a>` : `<b>${escapeHtml(player.demoName || player.name)}</b>`}${player.demoName && player.demoName !== player.name ? `<small>jogou como ${escapeHtml(player.demoName)}</small>` : ""}</span><span>${player.kills}-${player.deaths}</span><span class="${difference > 0 ? "positive" : difference < 0 ? "negative" : ""}">${difference > 0 ? "+" : ""}${difference}</span><span>${player.adr ?? "—"}</span><span>${player.kast != null ? `${player.kast}%` : "—"}</span><strong class="${ratingTone(player.rating)}">${player.rating || "—"}</strong></div>`;
+    }).join("")}</section>`;
+  }
+
+  function matchLineup(team, event, stats) {
+    const roster = event?.entries.find((entry) => entry.team === team)?.players || stats.filter((player) => player.team === team).map((player) => player.name);
+    return `<section class="match-lineup"><header>${teamLogoMarkup(team)}<a href="#time/${encodeURIComponent(team)}">${escapeHtml(team)}</a></header><div>${roster.map((player) => {
+      const meta = playerMeta.get(player) || {};
+      return `<a href="#jogador/${encodeURIComponent(player)}"><span>${meta.photo ? `<img src="${escapeHtml(meta.photo)}" alt="" />` : escapeHtml(player.slice(0, 2).toUpperCase())}</span><b>${escapeHtml(player)}</b></a>`;
+    }).join("")}</div></section>`;
+  }
+
+  function drawMatchPage(match, options = {}) {
+    const event = data.tournaments.find((item) => item.id === match.tournamentId);
+    const teamA = match.teamA || match.slotA || "A decidir";
+    const teamB = match.teamB || match.slotB || "A decidir";
+    const stats = Array.isArray(match.statistics) ? match.statistics : [];
+    const scores = String(match.score || "").match(/\d+/g) || [];
+    const mapName = mapLabel(match.leetifyInfo?.mapName || match.demoInfo?.mapName);
+    const leetifyUrl = safeLeetifyUrl(match.leetifyUrl);
+    const scoreboardImage = safeScoreboardImage(match.scoreboardImage);
+    const mvp = [...stats].sort((a, b) => Number(b.rating || 0) - Number(a.rating || 0) || Number(b.kills || 0) - Number(a.kills || 0))[0];
+    const mvpMeta = mvp && playerMeta.get(mvp.name) || {};
+    const sourceLabel = match.statisticsSource === "leetify" ? "Leetify" : match.statisticsSource === "demo" ? "Demo" : "Aguardando extração";
+    const back = event ? `#campeonato/${encodeURIComponent(event.id)}/matches` : "#campeonatos";
+    const statsBody = stats.length ? `${matchStatsTable(teamA, stats)}${matchStatsTable(teamB, stats)}` : `<div class="match-loading"><b>${options.loading ? "Buscando os números no Leetify…" : "Estatísticas ainda não disponíveis"}</b><span>${options.error ? escapeHtml(options.error) : "A demo e as fontes continuam anexadas à partida."}</span></div>`;
+    document.querySelector("#matchPage").innerHTML = `<a class="profile-back" href="${back}">← Voltar ao campeonato</a><article class="match-detail-page"><header class="match-detail-hero"><a class="match-event-link" href="#campeonato/${encodeURIComponent(event?.id || "")}/overview">${escapeHtml(event?.name || "Campeonato HLTPC")} ${event?.year || ""}</a><div class="match-detail-team team-a">${teamLogoMarkup(teamA)}<a href="#time/${encodeURIComponent(teamA)}">${escapeHtml(teamA)}</a></div><div class="match-detail-score"><time>${escapeHtml(match.subtitle || "Data a definir")}</time><strong>${scores.length ? `${scores[0]} <i>:</i> ${scores[1]}` : "VS"}</strong><span>${escapeHtml(match.name || "Partida")} · MD${match.bestOf || 1}</span></div><div class="match-detail-team team-b">${teamLogoMarkup(teamB)}<a href="#time/${encodeURIComponent(teamB)}">${escapeHtml(teamB)}</a></div></header><nav class="match-detail-tabs"><span class="active">Overview</span><a href="#campeonato/${encodeURIComponent(event?.id || "")}/matches">Campeonato</a></nav><div class="match-detail-grid"><section class="match-map-panel"><header><span>MAPA</span><b>${escapeHtml(mapName)}</b></header><div><a href="#time/${encodeURIComponent(teamA)}">${escapeHtml(teamA)}</a><strong>${scores[0] ?? "—"}</strong></div><div><a href="#time/${encodeURIComponent(teamB)}">${escapeHtml(teamB)}</a><strong>${scores[1] ?? "—"}</strong></div><small>${match.leetifyInfo?.rounds || match.demoInfo?.rounds || 0} rounds registrados</small></section><section class="match-proof-panel"><header><span>FONTES</span><b>Conferência dos dados</b></header>${matchSourcesMarkup(match)}${scoreboardImage ? `<a class="scoreboard-evidence" href="${escapeHtml(scoreboardImage)}" target="_blank" rel="noopener"><img src="${escapeHtml(scoreboardImage)}" alt="Print do placar final" /><span>Abrir print do placar ↗</span></a>` : ""}${leetifyUrl ? `<a class="external-source" href="${escapeHtml(leetifyUrl)}" target="_blank" rel="noopener">Abrir partida no Leetify ↗</a>` : ""}</section></div><section class="match-stats-section"><header><div><span>DESEMPENHO</span><h2>Estatísticas da partida</h2></div><small>Fonte: ${sourceLabel}</small></header>${statsBody}</section>${stats.length ? `<section class="match-lineups-section"><header><span>ESCALAÇÕES</span><h2>Lineups</h2></header><div>${matchLineup(teamA, event, stats)}${matchLineup(teamB, event, stats)}</div></section>` : ""}${mvp ? `<section class="match-mvp"><div class="match-mvp-photo">${mvpMeta.photo ? `<img src="${escapeHtml(mvpMeta.photo)}" alt="" />` : escapeHtml((mvp.name || "MVP").slice(0, 2).toUpperCase())}</div><div><span>DESTAQUE DA PARTIDA</span><h2>${playerHistory.has(mvp.name) ? `<a href="#jogador/${encodeURIComponent(mvp.name)}">${escapeHtml(mvp.name)}</a>` : escapeHtml(mvp.demoName || mvp.name)}</h2><p>${mvp.kills}-${mvp.deaths} · ${mvp.adr} ADR · ${mvp.kast}% KAST</p></div><strong>${mvp.rating}<small>Rating</small></strong></section>` : ""}</article>`;
+  }
+
+  let matchRenderToken = 0;
+  async function renderMatchPage(match) {
+    const token = ++matchRenderToken;
+    const shouldFetch = !Array.isArray(match.statistics) || !match.statistics.length;
+    drawMatchPage(match, { loading: shouldFetch && Boolean(leetifyId(match.leetifyUrl)) });
+    if (!shouldFetch || !leetifyId(match.leetifyUrl)) return;
+    try {
+      const enriched = await fetchLeetifyMatch(match);
+      Object.assign(match, enriched);
+      if (token === matchRenderToken) drawMatchPage(match);
+    } catch (reason) {
+      if (token === matchRenderToken) drawMatchPage(match, { error: `Não foi possível consultar o Leetify: ${reason.message}` });
+    }
+  }
+
   function navigate() {
     const requested = location.hash.slice(1) || "inicio";
     const [requestedRoute, parameter, detail] = requested.split("/");
@@ -311,13 +444,28 @@
       const event = data.tournaments.find((item) => item.id === decodeURIComponent(parameter));
       if (event) renderTournamentPage(event, detail); else location.hash = "campeonatos";
     }
+    if (route === "partida" && parameter) {
+      const match = data.matches.find((item) => item.id === decodeURIComponent(parameter));
+      if (match) renderMatchPage(match); else location.hash = "campeonatos";
+    }
     document.querySelectorAll(".view").forEach((view) => view.classList.toggle("active", view.dataset.view === route));
-    const navRoute = ({ jogador: "jogadores", time: "times", campeonato: "campeonatos" })[route] || route;
+    const navRoute = ({ jogador: "jogadores", time: "times", campeonato: "campeonatos", partida: "campeonatos" })[route] || route;
     document.querySelectorAll("[data-route]").forEach((link) => link.classList.toggle("active", link.dataset.route === navRoute));
     window.scrollTo({ top: 0, behavior: "instant" });
   }
 
   document.querySelector("#playerSearch").addEventListener("input", (event) => renderPlayers(event.target.value));
+  document.addEventListener("click", (event) => {
+    const card = event.target.closest("[data-open-match]");
+    if (!card || event.target.closest("a,button,summary")) return;
+    location.hash = `partida/${encodeURIComponent(card.dataset.openMatch)}/overview`;
+  });
+  document.addEventListener("keydown", (event) => {
+    const card = event.target.closest("[data-open-match]");
+    if (!card || !["Enter", " "].includes(event.key)) return;
+    event.preventDefault();
+    location.hash = `partida/${encodeURIComponent(card.dataset.openMatch)}/overview`;
+  });
   document.querySelectorAll("#tournamentFilters button").forEach((button) => button.addEventListener("click", () => {
     document.querySelectorAll("#tournamentFilters button").forEach((item) => item.classList.remove("active"));
     button.classList.add("active");
