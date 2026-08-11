@@ -14,6 +14,7 @@
   const singular = { players: "jogador", teams: "time", tournaments: "campeonato", matches: "partida", news: "notícia" };
   let section = "overview";
   let editingId = null;
+  let returnSection = null;
   let search = "";
   let demoParserPromise = null;
   const DEMO_PARSER_MODULE = "https://cdn.jsdelivr.net/npm/@laihoe/demoparser2@0.42.0/wasm/pkg/demoparser2.js";
@@ -69,10 +70,10 @@
       </div>
       <div class="dashboard-grid">
         <section class="panel"><div class="panel-title">O que você poderá fazer</div>
-          ${[["✓","Cadastrar jogadores e aliases"],["✓","Criar times e selecionar logos"],["✓","Montar campeonatos e escalações"],["✓","Registrar partidas, mapas e resultados"],["✓","Publicar notícias compartilhadas"],["⇧","Enviar demos para processamento"]].map((item) => `<div class="activity"><span>${item[0]}</span><div><b>${item[1]}</b><small>Disponível para teste visual nesta demonstração</small></div></div>`).join("")}
+          ${[["✓","Cadastrar jogadores e aliases"],["✓","Criar times e selecionar logos"],["✓","Montar campeonatos, brackets e partidas"],["✓","Abrir cada confronto para lançar resultado"],["✓","Publicar notícias compartilhadas"],["⇧","Enviar demos dentro da própria partida"]].map((item) => `<div class="activity"><span>${item[0]}</span><div><b>${item[1]}</b><small>Disponível no painel conectado</small></div></div>`).join("")}
         </section>
         <section class="panel"><div class="panel-title">Acesso rápido</div>
-          ${[["players","♟"],["teams","◆"],["tournaments","★"],["matches","◫"],["news","▤"]].map(([key, icon]) => `<button class="quick" data-go="${key}"><i>${icon}</i><span><b>${labels[key]}</b><small>Abrir gerenciamento</small></span><em>›</em></button>`).join("")}
+          ${[["players","♟"],["teams","◆"],["tournaments","★"],["news","▤"]].map(([key, icon]) => `<button class="quick" data-go="${key}"><i>${icon}</i><span><b>${labels[key]}</b><small>Abrir gerenciamento</small></span><em>›</em></button>`).join("")}
         </section>
       </div>`;
     bindActions();
@@ -98,6 +99,56 @@
       ${items.length ? `<div class="data-table"><div class="table-head"><span>NOME</span><span>DETALHE</span><span>ORIGEM / ATUALIZAÇÃO</span><span>STATUS</span><span></span></div>${items.map(tableRow).join("")}</div>` : `<div class="empty"><span>＋</span><h3>Nenhum registro</h3><p>Adicione o primeiro ${singular[section]} para testar o fluxo.</p></div>`}`;
     bindActions();
     document.querySelector("#adminSearch")?.addEventListener("input", (event) => { search = event.target.value; listView(); document.querySelector("#adminSearch")?.focus(); });
+  }
+
+  function fixtureTeam(match, side) {
+    return match[`team${side}`] || match[`slot${side}`] || "A decidir";
+  }
+
+  function adminFixtureCard(match) {
+    const teamA = fixtureTeam(match, "A");
+    const teamB = fixtureTeam(match, "B");
+    const decided = Boolean(match.teamA && match.teamB);
+    const completed = Boolean(match.score || match.status === "finished");
+    return `<button type="button" class="admin-fixture ${completed ? "completed" : ""}" data-edit-match="${escapeHtml(match.id)}">
+      <span><b>${escapeHtml(match.name)}</b><em>MD${match.bestOf || 1}</em></span>
+      <div><strong>${escapeHtml(teamA)}</strong><i>${escapeHtml(match.score || "—")}</i><strong>${escapeHtml(teamB)}</strong></div>
+      <small>${completed ? "Resultado lançado" : decided ? escapeHtml(match.subtitle || "Data a definir") : "Aguardando definição"}<u>Editar partida →</u></small>
+    </button>`;
+  }
+
+  function adminBracket(tournament, matches) {
+    const groups = matches.filter((match) => match.round === "group");
+    const semifinals = matches.filter((match) => match.round === "semifinal");
+    const finals = matches.filter((match) => match.round === "final");
+    const columns = [];
+    if (groups.length) columns.push(`<section><header><span>1</span><div><b>Fase de grupos</b><small>${groups.length} confrontos</small></div></header>${groups.map(adminFixtureCard).join("")}</section>`);
+    if (semifinals.length) columns.push(`<section><header><span>${columns.length + 1}</span><div><b>Semifinal${semifinals.length > 1 ? "is" : ""}</b><small>${semifinals.length} confronto${semifinals.length > 1 ? "s" : ""}</small></div></header>${semifinals.map(adminFixtureCard).join("")}</section>`);
+    if (finals.length) columns.push(`<section><header><span>${columns.length + 1}</span><div><b>Final</b><small>Decisão do título</small></div></header>${finals.map(adminFixtureCard).join("")}</section>`);
+    return `<div class="admin-bracket ${columns.length === 1 ? "single" : ""}">${columns.join(`<i class="bracket-arrow">→</i>`)}</div>`;
+  }
+
+  function tournamentsView() {
+    const tournaments = [...state.tournaments].sort((a, b) => Number(b.subtitle || 0) - Number(a.subtitle || 0));
+    content.innerHTML = `${pageTitle("Campeonatos", "Crie o evento, publique a estrutura e atualize cada partida no mesmo lugar.")}
+      <div class="championship-flow"><b>1. Configure</b><span>→</span><b>2. Publique o bracket</b><span>→</span><b>3. Abra a partida</b><span>→</span><b>4. Envie demo e resultado</b></div>
+      <div class="championship-workspace">${tournaments.map((tournament) => {
+        const definition = formatDefinition(tournament.formatType);
+        const matches = state.matches.filter((match) => match.tournamentId === tournament.id).sort((a, b) => (a.order || 999) - (b.order || 999));
+        const completed = matches.filter((match) => match.score || match.status === "finished").length;
+        return `<article class="admin-championship">
+          <header><div class="championship-identity">${tournament.logo ? `<img src="${escapeHtml(tournament.logo)}" alt="" />` : `<span>${initials(tournament.name)}</span>`}<div><small>${escapeHtml(tournament.subtitle || "ANO A DEFINIR")}</small><h2>${escapeHtml(tournament.name)}</h2><p>${definition ? escapeHtml(definition.label) : "Formato a definir"} · ${(tournament.teams || []).length} times</p></div></div><div class="championship-actions"><span class="badge ${tournament.status === "draft" ? "draft" : ""}">${tournament.status === "draft" ? "Rascunho" : "Publicado"}</span><a class="ghost" href="../#campeonato/${encodeURIComponent(tournament.id)}/overview" target="_blank">Ver público ↗</a><button class="ghost" data-edit-event="${escapeHtml(tournament.id)}">Editar campeonato</button></div></header>
+          <div class="championship-progress"><span><b>${completed}/${matches.length}</b> partidas concluídas</span><span>${matches.length ? "Clique em qualquer partida para lançar os dados" : "Salve um formato válido para gerar o bracket"}</span></div>
+          ${matches.length ? adminBracket(tournament, matches) : `<div class="empty compact"><h3>Estrutura ainda não gerada</h3><p>Edite o campeonato e selecione o formato e os participantes.</p></div>`}
+        </article>`;
+      }).join("")}</div>`;
+    bindActions();
+    document.querySelectorAll("[data-edit-event]").forEach((button) => button.addEventListener("click", () => openEditor(button.dataset.editEvent)));
+    document.querySelectorAll("[data-edit-match]").forEach((button) => button.addEventListener("click", () => {
+      returnSection = "tournaments";
+      section = "matches";
+      openEditor(button.dataset.editMatch);
+    }));
   }
 
   function tableRow(item) {
@@ -207,7 +258,7 @@
 
   function tournamentFixtures(tournament) {
     const teams = tournament.teams || [];
-    const common = { tournamentId: tournament.id, subtitle: "Data a definir", score: "", status: "draft", generatedByFormat: true, formatType: tournament.formatType };
+    const common = { tournamentId: tournament.id, subtitle: "Data a definir", score: "", status: tournament.status === "published" ? "published" : "draft", generatedByFormat: true, formatType: tournament.formatType };
     if (tournament.formatType === "two_team_md3" && teams.length === 2) {
       return [{ ...common, id: `${tournament.id}-final`, name: "Final · MD3", teamA: teams[0], teamB: teams[1], slotA: teams[0], slotB: teams[1], round: "final", bestOf: 3, order: 1, updated: "Final gerada pelo formato" }];
     }
@@ -241,6 +292,7 @@
       const current = state.matches.find((match) => match.id === fixture.id);
       if (!current) { state.matches.push(fixture); changed = true; return; }
       const structure = { slotA: fixture.slotA, slotB: fixture.slotB, round: fixture.round, bestOf: fixture.bestOf, order: fixture.order, generatedByFormat: true, formatType: tournament.formatType };
+      if ((!current.status || current.status === "draft") && fixture.status === "published") structure.status = "published";
       if (!current.demoInfo && !current.score && fixture.teamA && fixture.teamB) { structure.teamA = fixture.teamA; structure.teamB = fixture.teamB; }
       Object.entries(structure).forEach(([key, value]) => { if (current[key] !== value) { current[key] = value; changed = true; } });
     });
@@ -432,7 +484,9 @@
     await persistContent();
     dialog.close();
     showToast(demoFile?.size ? `${record.name}: demo lida e estatísticas anexadas` : `${record.name} foi salvo`);
-    listView();
+    if (returnSection) { const destination = returnSection; returnSection = null; go(destination); }
+    else if (section === "tournaments") tournamentsView();
+    else listView();
   }
 
   async function deleteEditor() {
@@ -464,13 +518,18 @@
     document.querySelector("#breadcrumb").textContent = labels[section];
     document.querySelectorAll("#adminNav button").forEach((button) => button.classList.toggle("active", button.dataset.section === section));
     document.querySelector(".sidebar").classList.remove("open");
-    if (section === "overview") overview(); else if (section === "users") usersView(); else listView();
+    if (section === "overview") overview(); else if (section === "users") usersView(); else if (section === "tournaments") tournamentsView(); else listView();
+  }
+
+  function closeEditor() {
+    dialog.close();
+    if (returnSection) { section = returnSection; returnSection = null; }
   }
 
   document.querySelectorAll("#adminNav button").forEach((button) => button.addEventListener("click", () => go(button.dataset.section)));
   document.querySelector("#mobileMenu").addEventListener("click", () => document.querySelector(".sidebar").classList.toggle("open"));
-  document.querySelector("#closeDialog").addEventListener("click", () => dialog.close());
-  document.querySelector("#cancelButton").addEventListener("click", () => dialog.close());
+  document.querySelector("#closeDialog").addEventListener("click", closeEditor);
+  document.querySelector("#cancelButton").addEventListener("click", closeEditor);
   deleteButton.addEventListener("click", async () => { try { await deleteEditor(); } catch (reason) { showToast(reason.message); } });
   form.addEventListener("submit", async (event) => { event.preventDefault(); if (!form.reportValidity()) return; try { await saveEditor(); } catch (reason) { showToast(reason.message); } });
 
