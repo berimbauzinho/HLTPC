@@ -111,10 +111,11 @@
     const teamB = fixtureTeam(match, "B");
     const decided = Boolean(match.teamA && match.teamB);
     const completed = Boolean(match.score || match.status === "finished");
+    const sources = [match.demoInfo ? `<i class="source-chip ${match.statistics?.length ? "ok" : "partial"}">DEMO</i>` : "", match.leetifyUrl ? `<i class="source-chip ok">LEETIFY</i>` : "", match.scoreboardImage ? `<i class="source-chip ok">PRINT</i>` : ""].join("");
     return `<button type="button" class="admin-fixture ${completed ? "completed" : ""}" data-edit-match="${escapeHtml(match.id)}">
       <span><b>${escapeHtml(match.name)}</b><em>MD${match.bestOf || 1}</em></span>
       <div><strong>${escapeHtml(teamA)}</strong><i>${escapeHtml(match.score || "—")}</i><strong>${escapeHtml(teamB)}</strong></div>
-      <small>${completed ? "Resultado lançado" : decided ? escapeHtml(match.subtitle || "Data a definir") : "Aguardando definição"}<u>Editar partida →</u></small>
+      <small>${completed ? "Resultado lançado" : decided ? escapeHtml(match.subtitle || "Data a definir") : "Aguardando definição"}<span class="fixture-sources">${sources}</span><u>Editar partida →</u></small>
     </button>`;
   }
 
@@ -243,14 +244,29 @@
       const tournament = state.tournaments.find((event) => event.id === item.tournamentId);
       const tournamentField = generated ? `<input type="hidden" name="tournamentId" value="${escapeHtml(item.tournamentId)}" /><div class="fixture-source"><b>${escapeHtml(tournament?.name || "Campeonato")}</b><span>${escapeHtml(item.slotA || "Time A")} × ${escapeHtml(item.slotB || "Time B")}</span></div>` : `<label>Campeonato<select name="tournamentId" id="matchTournament" required><option value="">Selecione primeiro o campeonato</option>${state.tournaments.map((event) => `<option value="${escapeHtml(event.id)}" ${item.tournamentId === event.id ? "selected" : ""}>${escapeHtml(event.name)} ${escapeHtml(event.subtitle)}</option>`).join("")}</select></label>`;
       const teamsField = lockedGroupMatch ? `<input type="hidden" name="teamA" value="${escapeHtml(item.teamA)}" /><input type="hidden" name="teamB" value="${escapeHtml(item.teamB)}" /><div class="locked-match-teams"><b>${escapeHtml(item.teamA)}</b><span>×</span><b>${escapeHtml(item.teamB)}</b></div>` : `<div class="field-row"><label>Time A<select name="teamA" id="matchTeamA" required></select></label><label>Time B<select name="teamB" id="matchTeamB" required></select></label></div>`;
-      return `${tournamentField}${teamsField}${textField("name", "Fase", item.name, "Ex.: Semifinal", true)}<div class="field-row">${textField("score", "Placar / mapas", item.score, "Somente após confirmação")}${selectField("status", item.status)}</div>${fileField("demo", "Ler demo e anexar estatísticas", ".dem")}${item.demoInfo ? `<div class="demo-result ${item.demoInfo.warnings?.length ? "partial" : ""}"><b>${item.demoInfo.warnings?.length ? "⚠ Demo processada parcialmente" : "✓ Demo processada"}</b><span>${escapeHtml(item.demoInfo.fileName)} · ${escapeHtml(item.demoInfo.mapName || "mapa não identificado")} · ${item.demoInfo.rounds || 0} rounds</span><small>${escapeHtml(item.demoInfo.playedAtLabel || item.subtitle || "Data não identificada")} · ${(item.statistics || []).length} jogadores extraídos</small>${item.demoInfo.warnings?.length ? `<small>${escapeHtml(item.demoInfo.warnings.join(" · "))}</small>` : ""}</div>` : ""}<div class="helper" id="matchHelper">${generated ? "A data e a hora serão extraídas automaticamente do nome da demo. As estatísticas ficarão ligadas exclusivamente a este confronto." : "Escolha uma edição: os times serão limitados exclusivamente às escalações daquele campeonato."}</div>`;
+      const demoHasStats = Boolean(item.demoInfo && (item.statistics || []).length);
+      const sourceSummary = item.demoInfo || item.leetifyUrl || item.scoreboardImage ? `<div class="match-source-summary"><span class="${demoHasStats ? "verified" : item.demoInfo ? "partial" : "muted"}"><b>${demoHasStats ? "1 · Demo confirmada" : item.demoInfo ? "1 · Demo anexada" : "1 · Sem demo"}</b><small>${item.demoInfo ? `${escapeHtml(item.demoInfo.fileName)}${demoHasStats ? ` · ${(item.statistics || []).length} jogadores` : " · extração automática pendente"}` : "Fonte primária"}</small></span><span class="${item.leetifyUrl ? "verified" : "muted"}"><b>2 · Leetify</b><small>${item.leetifyUrl ? "Link salvo como conferência" : "Fonte secundária opcional"}</small></span><span class="${item.scoreboardImage ? "verified" : "muted"}"><b>3 · Print do placar</b><small>${item.scoreboardImage ? "Imagem salva como comprovação" : "Evidência visual opcional"}</small></span></div>` : "";
+      return `${tournamentField}${teamsField}${textField("name", "Fase", item.name, "Ex.: Semifinal", true)}<div class="field-row">${textField("score", "Placar / mapas", item.score, "Somente após confirmação")}${selectField("status", item.status)}</div><fieldset class="match-evidence"><legend>Fontes dos dados</legend><div class="evidence-order"><b>1</b><span><strong>Demo · fonte principal</strong><small>O painel tenta extrair data e estatísticas automaticamente.</small></span></div>${fileField("demo", "Selecionar arquivo .dem", ".dem")}${item.demoInfo ? `<div class="demo-result ${demoHasStats ? "" : "partial"}"><b>${demoHasStats ? "✓ Demo processada" : "⚠ Demo anexada, sem estatísticas automáticas"}</b><span>${escapeHtml(item.demoInfo.fileName)} · ${escapeHtml(item.demoInfo.mapName || "mapa não identificado")} · ${item.demoInfo.rounds || 0} rounds</span><small>${escapeHtml(item.demoInfo.playedAtLabel || item.subtitle || "Data não identificada")} · ${(item.statistics || []).length} jogadores extraídos</small>${item.demoInfo.warnings?.length ? `<small>${escapeHtml(item.demoInfo.warnings.join(" · "))}</small>` : ""}</div>` : ""}<div class="evidence-order"><b>2</b><span><strong>Leetify · fonte secundária</strong><small>Use para conferir placar e números quando a demo estiver incompleta.</small></span></div>${urlField("leetifyUrl", "Link da partida no Leetify", item.leetifyUrl, "https://leetify.com/app/match-details/...")}<div class="evidence-order"><b>3</b><span><strong>Print do placar · comprovação visual</strong><small>Envie a tela final quando a demo ou o Leetify não trouxerem tudo.</small></span></div>${fileField("scoreboardImage", item.scoreboardImage ? "Substituir print do placar" : "Enviar print do placar", "image/*")}${item.scoreboardImage ? `<div class="scoreboard-preview"><img src="${escapeHtml(item.scoreboardImage)}" alt="Print do placar salvo" /><span><b>Print salvo</b><small>Um novo arquivo substituirá esta imagem.</small><label><input type="checkbox" name="removeScoreboardImage" value="true" /> Remover print atual</label></span></div>` : ""}</fieldset>${sourceSummary}<div class="helper" id="matchHelper">${generated ? "A data e a hora serão extraídas automaticamente do nome da demo. As três fontes ficam ligadas exclusivamente a este confronto." : "Escolha uma edição: os times serão limitados exclusivamente às escalações daquele campeonato."}</div>`;
     }
     return `${textField("name", "Título", item.name, "Título da notícia", true)}<label>Texto / resumo<textarea name="subtitle" placeholder="Escreva a notícia...">${escapeHtml(item.subtitle)}</textarea></label><div class="field-row">${textField("author", "Autor", item.author, "HLTPC")}${textField("date", "Data", item.date, "2026-08-10", true)}</div>${selectField("status", item.status)}${fileField("image", "Imagem de destaque", "image/*")}`;
   }
 
   function textField(name, label, value = "", placeholder = "", required = false) { return `<label>${label}<input name="${name}" value="${escapeHtml(value)}" placeholder="${placeholder}" ${required ? "required" : ""} /></label>`; }
+  function urlField(name, label, value = "", placeholder = "") { return `<label>${label}<input name="${name}" type="url" inputmode="url" value="${escapeHtml(value)}" placeholder="${placeholder}" /></label>`; }
   function selectField(name, value = "draft") { return `<label>Status<select name="${name}"><option value="draft" ${value === "draft" ? "selected" : ""}>Rascunho</option><option value="published" ${value === "published" ? "selected" : ""}>Publicado</option></select></label>`; }
   function fileField(name, label, accept) { return `<label>${label}<input class="file-field" name="${name}" type="file" accept="${accept}" /></label>`; }
+
+  function normalizedLeetifyUrl(value) {
+    const raw = String(value || "").trim();
+    if (!raw) return "";
+    try {
+      const url = new URL(raw);
+      if (url.protocol !== "https:" || !/(^|\.)leetify\.com$/i.test(url.hostname)) throw new Error();
+      return url.href;
+    } catch (_) {
+      throw new Error("Use um link HTTPS válido do Leetify.");
+    }
+  }
 
   function formatCards(value = "three_team_series") {
     return [
@@ -457,13 +473,20 @@
         catch (_) { warnings.push(`${eventName}: ${reason.message || reason}`); return []; }
       }
     };
-    const allEvents = [
-      ...parseEventSafely("begin_new_match"),
-      ...parseEventSafely("round_end", [], ["total_rounds_played"]),
-      ...parseEventSafely("player_death", ["team_name"], ["total_rounds_played", "is_warmup_period"]),
-      ...parseEventSafely("player_hurt", ["team_name"], ["total_rounds_played", "is_warmup_period"])
-    ];
-    const matchStartTick = numberValue(allEvents.find((event) => event.event_name === "begin_new_match")?.tick);
+    let allEvents = [];
+    try {
+      allEvents = demoRows(parser.parseEvents(bytes, ["begin_new_match", "round_end", "player_death", "player_hurt"], ["team_name"], ["total_rounds_played", "is_warmup_period"]));
+    } catch (reason) {
+      warnings.push(`leitura conjunta: ${reason.message || reason}`);
+      allEvents = [
+        ...parseEventSafely("begin_new_match"),
+        ...parseEventSafely("round_end", [], ["total_rounds_played", "is_warmup_period"]),
+        ...parseEventSafely("player_death", ["team_name"], ["total_rounds_played", "is_warmup_period"]),
+        ...parseEventSafely("player_hurt", ["team_name"], ["total_rounds_played", "is_warmup_period"])
+      ];
+    }
+    const starts = allEvents.filter((event) => event.event_name === "begin_new_match").sort((a, b) => numberValue(a.tick) - numberValue(b.tick));
+    const matchStartTick = numberValue(starts.find((event) => !booleanValue(event.is_warmup_period))?.tick || starts[0]?.tick);
     const matchEvents = allEvents.filter((event) => numberValue(event.tick) >= matchStartTick && !booleanValue(event.is_warmup_period));
     const deaths = matchEvents.filter((event) => event.event_name === "player_death");
     const hurts = matchEvents.filter((event) => event.event_name === "player_hurt");
@@ -494,10 +517,17 @@
     });
     const observedRounds = [...deaths, ...hurts].map((event) => numberValue(event.total_rounds_played)).filter((round) => round >= 0);
     const rounds = roundEnds.length || (observedRounds.length ? Math.max(...observedRounds) + 1 : 0);
-    const statistics = [...stats.values()].map((player) => ({ ...player, adr: rounds ? Number((player.damage / rounds).toFixed(1)) : null, kd: player.deaths ? Number((player.kills / player.deaths).toFixed(2)) : player.kills })).sort((a, b) => b.kills - a.kills || b.damage - a.damage);
+    let statistics = [...stats.values()].filter((player) => player.steamid && player.steamid !== "0").map((player) => ({ ...player, adr: rounds ? Number((player.damage / rounds).toFixed(1)) : null, kd: player.deaths ? Number((player.kills / player.deaths).toFixed(2)) : player.kills })).sort((a, b) => b.kills - a.kills || b.damage - a.damage);
+    const lastRoundTick = roundEnds.length ? Math.max(...roundEnds.map((event) => numberValue(event.tick))) : 0;
+    if (lastRoundTick) {
+      try {
+        const scoreboard = demoRows(parser.parseTicks(bytes, ["kills_total", "deaths_total", "assists_total", "headshot_kills_total", "damage_total", "team_name"], new Int32Array([lastRoundTick]))).filter((player) => player.steamid && String(player.steamid) !== "0");
+        if (scoreboard.length) statistics = scoreboard.map((player) => ({ steamid: String(player.steamid), name: canonicalPlayerName(player.name), demoName: String(player.name || ""), team: String(player.team_name || ""), kills: numberValue(player.kills_total), deaths: numberValue(player.deaths_total), assists: numberValue(player.assists_total), headshots: numberValue(player.headshot_kills_total), damage: numberValue(player.damage_total), adr: rounds ? Number((numberValue(player.damage_total) / rounds).toFixed(1)) : null, kd: numberValue(player.deaths_total) ? Number((numberValue(player.kills_total) / numberValue(player.deaths_total)).toFixed(2)) : numberValue(player.kills_total) })).sort((a, b) => b.kills - a.kills || b.damage - a.damage);
+      } catch (reason) { warnings.push(`placar final: ${reason.message || reason}`); }
+    }
     const playedAt = demoPlayedAt(file);
     return {
-      demoInfo: { fileName: file.name, fileSize: file.size, mapName: String(header.map_name || ""), serverName: String(header.server_name || ""), rounds, playedAt: playedAt.iso, playedAtLabel: playedAt.label, processedAt: new Date().toISOString(), parser: "demoparser2 0.42.0", rawFileStored: false, warnings: [...new Set(warnings)] },
+      demoInfo: { fileName: file.name, fileSize: file.size, mapName: String(header.map_name || ""), serverName: String(header.server_name || ""), rounds, playedAt: playedAt.iso, playedAtLabel: playedAt.label, processedAt: new Date().toISOString(), parser: "demoparser2 0.42.0", rawFileStored: false, extractionStatus: statistics.length ? "complete" : "pending", warnings: [...new Set(warnings)] },
       statistics
     };
   }
@@ -514,10 +544,19 @@
       values.format = definition.description;
     }
     if (section === "news" && !values.date) values.date = new Date().toISOString().slice(0, 10);
+    if (section === "matches") {
+      try { values.leetifyUrl = normalizedLeetifyUrl(values.leetifyUrl); }
+      catch (reason) { showToast(reason.message); return; }
+    }
     const imageField = section === "players" ? "photo" : ["teams", "tournaments"].includes(section) ? "logo" : section === "news" ? "image" : null;
     const imageFile = imageField ? formData.get(imageField) : null;
     if (imageFile?.size > 2 * 1024 * 1024) { showToast("Use uma imagem de até 2 MB"); return; }
     if (imageField && imageFile?.size) values[imageField] = await fileAsDataUrl(imageFile);
+    const scoreboardFile = section === "matches" ? formData.get("scoreboardImage") : null;
+    if (scoreboardFile?.size > 2 * 1024 * 1024) { showToast("Use um print do placar de até 2 MB"); return; }
+    if (scoreboardFile?.size) values.scoreboardImage = await fileAsDataUrl(scoreboardFile);
+    if (section === "matches" && values.removeScoreboardImage === "true") values.scoreboardImage = "";
+    delete values.removeScoreboardImage;
     const list = state[section];
     if (section === "matches" && values.teamA === values.teamB) { showToast("Escolha dois times diferentes"); return; }
     const fallbackName = section === "matches" ? `${values.teamA} x ${values.teamB}` : "Novo registro";
@@ -533,7 +572,7 @@
     if (section === "tournaments") ensureTournamentFixtures(index >= 0 ? list[index] : record);
     await persistContent();
     dialog.close();
-    showToast(demoFile?.size ? (record.statistics?.length ? `${record.name}: demo lida e ${record.statistics.length} jogadores extraídos` : `${record.name}: data extraída, mas a demo não retornou estatísticas`) : `${record.name} foi salvo`);
+    showToast(demoFile?.size ? (record.statistics?.length ? `${record.name}: demo lida e ${record.statistics.length} jogadores extraídos` : `${record.name}: demo anexada; use Leetify ou print enquanto a extração estiver pendente`) : `${record.name} foi salvo`);
     if (returnSection) { const destination = returnSection; returnSection = null; go(destination); }
     else if (section === "tournaments") tournamentsView();
     else listView();
