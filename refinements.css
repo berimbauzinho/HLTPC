@@ -85,7 +85,7 @@
 .group-standings-head,
 .group-standing-row {
   display: grid;
-  grid-template-columns: 34px minmax(190px, 1fr) repeat(7, minmax(48px, 62px));
+  grid-template-columns: 34px minmax(190px, 1fr) minmax(48px, 62px) minmax(82px, 100px) repeat(3, minmax(55px, 70px));
   align-items: center;
   min-width: 650px;
 }
@@ -161,9 +161,10 @@
   color: #ff716c;
 }
 
-.group-standing-row > strong:last-child {
+.group-standing-row > .campaign {
   height: 28px;
-  width: 34px;
+  min-width: 48px;
+  padding: 0 8px;
   display: grid;
   place-items: center;
   justify-self: center;
@@ -171,6 +172,16 @@
   border: 1px solid #485867;
   color: var(--amber2);
   font-size: 11px;
+}
+
+.match-evidence-note {
+  margin: 0 12px 10px;
+  padding: 9px 10px;
+  border-left: 3px solid var(--amber);
+  background: #1a232c;
+  color: #aeb9c3;
+  font-size: 8px;
+  line-height: 1.55;
 }
 
 @media (max-width: 780px) {
