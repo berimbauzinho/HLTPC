@@ -2,11 +2,17 @@
   "use strict";
 
   const source = window.HLTPC_DATA;
+  const MAX_LOCAL_DEMO_BYTES = 500 * 1024 * 1024;
+  const confirmedPlayerAliases = new Map([
+    ["GJota", ["GJ"]],
+    ["Downey", ["Mikasa es su kasa"]],
+    ["190", ["fraquinho"]]
+  ]);
   const baselineTeamNames = [...new Set(source.tournaments.flatMap((event) => event.entries.map((entry) => entry.team)))];
   const baselineTeams = baselineTeamNames.map((name, index) => ({ id: `team-${index}`, name, acronym: initials(name), aliases: [], status: "published", logo: "", updated: "Derivado das edições" }));
   const baselineTeamNameById = new Map(baselineTeams.map((team) => [team.id, team.name]));
   const state = {
-    players: source.players.map((name, index) => ({ id: `player-${index}`, name, alias: "", status: "published", photo: "", teams: [...new Set(source.tournaments.flatMap((event) => event.entries.filter((entry) => entry.players.includes(name)).map((entry) => entry.team)))], updated: "Dados históricos" })),
+    players: source.players.map((name, index) => ({ id: `player-${index}`, name, alias: (confirmedPlayerAliases.get(name) || []).join(", "), status: "published", photo: "", teams: [...new Set(source.tournaments.flatMap((event) => event.entries.filter((entry) => entry.players.includes(name)).map((entry) => entry.team)))], updated: "Dados históricos" })),
     teams: baselineTeams.map((team) => ({ ...team })),
     tournaments: source.tournaments.map((event) => ({ id: event.id, name: event.name, subtitle: String(event.year), status: "published", logo: "", format: event.format, formatType: event.entries.length === 2 ? "two_team_md3" : event.entries.length === 3 ? "three_team_series" : "four_team_groups", teams: event.entries.map((entry) => entry.team), updated: event.status === "ongoing" ? "Em andamento" : `Campeão: ${event.champion}` })),
     matches: [],
@@ -174,7 +180,7 @@
     const teamB = fixtureTeam(match, "B");
     const decided = Boolean(match.teamA && match.teamB);
     const completed = Boolean(match.score || match.status === "finished");
-    const sources = [match.demoInfo ? `<i class="source-chip ${match.statistics?.length ? "ok" : "partial"}">DEMO</i>` : "", match.leetifyUrl ? `<i class="source-chip ok">LEETIFY</i>` : "", match.scoreboardImage ? `<i class="source-chip ok">PRINT</i>` : ""].join("");
+    const sources = [match.demoInfo ? `<i class="source-chip ${match.statistics?.length ? "ok" : "partial"}">DEMO</i>` : "", match.leetifyUrl ? `<i class="source-chip ${match.leetifySyncError ? "partial" : "ok"}">LEETIFY</i>` : "", match.scoreboardImage ? `<i class="source-chip ok">PRINT</i>` : "", match.resultSource === "manual" ? `<i class="source-chip ok">MANUAL</i>` : ""].join("");
     return `<button type="button" class="admin-fixture ${completed ? "completed" : ""}" data-edit-match="${escapeHtml(match.id)}">
       <span><b>${escapeHtml(match.name)}</b><em>MD${match.bestOf || 1}</em></span>
       <div><strong>${escapeHtml(teamA)}</strong><i>${escapeHtml(match.score || "—")}</i><strong>${escapeHtml(teamB)}</strong></div>
@@ -294,7 +300,7 @@
   }
 
   function formFields(item) {
-    if (section === "players") return `<div class="editor-tabs"><button type="button" class="active" data-editor-tab="profile">Dados do jogador</button><button type="button" data-editor-tab="teams">Equipes</button></div><div data-editor-panel="profile">${textField("name", "Nick principal", item.name, "Ex.: lanches", true)}<div class="field-row">${textField("alias", "Nome / alias", item.alias, "Ex.: Mathieu Herbaut")}${selectField("status", item.status)}</div>${textField("steamId", "SteamID64", item.steamId, "Ex.: 76561198300371519")}${fileField("photo", "Foto do jogador", "image/*")}<div class="helper">O SteamID64 conecta automaticamente o nick usado na demo ou no Leetify ao perfil correto.</div></div><div data-editor-panel="teams" hidden><span class="field-title">Equipes defendidas</span><div class="team-checklist">${state.teams.map((team) => `<label><input type="checkbox" name="teams" value="${escapeHtml(team.name)}" ${(item.teams || []).includes(team.name) ? "checked" : ""} /><span><b>${escapeHtml(team.name)}</b><small>${escapeHtml(team.acronym)}</small></span></label>`).join("")}</div><div class="helper">As equipes encontradas nas escalações históricas já aparecem marcadas. Use esta área para complementar ou corrigir o perfil.</div></div>`;
+    if (section === "players") return `<div class="editor-tabs"><button type="button" class="active" data-editor-tab="profile">Dados do jogador</button><button type="button" data-editor-tab="teams">Equipes</button></div><div data-editor-panel="profile">${textField("name", "Nick principal", item.name, "Ex.: lanches", true)}<div class="field-row">${textField("alias", "Aliases conhecidos", item.alias, "Ex.: GJ, outro nick")}${selectField("status", item.status)}</div>${textField("steamId", "SteamID64", item.steamId, "Ex.: 76561198300371519")}${fileField("photo", "Foto do jogador", "image/*")}<div class="helper">Separe aliases por vírgula. O SteamID64 é a identidade principal e conecta automaticamente qualquer nick usado na demo ou no Leetify ao perfil correto.</div></div><div data-editor-panel="teams" hidden><span class="field-title">Equipes defendidas</span><div class="team-checklist">${state.teams.map((team) => `<label><input type="checkbox" name="teams" value="${escapeHtml(team.name)}" ${(item.teams || []).includes(team.name) ? "checked" : ""} /><span><b>${escapeHtml(team.name)}</b><small>${escapeHtml(team.acronym)}</small></span></label>`).join("")}</div><div class="helper">As equipes encontradas nas escalações históricas já aparecem marcadas. Use esta área para complementar ou corrigir o perfil.</div></div>`;
     if (section === "teams") return `${textField("name", "Nome oficial do time", item.name, "Ex.: Deftones", true)}<div class="field-row">${textField("acronym", "Sigla", item.acronym, "Ex.: DFT")}${selectField("status", item.status)}</div>${fileField("logo", "Logo do time", "image/*")}<div class="helper">O elenco mais recente e as formações históricas serão derivados de cada participação.</div>`;
     if (section === "tournaments") {
       const selectedFormat = item.formatType || "three_team_series";
@@ -309,8 +315,11 @@
       const teamsField = lockedGroupMatch ? `<input type="hidden" name="teamA" value="${escapeHtml(item.teamA)}" /><input type="hidden" name="teamB" value="${escapeHtml(item.teamB)}" /><div class="locked-match-teams"><b>${escapeHtml(item.teamA)}</b><span>×</span><b>${escapeHtml(item.teamB)}</b></div>` : `<div class="field-row"><label>Time A<select name="teamA" id="matchTeamA" required></select></label><label>Time B<select name="teamB" id="matchTeamB" required></select></label></div>`;
       const demoHasStats = Boolean(item.demoInfo && item.statisticsSource !== "leetify" && (item.statistics || []).length);
       const leetifyHasStats = Boolean(item.leetifyInfo && item.statisticsSource === "leetify" && (item.statistics || []).length);
-      const sourceSummary = item.demoInfo || item.leetifyUrl || item.scoreboardImage ? `<div class="match-source-summary"><span class="${demoHasStats ? "verified" : item.demoInfo ? "partial" : "muted"}"><b>${demoHasStats ? "1 · Demo confirmada" : item.demoInfo ? "1 · Demo anexada" : "1 · Sem demo"}</b><small>${item.demoInfo ? `${escapeHtml(item.demoInfo.fileName)}${demoHasStats ? ` · ${(item.statistics || []).length} jogadores` : " · extração automática pendente"}` : "Fonte primária"}</small></span><span class="${leetifyHasStats ? "verified" : item.leetifyUrl ? "partial" : "muted"}"><b>2 · Leetify</b><small>${leetifyHasStats ? `${(item.statistics || []).length} jogadores · ${escapeHtml(item.leetifyInfo.mapName || "mapa identificado")}` : item.leetifyUrl ? "Link salvo · aguarda importação" : "Fonte secundária opcional"}</small></span><span class="${item.scoreboardImage ? "verified" : "muted"}"><b>3 · Print do placar</b><small>${item.scoreboardImage ? "Imagem salva como comprovação" : "Evidência visual opcional"}</small></span></div>` : "";
-      return `${tournamentField}${teamsField}${textField("name", "Fase", item.name, "Ex.: Semifinal", true)}<div class="field-row">${textField("score", "Placar / mapas", item.score, "Somente após confirmação")}${selectField("status", item.status)}</div><fieldset class="match-evidence"><legend>Fontes dos dados</legend><div class="evidence-order"><b>1</b><span><strong>Demo · fonte principal</strong><small>O painel tenta extrair data e estatísticas automaticamente.</small></span></div>${fileField("demo", "Selecionar arquivo .dem", ".dem")}${urlField("demoUrl", "Ou link da demo no Google Drive", item.demoUrl, "https://drive.google.com/file/d/...")}${item.demoInfo ? `<div class="demo-result ${demoHasStats ? "" : "partial"}"><b>${demoHasStats ? "✓ Demo processada" : item.demoUrl ? "✓ Demo vinculada pelo Drive" : "⚠ Demo anexada, sem estatísticas automáticas"}</b><span>${escapeHtml(item.demoInfo.fileName)} · ${escapeHtml(item.demoInfo.mapName || "mapa não identificado")} · ${item.demoInfo.rounds || 0} rounds</span><small>${escapeHtml(item.demoInfo.playedAtLabel || item.subtitle || "Data não identificada")} · ${(item.statistics || []).length} jogadores extraídos</small>${item.demoInfo.warnings?.length ? `<small>${escapeHtml(item.demoInfo.warnings.join(" · "))}</small>` : ""}</div>` : ""}<div class="evidence-order"><b>2</b><span><strong>Leetify · fonte secundária</strong><small>Use para conferir placar e números quando a demo estiver incompleta.</small></span></div>${urlField("leetifyUrl", "Link da partida no Leetify", item.leetifyUrl, "https://leetify.com/app/match-details/...")}<div class="evidence-order"><b>3</b><span><strong>Print do placar · comprovação visual</strong><small>Envie a tela final quando a demo ou o Leetify não trouxerem tudo.</small></span></div>${fileField("scoreboardImage", item.scoreboardImage ? "Substituir print do placar" : "Enviar print do placar", "image/*")}${item.scoreboardImage ? `<div class="scoreboard-preview"><img src="${escapeHtml(item.scoreboardImage)}" alt="Print do placar salvo" /><span><b>Print salvo</b><small>Um novo arquivo substituirá esta imagem.</small><label><input type="checkbox" name="removeScoreboardImage" value="true" /> Remover print atual</label></span></div>` : ""}</fieldset>${sourceSummary}<div class="helper" id="matchHelper">${generated ? "A data e a hora serão extraídas automaticamente do nome da demo. As três fontes ficam ligadas exclusivamente a este confronto." : "Escolha uma edição: os times serão limitados exclusivamente às escalações daquele campeonato."}</div>`;
+      const savedScores = String(item.score || "").match(/\d+/g) || [];
+      const manualResult = item.manualResult === true || item.manualResult === "true" || item.resultSource === "manual";
+      const sourceSummary = item.demoInfo || item.leetifyUrl || item.scoreboardImage || manualResult ? `<div class="match-source-summary"><span class="${demoHasStats ? "verified" : item.demoInfo ? "partial" : "muted"}"><b>${demoHasStats ? "1 · Demo confirmada" : item.demoInfo?.extractionStatus === "skipped-large" ? "1 · Demo grande" : item.demoInfo ? "1 · Demo anexada" : "1 · Sem demo"}</b><small>${item.demoInfo ? `${escapeHtml(item.demoInfo.fileName)}${demoHasStats ? ` · ${(item.statistics || []).length} jogadores` : item.demoInfo.extractionStatus === "skipped-large" ? " · leitura local ignorada" : " · extração pendente"}` : "Fonte primária opcional"}</small></span><span class="${leetifyHasStats ? "verified" : item.leetifyUrl ? "partial" : "muted"}"><b>2 · Leetify</b><small>${leetifyHasStats ? `${(item.statistics || []).length} jogadores · ${escapeHtml(item.leetifyInfo.mapName || "mapa identificado")}` : item.leetifySyncError ? escapeHtml(item.leetifySyncError) : item.leetifyUrl ? "Link salvo · aguarda importação" : "Fonte secundária opcional"}</small></span><span class="${item.scoreboardImage ? "verified" : "muted"}"><b>3 · Print</b><small>${item.scoreboardImage ? "Imagem salva como comprovação" : "Evidência visual opcional"}</small></span><span class="${manualResult ? "verified" : "muted"}"><b>4 · Manual</b><small>${manualResult ? `Resultado confirmado: ${escapeHtml(item.score || "—")}` : "Disponível mesmo sem arquivos"}</small></span></div>` : "";
+      const manualFields = `<fieldset class="manual-result"><legend>Resultado manual</legend><label class="manual-result-toggle"><input type="checkbox" name="manualResult" value="true" ${manualResult ? "checked" : ""} /><span><b>Informar o placar manualmente</b><small>Use quando não houver demo, Leetify ou print completo. O placar manual sempre tem prioridade sobre a importação.</small></span></label><div class="manual-score-fields" ${manualResult ? "" : "hidden"}><label>${escapeHtml(item.teamA || "Time A")}<input type="number" name="manualScoreA" min="0" max="99" step="1" value="${escapeHtml(savedScores[0] || "")}" /></label><i>×</i><label>${escapeHtml(item.teamB || "Time B")}<input type="number" name="manualScoreB" min="0" max="99" step="1" value="${escapeHtml(savedScores[1] || "")}" /></label></div></fieldset>`;
+      return `${tournamentField}${teamsField}${textField("name", "Fase", item.name, "Ex.: Semifinal", true)}${selectField("status", item.status)}${manualFields}<fieldset class="match-evidence"><legend>Fontes dos dados</legend><div class="evidence-order"><b>1</b><span><strong>Demo · fonte principal</strong><small>Até 500 MB, o painel tenta extrair data e estatísticas. Acima disso, ignora somente a leitura local e continua salvando as outras fontes.</small></span></div>${fileField("demo", "Selecionar arquivo .dem", ".dem")}${urlField("demoUrl", "Ou link da demo no Google Drive", item.demoUrl, "https://drive.google.com/file/d/...")}${item.demoInfo ? `<div class="demo-result ${demoHasStats ? "" : "partial"}"><b>${demoHasStats ? "✓ Demo processada" : item.demoInfo.extractionStatus === "skipped-large" ? "⚠ Demo grande registrada; leitura local ignorada" : item.demoUrl ? "✓ Demo vinculada pelo Drive" : "⚠ Demo anexada, sem estatísticas automáticas"}</b><span>${escapeHtml(item.demoInfo.fileName)} · ${escapeHtml(item.demoInfo.mapName || "mapa não identificado")} · ${item.demoInfo.rounds || 0} rounds</span><small>${escapeHtml(item.demoInfo.playedAtLabel || item.subtitle || "Data não identificada")} · ${(item.statistics || []).length} jogadores extraídos</small>${item.demoInfo.warnings?.length ? `<small>${escapeHtml(item.demoInfo.warnings.join(" · "))}</small>` : ""}</div>` : ""}<div class="evidence-order"><b>2</b><span><strong>Leetify · fonte secundária</strong><small>Use sozinho ou para complementar rating/KAST quando a demo estiver disponível.</small></span></div>${urlField("leetifyUrl", "Link da partida no Leetify", item.leetifyUrl, "https://leetify.com/app/match-details/...")}<div class="evidence-order"><b>3</b><span><strong>Print do placar · comprovação visual</strong><small>Envie a tela final quando a demo ou o Leetify não trouxerem tudo.</small></span></div>${fileField("scoreboardImage", item.scoreboardImage ? "Substituir print do placar" : "Enviar print do placar", "image/*")}${item.scoreboardImage ? `<div class="scoreboard-preview"><img src="${escapeHtml(item.scoreboardImage)}" alt="Print do placar salvo" /><span><b>Print salvo</b><small>Um novo arquivo substituirá esta imagem.</small><label><input type="checkbox" name="removeScoreboardImage" value="true" /> Remover print atual</label></span></div>` : ""}</fieldset>${sourceSummary}<div class="helper" id="matchHelper">${generated ? "A data será extraída do nome da demo quando ela puder ser lida. Cada fonte funciona de forma independente e fica ligada somente a este confronto." : "Escolha uma edição: os times serão limitados exclusivamente às escalações daquele campeonato."}</div>`;
     }
     return `${textField("name", "Título", item.name, "Título da notícia", true)}<label>Texto / resumo<textarea name="subtitle" placeholder="Escreva a notícia...">${escapeHtml(item.subtitle)}</textarea></label><div class="field-row">${textField("author", "Autor", item.author, "HLTPC")}${textField("date", "Data", item.date, "2026-08-10", true)}</div>${selectField("status", item.status)}${fileField("image", "Imagem de destaque", "image/*")}`;
   }
@@ -462,6 +471,13 @@
       const current = editingId ? state.matches.find((item) => item.id === editingId) : null;
       document.querySelector("#matchTournament")?.addEventListener("change", () => populateMatchTeams());
       populateMatchTeams(current?.teamA || "", current?.teamB || "");
+      const manualToggle = document.querySelector('input[name="manualResult"]');
+      const manualFields = document.querySelector(".manual-score-fields");
+      manualToggle?.addEventListener("change", () => {
+        manualFields.hidden = !manualToggle.checked;
+        manualFields.querySelectorAll("input").forEach((input) => { input.required = manualToggle.checked; });
+      });
+      if (manualToggle?.checked) manualFields?.querySelectorAll("input").forEach((input) => { input.required = true; });
     }
   }
 
@@ -516,13 +532,40 @@
     return String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("pt-BR").replace(/[^a-z0-9]/g, "");
   }
 
-  function canonicalPlayerName(name, steamId = "") {
+  function playerNames(player) {
+    const aliases = [
+      ...(Array.isArray(player.aliases) ? player.aliases : []),
+      ...String(player.alias || "").split(/[,;|]/),
+      ...(confirmedPlayerAliases.get(player.name) || [])
+    ];
+    return [...new Set([player.name, ...aliases].map((value) => String(value || "").trim()).filter(Boolean))];
+  }
+
+  function findPlayerIdentity(name, steamId = "") {
+    const id = String(steamId || "").trim();
+    if (id) {
+      const bySteam = state.players.find((item) => String(item.steamId || "").trim() === id);
+      if (bySteam) return bySteam;
+    }
     const normalized = normalizedNick(name);
-    const player = state.players.find((item) => String(item.steamId || "") === String(steamId || "") && steamId)
-      || state.players.find((item) => [item.name, item.alias].some((value) => {
-        const candidate = normalizedNick(value);
-        return candidate && (candidate === normalized || (candidate.length >= 4 && normalized.startsWith(candidate)));
-      }));
+    const confirmedCanonical = [...confirmedPlayerAliases.entries()].find(([, aliases]) => aliases.some((alias) => normalizedNick(alias) === normalized))?.[0];
+    return state.players.find((item) => normalizedNick(item.name) === normalizedNick(confirmedCanonical || ""))
+      || state.players.find((item) => playerNames(item).some((value) => normalizedNick(value) === normalized));
+  }
+
+  function canonicalPlayerName(name, steamId = "", learn = false) {
+    const player = findPlayerIdentity(name, steamId);
+    if (player && learn) {
+      const id = String(steamId || "").trim();
+      if (id && !player.steamId) {
+        player.steamId = id;
+        player.updated = "SteamID64 identificado automaticamente";
+      }
+      const rawName = String(name || "").trim();
+      if (rawName && normalizedNick(rawName) !== normalizedNick(player.name) && !playerNames(player).some((value) => normalizedNick(value) === normalizedNick(rawName))) {
+        player.alias = [...String(player.alias || "").split(/[,;|]/).map((value) => value.trim()).filter(Boolean), rawName].join(", ");
+      }
+    }
     return player?.name || String(name || "Desconhecido");
   }
 
@@ -535,16 +578,55 @@
     return source.tournaments.find((event) => event.id === tournamentId)?.entries || [];
   }
 
+  function sameTeamName(first, second) {
+    const find = (name) => state.teams.find((team) => [team.name, ...(team.aliases || [])].some((value) => normalizedTeamName(value) === normalizedTeamName(name)));
+    const firstTeam = find(first);
+    const secondTeam = find(second);
+    return firstTeam && secondTeam ? firstTeam.id === secondTeam.id : normalizedTeamName(first) === normalizedTeamName(second);
+  }
+
+  function rosterIdentity(tournamentId, team) {
+    const entry = tournamentEntries(tournamentId).find((item) => sameTeamName(item.team, team));
+    const steamIds = new Set();
+    const names = new Set();
+    (entry?.players || []).forEach((name) => {
+      names.add(normalizedNick(name));
+      const player = findPlayerIdentity(name);
+      if (!player) return;
+      playerNames(player).forEach((value) => names.add(normalizedNick(value)));
+      if (player.steamId) steamIds.add(String(player.steamId));
+    });
+    return { steamIds, names };
+  }
+
+  function identityScore(player, roster) {
+    const steamId = String(player.steam64Id || player.steamid || "");
+    if (steamId && roster.steamIds.has(steamId)) return 100;
+    const canonical = canonicalPlayerName(player.name || player.demoName, steamId);
+    return roster.names.has(normalizedNick(canonical)) || roster.names.has(normalizedNick(player.name || player.demoName)) ? 5 : 0;
+  }
+
+  function mapGroupsToMatchTeams(match, players, groupValue) {
+    const groups = [...new Set(players.map(groupValue).filter((value) => value !== "" && value != null))];
+    if (groups.length !== 2) throw new Error("A fonte não retornou exatamente duas equipes. Use o resultado manual para esta partida.");
+    const rosterA = rosterIdentity(match.tournamentId, match.teamA);
+    const rosterB = rosterIdentity(match.tournamentId, match.teamB);
+    const score = (group, roster) => players.filter((player) => groupValue(player) === group).reduce((total, player) => total + identityScore(player, roster), 0);
+    const direct = score(groups[0], rosterA) + score(groups[1], rosterB);
+    const swapped = score(groups[0], rosterB) + score(groups[1], rosterA);
+    if (!Math.max(direct, swapped) || direct === swapped) throw new Error("Não foi possível distinguir os times com segurança. Cadastre os SteamID64 dos jogadores ou informe o resultado manualmente.");
+    const groupA = direct > swapped ? groups[0] : groups[1];
+    const groupB = direct > swapped ? groups[1] : groups[0];
+    const matchedBySteamId = players.filter((player) => {
+      const id = String(player.steam64Id || player.steamid || "");
+      return id && (rosterA.steamIds.has(id) || rosterB.steamIds.has(id));
+    }).length;
+    return { groupA, groupB, confidence: Math.abs(direct - swapped), matchedBySteamId };
+  }
+
   function leetifyTeamMapping(match, players) {
-    const entries = tournamentEntries(match.tournamentId);
-    const roster = (team) => new Set((entries.find((entry) => entry.team === team)?.players || []).map(normalizedNick));
-    const rosterA = roster(match.teamA);
-    const rosterB = roster(match.teamB);
-    const numbers = [...new Set(players.map((player) => numberValue(player.initialTeamNumber)).filter(Boolean))];
-    const scoreFor = (number, playerRoster) => players.filter((player) => numberValue(player.initialTeamNumber) === number).reduce((score, player) => score + (playerRoster.has(normalizedNick(canonicalPlayerName(player.name, player.steam64Id))) ? 1 : 0), 0);
-    const numberA = numbers.sort((a, b) => scoreFor(b, rosterA) - scoreFor(a, rosterA))[0];
-    const numberB = numbers.find((number) => number !== numberA);
-    return { numberA, numberB };
+    const mapped = mapGroupsToMatchTeams(match, players, (player) => numberValue(player.initialTeamNumber));
+    return { numberA: mapped.groupA, numberB: mapped.groupB, confidence: mapped.confidence, matchedBySteamId: mapped.matchedBySteamId };
   }
 
   async function importLeetifyMatch(url, match, quiet = false) {
@@ -559,7 +641,7 @@
       const player = payload.playerStats.find((item) => numberValue(item.initialTeamNumber) === number);
       return player ? numberValue(player.ctRoundsWon) + numberValue(player.tRoundsWon) : 0;
     };
-    const { numberA, numberB } = leetifyTeamMapping(match, payload.playerStats);
+    const { numberA, numberB, confidence, matchedBySteamId } = leetifyTeamMapping(match, payload.playerStats);
     const scoreA = roundsForTeam(numberA);
     const scoreB = roundsForTeam(numberB);
     const rounds = scoreA + scoreB;
@@ -569,7 +651,7 @@
       const teamNumber = numberValue(player.initialTeamNumber);
       return {
         steamid: String(player.steam64Id || ""),
-        name: canonicalPlayerName(player.name, player.steam64Id),
+        name: canonicalPlayerName(player.name, player.steam64Id, true),
         demoName: String(player.name || ""),
         teamNumber,
         team: teamNumber === numberA ? match.teamA : teamNumber === numberB ? match.teamB : "",
@@ -586,13 +668,38 @@
         hsPercent: Number((numberValue(player.hsp) * 100).toFixed(1))
       };
     }).sort((a, b) => b.rating - a.rating || b.kills - a.kills);
+    const manualResult = match.manualResult === true || match.manualResult === "true" || match.resultSource === "manual";
+    const importedScore = scoreA || scoreB ? `${scoreA} - ${scoreB}` : "";
+    const importedWinner = scoreA > scoreB ? match.teamA : scoreB > scoreA ? match.teamB : "";
     return {
       statistics,
       statisticsSource: "leetify",
-      score: match.score || (scoreA || scoreB ? `${scoreA} - ${scoreB}` : ""),
-      winner: match.winner || (scoreA > scoreB ? match.teamA : scoreB > scoreA ? match.teamB : ""),
-      leetifyInfo: { matchId, importedAt: new Date().toISOString(), finishedAt: payload.finishedAt || "", mapName: payload.mapName || "", rounds, scoreA, scoreB, status: payload.status || "ready" }
+      score: manualResult && match.score ? match.score : importedScore,
+      winner: manualResult && match.winner ? match.winner : importedWinner,
+      winnerId: manualResult && match.winnerId ? match.winnerId : importedWinner === match.teamA ? match.teamAId || "" : importedWinner === match.teamB ? match.teamBId || "" : "",
+      resultSource: manualResult ? "manual" : "leetify",
+      leetifySyncError: "",
+      leetifyInfo: { matchId, importedAt: new Date().toISOString(), finishedAt: payload.finishedAt || "", mapName: payload.mapName || "", rounds, scoreA, scoreB, status: payload.status || "ready", teamMapping: { numberA, numberB, confidence, matchedBySteamId } }
     };
+  }
+
+  function mergeDemoWithLeetify(demoStatistics, leetifyStatistics) {
+    const secondary = new Map();
+    leetifyStatistics.forEach((player) => {
+      if (player.steamid) secondary.set(`steam:${player.steamid}`, player);
+      secondary.set(`name:${normalizedNick(player.name)}`, player);
+    });
+    return demoStatistics.map((player) => {
+      const extra = secondary.get(`steam:${player.steamid}`) || secondary.get(`name:${normalizedNick(player.name)}`) || {};
+      return {
+        ...player,
+        team: player.team || extra.team || "",
+        kast: extra.kast ?? player.kast,
+        rating: extra.rating ?? player.rating,
+        leetifyRating: extra.leetifyRating ?? player.leetifyRating,
+        hsPercent: extra.hsPercent ?? player.hsPercent
+      };
+    });
   }
 
   async function syncPendingLeetifyMatches() {
@@ -609,9 +716,29 @@
     return imported;
   }
 
-  async function parseDemoFile(file) {
+  async function parseDemoFile(file, match) {
     if (!file.name.toLowerCase().endsWith(".dem")) throw new Error("Selecione um arquivo .dem do Counter-Strike 2.");
-    if (file.size > 500 * 1024 * 1024) throw new Error("A demo ultrapassa 500 MB e pode esgotar a memória do navegador.");
+    if (file.size > MAX_LOCAL_DEMO_BYTES) {
+      const playedAt = demoPlayedAt(file);
+      return {
+        demoInfo: {
+          fileName: file.name,
+          fileSize: file.size,
+          mapName: "",
+          serverName: "",
+          rounds: 0,
+          playedAt: playedAt.iso,
+          playedAtLabel: playedAt.label,
+          processedAt: new Date().toISOString(),
+          parser: "Leitura local ignorada",
+          rawFileStored: false,
+          extractionStatus: "skipped-large",
+          warnings: ["Demo acima de 500 MB: a leitura local foi ignorada para proteger a memória. Leetify, print e resultado manual continuam disponíveis."]
+        },
+        statistics: [],
+        statisticsSource: ""
+      };
+    }
     showToast("Lendo a demo no seu navegador…");
     const parser = await loadDemoParser();
     const bytes = new Uint8Array(await file.arrayBuffer());
@@ -649,7 +776,7 @@
     const stats = new Map();
     const getPlayer = (steamid, name, team) => {
       const id = String(steamid || name || "desconhecido");
-      if (!stats.has(id)) stats.set(id, { steamid: String(steamid || ""), name: canonicalPlayerName(name), demoName: String(name || ""), team: String(team || ""), kills: 0, deaths: 0, assists: 0, headshots: 0, damage: 0 });
+      if (!stats.has(id)) stats.set(id, { steamid: String(steamid || ""), name: canonicalPlayerName(name, steamid, true), demoName: String(name || ""), team: String(team || ""), kills: 0, deaths: 0, assists: 0, headshots: 0, damage: 0 });
       const player = stats.get(id);
       if (!player.team && team) player.team = String(team);
       return player;
@@ -677,12 +804,21 @@
     if (lastRoundTick) {
       try {
         const scoreboard = demoRows(parser.parseTicks(bytes, ["kills_total", "deaths_total", "assists_total", "headshot_kills_total", "damage_total", "team_name"], new Int32Array([lastRoundTick]))).filter((player) => player.steamid && String(player.steamid) !== "0");
-        if (scoreboard.length) statistics = scoreboard.map((player) => ({ steamid: String(player.steamid), name: canonicalPlayerName(player.name), demoName: String(player.name || ""), team: String(player.team_name || ""), kills: numberValue(player.kills_total), deaths: numberValue(player.deaths_total), assists: numberValue(player.assists_total), headshots: numberValue(player.headshot_kills_total), damage: numberValue(player.damage_total), adr: rounds ? Number((numberValue(player.damage_total) / rounds).toFixed(1)) : null, kd: numberValue(player.deaths_total) ? Number((numberValue(player.kills_total) / numberValue(player.deaths_total)).toFixed(2)) : numberValue(player.kills_total) })).sort((a, b) => b.kills - a.kills || b.damage - a.damage);
+        if (scoreboard.length) statistics = scoreboard.map((player) => ({ steamid: String(player.steamid), name: canonicalPlayerName(player.name, player.steamid, true), demoName: String(player.name || ""), team: String(player.team_name || ""), kills: numberValue(player.kills_total), deaths: numberValue(player.deaths_total), assists: numberValue(player.assists_total), headshots: numberValue(player.headshot_kills_total), damage: numberValue(player.damage_total), adr: rounds ? Number((numberValue(player.damage_total) / rounds).toFixed(1)) : null, kd: numberValue(player.deaths_total) ? Number((numberValue(player.kills_total) / numberValue(player.deaths_total)).toFixed(2)) : numberValue(player.kills_total) })).sort((a, b) => b.kills - a.kills || b.damage - a.damage);
       } catch (reason) { warnings.push(`placar final: ${reason.message || reason}`); }
+    }
+    let teamMapping = null;
+    if (statistics.length && match?.teamA && match?.teamB) {
+      try {
+        teamMapping = mapGroupsToMatchTeams(match, statistics, (player) => player.team);
+        statistics = statistics.map((player) => ({ ...player, team: player.team === teamMapping.groupA ? match.teamA : player.team === teamMapping.groupB ? match.teamB : player.team }));
+      } catch (reason) {
+        warnings.push(`equipes: ${reason.message || reason}`);
+      }
     }
     const playedAt = demoPlayedAt(file);
     return {
-      demoInfo: { fileName: file.name, fileSize: file.size, mapName: String(header.map_name || ""), serverName: String(header.server_name || ""), rounds, playedAt: playedAt.iso, playedAtLabel: playedAt.label, processedAt: new Date().toISOString(), parser: "demoparser2 0.42.0", rawFileStored: false, extractionStatus: statistics.length ? "complete" : "pending", warnings: [...new Set(warnings)] },
+      demoInfo: { fileName: file.name, fileSize: file.size, mapName: String(header.map_name || ""), serverName: String(header.server_name || ""), rounds, playedAt: playedAt.iso, playedAtLabel: playedAt.label, processedAt: new Date().toISOString(), parser: "demoparser2 0.42.0", rawFileStored: false, extractionStatus: statistics.length ? "complete" : "pending", teamMapping: teamMapping ? { rawTeamA: teamMapping.groupA, rawTeamB: teamMapping.groupB, confidence: teamMapping.confidence, matchedBySteamId: teamMapping.matchedBySteamId } : null, warnings: [...new Set(warnings)] },
       statistics,
       statisticsSource: statistics.length ? "demo" : ""
     };
@@ -691,6 +827,7 @@
   async function saveEditor() {
     const formData = new FormData(form);
     const values = {};
+    const saveWarnings = [];
     for (const [key, value] of formData.entries()) if (!(typeof File !== "undefined" && value instanceof File)) values[key] = value;
     if (section === "players") values.teams = formData.getAll("teams");
     if (section === "tournaments") {
@@ -709,8 +846,8 @@
     if (imageFile?.size > 2 * 1024 * 1024) { showToast("Use uma imagem de até 2 MB"); return; }
     if (imageField && imageFile?.size) values[imageField] = await fileAsDataUrl(imageFile);
     const scoreboardFile = section === "matches" ? formData.get("scoreboardImage") : null;
-    if (scoreboardFile?.size > 2 * 1024 * 1024) { showToast("Use um print do placar de até 2 MB"); return; }
-    if (scoreboardFile?.size) values.scoreboardImage = await fileAsDataUrl(scoreboardFile);
+    if (scoreboardFile?.size > 2 * 1024 * 1024) saveWarnings.push("O print passou de 2 MB e foi ignorado");
+    else if (scoreboardFile?.size) values.scoreboardImage = await fileAsDataUrl(scoreboardFile);
     if (section === "matches" && values.removeScoreboardImage === "true") values.scoreboardImage = "";
     delete values.removeScoreboardImage;
     const list = state[section];
@@ -721,28 +858,78 @@
       if (duplicate) { showToast(`Esse nome já pertence ao time ${duplicate.name}`); return; }
       values.aliases = [...new Set([...(previousTeam?.aliases || []), previousTeam?.name].filter((name) => name && name !== values.name))];
     }
-    const fallbackName = section === "matches" ? `${values.teamA} x ${values.teamB}` : "Novo registro";
-    const record = { ...values, name: values.name || fallbackName, id: editingId || `${section}-${Date.now()}`, updated: "Atualizado pelo painel" };
-    const demoFile = section === "matches" ? formData.get("demo") : null;
-    let leetifyImported = false;
-    if (demoFile?.size) {
-      Object.assign(record, await parseDemoFile(demoFile));
-      record.subtitle = record.demoInfo.playedAtLabel;
-      record.updated = "Demo processada pelo painel";
-    }
-    if (section === "matches" && record.leetifyUrl) {
-      Object.assign(record, await importLeetifyMatch(record.leetifyUrl, record));
-      leetifyImported = true;
-      record.updated = "Estatísticas conferidas pelo Leetify";
+    if (section === "players" && String(values.steamId || "").trim()) {
+      values.steamId = String(values.steamId).trim();
+      const duplicateSteamId = state.players.find((item) => item.id !== editingId && String(item.steamId || "").trim() === values.steamId);
+      if (duplicateSteamId) { showToast(`Esse SteamID64 já pertence ao jogador ${duplicateSteamId.name}`); return; }
     }
     const index = list.findIndex((item) => item.id === editingId);
-    if (index >= 0) list[index] = { ...list[index], ...record }; else list.unshift(record);
+    const previousRecord = index >= 0 ? list[index] : {};
+    const fallbackName = section === "matches" ? `${values.teamA} x ${values.teamB}` : "Novo registro";
+    const record = { ...previousRecord, ...values, name: values.name || fallbackName, id: editingId || `${section}-${Date.now()}`, updated: "Atualizado pelo painel" };
+    const demoFile = section === "matches" ? formData.get("demo") : null;
+    let leetifyImported = false;
+    if (section === "matches") {
+      const manualResult = values.manualResult === "true";
+      record.manualResult = manualResult;
+      if (manualResult) {
+        const scoreA = Number(values.manualScoreA);
+        const scoreB = Number(values.manualScoreB);
+        if (!Number.isInteger(scoreA) || !Number.isInteger(scoreB) || scoreA < 0 || scoreB < 0 || scoreA === scoreB) {
+          showToast("Informe dois placares inteiros e diferentes para o resultado manual");
+          return;
+        }
+        record.score = `${scoreA} - ${scoreB}`;
+        record.winner = scoreA > scoreB ? record.teamA : record.teamB;
+        record.winnerId = scoreA > scoreB ? record.teamAId || "" : record.teamBId || "";
+        record.resultSource = "manual";
+        record.evidenceNote = "Resultado informado manualmente pelo painel administrativo.";
+      } else if (previousRecord.resultSource === "manual") {
+        record.score = "";
+        record.winner = "";
+        record.winnerId = "";
+        record.resultSource = "";
+        if (record.evidenceNote === "Resultado informado manualmente pelo painel administrativo.") record.evidenceNote = "";
+      }
+      delete record.manualScoreA;
+      delete record.manualScoreB;
+    }
+    if (demoFile?.size) {
+      try {
+        Object.assign(record, await parseDemoFile(demoFile, record));
+        record.subtitle = record.demoInfo.playedAtLabel;
+        record.updated = record.demoInfo.extractionStatus === "skipped-large" ? "Demo grande registrada; leitura local ignorada" : "Demo processada pelo painel";
+      } catch (reason) {
+        const playedAt = demoPlayedAt(demoFile);
+        record.demoInfo = { fileName: demoFile.name, fileSize: demoFile.size, playedAt: playedAt.iso, playedAtLabel: playedAt.label, processedAt: new Date().toISOString(), rawFileStored: false, extractionStatus: "failed", warnings: [String(reason.message || reason)] };
+        saveWarnings.push(`A demo não pôde ser lida: ${reason.message || reason}`);
+      }
+    }
+    if (section === "matches" && record.leetifyUrl) {
+      try {
+        const imported = await importLeetifyMatch(record.leetifyUrl, record);
+        if (record.statisticsSource === "demo" && (record.statistics || []).length) {
+          const { statistics: leetifyStatistics, statisticsSource: _, ...metadata } = imported;
+          Object.assign(record, metadata);
+          record.statistics = mergeDemoWithLeetify(record.statistics, leetifyStatistics);
+          record.statisticsSource = "demo";
+          record.statisticsSecondarySource = "leetify";
+        } else Object.assign(record, imported);
+        leetifyImported = true;
+        record.updated = record.statisticsSource === "demo" ? "Demo principal · Leetify complementar" : "Estatísticas importadas do Leetify";
+      } catch (reason) {
+        record.leetifySyncError = String(reason.message || reason);
+        saveWarnings.push(`Leetify não importado: ${reason.message || reason}`);
+      }
+    }
+    if (index >= 0) list[index] = record; else list.unshift(record);
     if (section === "teams" && previousTeam) migrateTeamRename(record.id, previousTeam.name, record.name);
     if (section === "tournaments") ensureTournamentFixtures(index >= 0 ? list[index] : record);
     normalizeTeamReferences();
     await persistContent();
     dialog.close();
-    showToast(leetifyImported ? `${record.name}: ${record.statistics.length} jogadores e placar importados do Leetify` : demoFile?.size ? (record.statistics?.length ? `${record.name}: demo lida e ${record.statistics.length} jogadores extraídos` : `${record.name}: demo anexada; use Leetify ou print enquanto a extração estiver pendente`) : `${record.name} foi salvo`);
+    const successMessage = leetifyImported ? `${record.name}: ${(record.statistics || []).length} jogadores e resultado conferidos` : demoFile?.size ? (record.demoInfo?.extractionStatus === "skipped-large" ? `${record.name}: demo grande registrada; outras fontes foram salvas` : record.statistics?.length ? `${record.name}: demo lida e ${record.statistics.length} jogadores extraídos` : `${record.name}: demo registrada sem estatísticas`) : `${record.name} foi salvo`;
+    showToast(saveWarnings.length ? `${successMessage}. Aviso: ${saveWarnings.join(" · ")}` : successMessage);
     if (returnSection) { const destination = returnSection; returnSection = null; go(destination); }
     else if (section === "tournaments") tournamentsView();
     else listView();
