@@ -451,26 +451,47 @@ footer {
 
 .site-brand {
   min-width: 0;
-  gap: 12px;
+  gap: 0;
 }
 
 .site-brand > img {
-  width: 190px;
-  height: 68px;
+  width: 64px;
+  height: 64px;
   display: block;
   object-fit: contain;
 }
 
+.site-wordmark {
+  margin-left: 22px;
+  color: #fff !important;
+  font: 700 39px/1 Oswald, sans-serif;
+  letter-spacing: .055em;
+}
+
 .site-brand > small {
+  margin-left: 22px;
+  padding-left: 22px;
   max-width: 190px;
   color: #b8b4ad;
   line-height: 1.45;
 }
 
+.footer-brand-lockup {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
 .footer-logo {
-  width: 150px;
-  height: 60px;
+  width: 50px;
+  height: 50px;
   object-fit: contain;
+}
+
+.footer-brand-lockup strong {
+  color: #fff;
+  font: 700 28px/1 Oswald, sans-serif;
+  letter-spacing: .05em;
 }
 
 footer p {
@@ -484,6 +505,69 @@ footer p {
 .match-detail-hero {
   background: radial-gradient(circle at 82% 22%, #f29d2428, transparent 34%), linear-gradient(120deg, #1d1d20, #111216);
   border-color: #3b352d;
+}
+
+.event-hero {
+  isolation: isolate;
+  overflow: hidden;
+}
+
+.event-hero > span,
+.event-hero > h1,
+.event-hero > p {
+  position: relative;
+  z-index: 3;
+}
+
+.event-brand-art {
+  position: absolute;
+  z-index: 1;
+  inset: 0 0 0 auto;
+  width: 42%;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background: linear-gradient(90deg, transparent, #f29d240b 45%, #f29d2412);
+}
+
+.event-brand-art::before {
+  content: "";
+  position: absolute;
+  width: min(520px, 105%);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle, #f29d2433 0 18%, #f29d241b 38%, #f29d2409 56%, transparent 72%);
+}
+
+.event-brand-art::after {
+  content: "";
+  position: absolute;
+  width: 76%;
+  height: 76%;
+  border: 1px solid #f29d2426;
+  background: linear-gradient(145deg, #ffffff08, transparent 46%);
+  transform: rotate(8deg);
+  box-shadow: 0 0 55px #f29d2410;
+}
+
+.event-brand-art .event-logo {
+  position: relative;
+  z-index: 2;
+  inset: auto;
+  width: min(250px, 70%);
+  height: 220px;
+  object-fit: contain;
+  filter: drop-shadow(0 18px 28px #0009);
+}
+
+.match-detail-hero {
+  border-bottom: 1px solid #3b352d;
+}
+
+.stage-team > .stage-team-name {
+  justify-self: start;
+  width: fit-content;
+  max-width: 100%;
 }
 
 .event-tabs,
@@ -520,12 +604,27 @@ footer p {
 
 @media (max-width: 650px) {
   .site-brand > img {
-    width: 138px;
+    width: 50px;
     height: 50px;
+  }
+
+  .site-wordmark {
+    margin-left: 16px;
+    font-size: 31px;
   }
 
   .site-brand > small {
     display: none;
+  }
+
+  .event-brand-art {
+    width: 44%;
+    opacity: .88;
+  }
+
+  .event-brand-art .event-logo {
+    width: min(110px, 78%);
+    height: 100px;
   }
 }
 
@@ -650,11 +749,18 @@ footer p {
   }
 
   .site-brand > img {
-    width: 225px;
-    height: 78px;
+    width: 72px;
+    height: 72px;
+  }
+
+  .site-wordmark {
+    margin-left: 25px;
+    font-size: 44px;
   }
 
   .site-brand > small {
+    margin-left: 25px;
+    padding-left: 25px;
     max-width: 230px;
     font-size: 10px;
   }
@@ -762,15 +868,17 @@ footer p {
   }
 
   .event-hero {
-    min-height: 300px;
-    padding: 43px;
+    min-height: 330px;
+    padding: 48px;
   }
 
-  .event-logo {
-    width: 210px;
-    height: 180px;
-    right: 42px;
-    top: 34px;
+  .event-brand-art {
+    width: 44%;
+  }
+
+  .event-brand-art .event-logo {
+    width: min(300px, 72%);
+    height: 255px;
   }
 
   .event-hero > span {
@@ -779,7 +887,7 @@ footer p {
   }
 
   .event-hero h1 {
-    max-width: calc(100% - 235px);
+    max-width: 60%;
     font-size: clamp(46px, 5vw, 66px);
   }
 
