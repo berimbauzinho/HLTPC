@@ -98,18 +98,30 @@
   };
   const safeScoreboardImage = (value) => /^data:image\/(png|jpe?g|webp|gif);base64,/i.test(String(value || "")) ? String(value) : "";
   const normalizedNick = (value) => String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("pt-BR").replace(/[^a-z0-9]/g, "");
+  const confirmedPlayerAliases = new Map([
+    ["GJota", ["GJ"]],
+    ["Downey", ["Mikasa es su kasa"]],
+    ["190", ["fraquinho"]]
+  ]);
+
+  function publicPlayerNames(name) {
+    const meta = playerMeta.get(name) || {};
+    const aliases = [
+      ...(Array.isArray(meta.aliases) ? meta.aliases : []),
+      ...String(meta.alias || "").split(/[,;|]/),
+      ...(confirmedPlayerAliases.get(name) || [])
+    ];
+    return [...new Set([name, ...aliases].map((value) => String(value || "").trim()).filter(Boolean))];
+  }
 
   function canonicalPublicPlayer(name, steamId = "") {
-    const bySteam = [...playerMeta.entries()].find(([, meta]) => steamId && String(meta.steamId || "") === String(steamId));
+    const id = String(steamId || "").trim();
+    const bySteam = [...playerMeta.entries()].find(([, meta]) => id && String(meta.steamId || "").trim() === id);
     if (bySteam) return bySteam[0];
     const normalized = normalizedNick(name);
-    const found = data.players.find((player) => {
-      const meta = playerMeta.get(player) || {};
-      return [player, meta.alias].some((value) => {
-        const candidate = normalizedNick(value);
-        return candidate && (candidate === normalized || (candidate.length >= 4 && normalized.startsWith(candidate)));
-      });
-    });
+    const confirmed = [...confirmedPlayerAliases.entries()].find(([, aliases]) => aliases.some((alias) => normalizedNick(alias) === normalized))?.[0];
+    if (confirmed) return confirmed;
+    const found = data.players.find((player) => publicPlayerNames(player).some((value) => normalizedNick(value) === normalized));
     return found || String(name || "Desconhecido");
   }
 
@@ -118,18 +130,43 @@
   }
 
   function leetifyTeamMap(match, players, event) {
-    const roster = (team) => new Set((event?.entries.find((entry) => entry.team === team)?.players || []).map(normalizedNick));
-    const rosterA = roster(match.teamA);
+    const roster = (team, teamId) => {
+      const entry = event?.entries.find((candidate) => teamId && candidate.teamId === teamId) || event?.entries.find((candidate) => normalizedTeam(candidate.team) === normalizedTeam(team));
+      const names = new Set();
+      const steamIds = new Set();
+      (entry?.players || []).forEach((player) => {
+        publicPlayerNames(player).forEach((alias) => names.add(normalizedNick(alias)));
+        const steamId = String(playerMeta.get(player)?.steamId || "").trim();
+        if (steamId) steamIds.add(steamId);
+      });
+      return { names, steamIds };
+    };
+    const rosterA = roster(match.teamA, match.teamAId);
+    const rosterB = roster(match.teamB, match.teamBId);
     const numbers = [...new Set(players.map((player) => Number(player.initialTeamNumber)).filter(Boolean))];
-    const matchesRoster = (number) => players.filter((player) => Number(player.initialTeamNumber) === number).reduce((total, player) => total + (rosterA.has(normalizedNick(canonicalPublicPlayer(player.name, player.steam64Id))) ? 1 : 0), 0);
-    const numberA = numbers.sort((a, b) => matchesRoster(b) - matchesRoster(a))[0];
-    return { numberA, numberB: numbers.find((number) => number !== numberA) };
+    if (numbers.length !== 2) throw new Error("O Leetify não retornou exatamente dois times");
+    const identityScore = (player, target) => {
+      const steamId = String(player.steam64Id || "").trim();
+      if (steamId && target.steamIds.has(steamId)) return 100;
+      return target.names.has(normalizedNick(canonicalPublicPlayer(player.name, steamId))) ? 5 : 0;
+    };
+    const groupScore = (number, target) => players.filter((player) => Number(player.initialTeamNumber) === number).reduce((total, player) => total + identityScore(player, target), 0);
+    const [first, second] = numbers;
+    const forward = groupScore(first, rosterA) + groupScore(second, rosterB);
+    const reverse = groupScore(first, rosterB) + groupScore(second, rosterA);
+    if (!forward && !reverse) throw new Error("Não foi possível relacionar os jogadores do Leetify às escalações do campeonato. Cadastre os SteamID64 no painel.");
+    if (forward === reverse) throw new Error("A identificação dos times ficou ambígua. Confira os SteamID64 das escalações.");
+    const numberA = forward > reverse ? first : second;
+    return { numberA, numberB: forward > reverse ? second : first, confidence: Math.abs(forward - reverse), matchedBySteamId: players.filter((player) => {
+      const steamId = String(player.steam64Id || "").trim();
+      return steamId && (rosterA.steamIds.has(steamId) || rosterB.steamIds.has(steamId));
+    }).length };
   }
 
   function normalizeLeetifyMatch(match, payload) {
     const event = data.tournaments.find((item) => item.id === match.tournamentId);
     const players = Array.isArray(payload.playerStats) ? payload.playerStats : [];
-    const { numberA, numberB } = leetifyTeamMap(match, players, event);
+    const { numberA, numberB, confidence, matchedBySteamId } = leetifyTeamMap(match, players, event);
     const teamRounds = (number) => {
       const player = players.find((item) => Number(item.initialTeamNumber) === number);
       return player ? Number(player.ctRoundsWon || 0) + Number(player.tRoundsWon || 0) : 0;
@@ -160,11 +197,11 @@
     }).sort((a, b) => b.rating - a.rating || b.kills - a.kills);
     return {
       ...match,
-      score: match.score || (scoreA || scoreB ? `${scoreA} - ${scoreB}` : ""),
-      winner: match.winner || (scoreA > scoreB ? match.teamA : scoreB > scoreA ? match.teamB : ""),
+      score: match.resultSource === "manual" && match.score ? match.score : scoreA || scoreB ? `${scoreA} - ${scoreB}` : "",
+      winner: match.resultSource === "manual" && match.winner ? match.winner : scoreA > scoreB ? match.teamA : scoreB > scoreA ? match.teamB : "",
       statistics,
       statisticsSource: "leetify",
-      leetifyInfo: { ...(match.leetifyInfo || {}), matchId: payload.id, finishedAt: payload.finishedAt, mapName: payload.mapName, rounds, scoreA, scoreB, status: payload.status }
+      leetifyInfo: { ...(match.leetifyInfo || {}), matchId: payload.id, finishedAt: payload.finishedAt, mapName: payload.mapName, rounds, scoreA, scoreB, status: payload.status, teamMapping: { numberA, numberB, confidence, matchedBySteamId } }
     };
   }
 
