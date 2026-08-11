@@ -297,9 +297,14 @@
   }
 
   function matchTimestamp(match) {
+    const mapTimestamps = (match?.maps || []).flatMap((map) => [map?.leetifyInfo?.finishedAt, map?.demoInfo?.playedAt]).map((value) => Date.parse(value || "")).filter(Number.isFinite);
+    if (mapTimestamps.length) return Math.max(...mapTimestamps);
     const value = match?.leetifyInfo?.finishedAt || match?.demoInfo?.playedAt || match?.date || "";
     const timestamp = Date.parse(value);
-    return Number.isFinite(timestamp) ? timestamp : Number(match?.order || 0);
+    if (Number.isFinite(timestamp)) return timestamp;
+    const brazilianDate = String(match?.subtitle || "").match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+    if (brazilianDate) return Date.UTC(Number(brazilianDate[3]), Number(brazilianDate[2]) - 1, Number(brazilianDate[1])) + Number(match?.order || 0);
+    return Number(match?.order || 0);
   }
 
   function latestMatchForEvent(event) {
