@@ -1,0 +1,193 @@
+/* Match tables share the exact same grid in the header and data rows. */
+.match-stat-head,
+.match-stat-row {
+  grid-template-columns: minmax(190px, 1.55fr) repeat(5, minmax(76px, .55fr));
+  align-items: stretch;
+  text-align: initial;
+}
+
+.match-stat-head {
+  min-height: 32px;
+}
+
+.match-stat-head > span,
+.match-stat-row > span,
+.match-stat-row > strong {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  padding: 0 10px;
+  text-align: center;
+}
+
+.match-stat-head > span:first-child,
+.match-stat-row > span:first-child {
+  justify-content: flex-start;
+  text-align: left;
+  padding-left: 14px;
+}
+
+.match-stat-row {
+  min-height: 48px;
+}
+
+.match-stat-row > span:first-child {
+  padding-top: 7px;
+  padding-bottom: 7px;
+  align-items: flex-start;
+}
+
+/* Automatically calculated group standings. */
+.group-standings {
+  margin: 16px 16px 0;
+  border: 1px solid #465665;
+  background: #24313c;
+}
+
+.group-standings > header {
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 13px;
+  background: #2d3b48;
+  border-bottom: 1px solid #465665;
+}
+
+.group-standings > header > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.group-standings > header span {
+  font: 700 7px JetBrains Mono, monospace;
+  color: var(--amber);
+}
+
+.group-standings > header h4 {
+  font: 600 15px Oswald, sans-serif;
+  margin: 0;
+}
+
+.group-standings > header small {
+  font: 600 7px JetBrains Mono, monospace;
+  color: #94a2ae;
+  text-align: right;
+}
+
+.group-standings-scroll {
+  overflow-x: auto;
+}
+
+.group-standings-head,
+.group-standing-row {
+  display: grid;
+  grid-template-columns: 34px minmax(190px, 1fr) repeat(7, minmax(48px, 62px));
+  align-items: center;
+  min-width: 650px;
+}
+
+.group-standings-head {
+  min-height: 30px;
+  background: #202b35;
+  color: #8e9ca8;
+  font: 700 7px JetBrains Mono, monospace;
+}
+
+.group-standings-head > span {
+  text-align: center;
+}
+
+.group-standings-head > span:nth-child(2) {
+  text-align: left;
+}
+
+.group-standing-row {
+  min-height: 50px;
+  border-top: 1px solid #3f4f5d;
+  color: #dce3e8;
+  font: 700 9px JetBrains Mono, monospace;
+}
+
+.group-standing-row > strong,
+.group-standing-row > span {
+  text-align: center;
+}
+
+.group-standing-row > a {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  color: #eef2f5;
+  text-decoration: none;
+  font: 600 11px Oswald, sans-serif;
+}
+
+.group-standing-row > a > span {
+  width: 29px;
+  height: 29px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  background: #1b252e;
+  border: 1px solid #3c4a57;
+  color: #8996a2;
+  font: 700 8px JetBrains Mono, monospace;
+  overflow: hidden;
+}
+
+.group-standing-row > a > span img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.group-standing-row > a > b {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.group-standing-row .positive {
+  color: #62d49d;
+}
+
+.group-standing-row .negative {
+  color: #ff716c;
+}
+
+.group-standing-row > strong:last-child {
+  height: 28px;
+  width: 34px;
+  display: grid;
+  place-items: center;
+  justify-self: center;
+  background: #17212a;
+  border: 1px solid #485867;
+  color: var(--amber2);
+  font-size: 11px;
+}
+
+@media (max-width: 780px) {
+  .match-stat-head,
+  .match-stat-row {
+    min-width: 650px;
+  }
+}
+
+@media (max-width: 720px) {
+  .group-standings > header {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .group-standings > header small {
+    text-align: left;
+  }
+}
