@@ -327,6 +327,33 @@
     bindEditorDynamics();
   }
 
+  function editableSeriesMaps(item) {
+    if (Array.isArray(item.maps) && item.maps.length) return item.maps;
+    const bestOf = Number(item.bestOf || 1);
+    if (bestOf <= 1) return [];
+    return Array.from({ length: bestOf }, (_, index) => ({ id: `${item.id || "match"}-map-${index + 1}`, name: `Mapa ${index + 1}`, order: index + 1, score: "", statistics: [] }));
+  }
+
+  function seriesMapsMarkup(item, maps) {
+    if (!maps.length) return "";
+    return `<section class="admin-series-maps"><header><span>MAPAS DA SÉRIE</span><b>${maps.filter((map) => map.score).length}/${maps.length} com placar</b></header>${maps.map((map, index) => {
+      const source = map.scoreSource === "manual" || map.resultSource === "manual" ? "Placar oficial manual" : map.statisticsSource === "missing" ? "Dados faltantes · preenchimento manual" : map.statisticsSource === "leetify" ? "Estatísticas: Leetify + demo" : map.statisticsSource === "demo" ? "Estatísticas: demo" : "Aguardando dados";
+      return `<article class="${map.statisticsSource === "missing" && !map.score ? "missing" : ""}"><span><b>${escapeHtml(map.name || map.mapName || `Mapa ${index + 1}`)}</b><small>${escapeHtml(source)}</small></span><button type="button" data-edit-map="${index}">${escapeHtml(map.score || "Preencher placar")}</button></article>`;
+    }).join("")}</section>`;
+  }
+
+  function manualResultFields(item, maps, manualResult) {
+    if (!maps.length) {
+      const savedScores = String(item.score || "").match(/\d+/g) || [];
+      return `<fieldset class="manual-result"><legend>Placar oficial do mapa</legend><label class="manual-result-toggle"><input type="checkbox" name="manualResult" value="true" ${manualResult ? "checked" : ""} /><span><b>Informar o placar manualmente</b><small>Para MD1, informe os rounds do único mapa. Este placar tem prioridade sobre demo, Leetify e print.</small></span></label><div class="manual-score-fields" ${manualResult ? "" : "hidden"}><label>${escapeHtml(item.teamA || "Time A")}<input type="number" name="manualScoreA" min="0" max="99" step="1" value="${escapeHtml(savedScores[0] || "")}" /></label><i>×</i><label>${escapeHtml(item.teamB || "Time B")}<input type="number" name="manualScoreB" min="0" max="99" step="1" value="${escapeHtml(savedScores[1] || "")}" /></label></div></fieldset>`;
+    }
+    const rows = maps.map((map, index) => {
+      const scores = String(map.score || "").match(/\d+/g) || [];
+      return `<article class="manual-map-row" data-manual-map="${index}"><label>Mapa<input name="manualMapName_${index}" value="${escapeHtml(map.name || map.mapName || `Mapa ${index + 1}`)}" placeholder="Ex.: Mirage" /></label><div><label>${escapeHtml(item.teamA || "Time A")}<input type="number" name="manualMapScoreA_${index}" min="0" max="99" step="1" value="${escapeHtml(scores[0] || "")}" /></label><i>×</i><label>${escapeHtml(item.teamB || "Time B")}<input type="number" name="manualMapScoreB_${index}" min="0" max="99" step="1" value="${escapeHtml(scores[1] || "")}" /></label></div></article>`;
+    }).join("");
+    return `<fieldset class="manual-result"><legend>Placar oficial por mapa</legend><label class="manual-result-toggle"><input type="checkbox" name="manualResult" value="true" ${manualResult ? "checked" : ""} /><span><b>Confirmar ou corrigir os rounds de cada mapa</b><small>O resultado da série (ex.: 2–0) será calculado automaticamente a partir dos mapas vencidos. As estatísticas da demo/Leetify permanecem separadas.</small></span></label><input type="hidden" name="manualMapCount" value="${maps.length}" /><div class="manual-map-score-fields" ${manualResult ? "" : "hidden"}>${rows}<div class="manual-series-live"><small>RESULTADO DA SÉRIE</small><b>Aguardando os placares dos mapas</b></div></div></fieldset>`;
+  }
+
   function formFields(item) {
     if (section === "players") return `<div class="editor-tabs"><button type="button" class="active" data-editor-tab="profile">Dados do jogador</button><button type="button" data-editor-tab="teams">Equipes</button></div><div data-editor-panel="profile">${textField("name", "Nick principal", item.name, "Ex.: lanches", true)}<div class="field-row">${textField("alias", "Aliases conhecidos", item.alias, "Ex.: GJ, outro nick")}${selectField("status", item.status)}</div>${textField("steamId", "SteamID64", item.steamId, "Ex.: 76561198300371519")}${fileField("photo", "Foto do jogador", "image/*")}<div class="helper">Separe aliases por vírgula. O SteamID64 é a identidade principal e conecta automaticamente qualquer nick usado na demo ou no Leetify ao perfil correto.</div></div><div data-editor-panel="teams" hidden><span class="field-title">Equipes defendidas</span><div class="team-checklist">${state.teams.map((team) => `<label><input type="checkbox" name="teams" value="${escapeHtml(team.name)}" ${(item.teams || []).includes(team.name) ? "checked" : ""} /><span><b>${escapeHtml(team.name)}</b><small>${escapeHtml(team.acronym)}</small></span></label>`).join("")}</div><div class="helper">As equipes encontradas nas escalações históricas já aparecem marcadas. Use esta área para complementar ou corrigir o perfil.</div></div>`;
     if (section === "teams") return `${textField("name", "Nome oficial do time", item.name, "Ex.: Deftones", true)}<div class="field-row">${textField("acronym", "Sigla", item.acronym, "Ex.: DFT")}${selectField("status", item.status)}</div>${fileField("logo", "Logo do time", "image/*")}<div class="helper">O elenco mais recente e as formações históricas serão derivados de cada participação.</div>`;
@@ -343,11 +370,11 @@
       const teamsField = lockedGroupMatch ? `<input type="hidden" name="teamA" value="${escapeHtml(item.teamA)}" /><input type="hidden" name="teamB" value="${escapeHtml(item.teamB)}" /><div class="locked-match-teams"><b>${escapeHtml(item.teamA)}</b><span>×</span><b>${escapeHtml(item.teamB)}</b></div>` : `<div class="field-row"><label>Time A<select name="teamA" id="matchTeamA" required></select></label><label>Time B<select name="teamB" id="matchTeamB" required></select></label></div>`;
       const demoHasStats = Boolean(item.demoInfo && item.statisticsSource !== "leetify" && (item.statistics || []).length);
       const leetifyHasStats = Boolean(item.leetifyInfo && item.statisticsSource === "leetify" && (item.statistics || []).length);
-      const savedScores = String(item.score || "").match(/\d+/g) || [];
-      const manualResult = item.manualResult === true || item.manualResult === "true" || item.resultSource === "manual";
-      const seriesMaps = Array.isArray(item.maps) && item.maps.length ? `<section class="admin-series-maps"><header><span>MAPAS DA SÉRIE</span><b>${item.maps.filter((map) => map.score).length}/${item.maps.length} com placar</b></header>${item.maps.map((map, index) => `<article class="${map.statisticsSource === "missing" ? "missing" : ""}"><span><b>${escapeHtml(map.name || map.mapName || `Mapa ${index + 1}`)}</b><small>${escapeHtml(map.statisticsSource === "missing" ? "Demo perdida · preenchimento manual pendente" : map.statisticsSource === "leetify" ? "Leetify + demo vinculada" : "Demo processada")}</small></span><strong>${escapeHtml(map.score || "A confirmar")}</strong></article>`).join("")}</section>` : "";
+      const maps = editableSeriesMaps(item);
+      const manualResult = item.manualResult === true || item.manualResult === "true" || ["manual", "manual-maps"].includes(item.resultSource) || maps.some((map) => map.scoreSource === "manual" || map.resultSource === "manual");
+      const seriesMaps = seriesMapsMarkup(item, maps);
       const sourceSummary = item.demoInfo || item.leetifyUrl || item.scoreboardImage || manualResult ? `<div class="match-source-summary"><span class="${demoHasStats ? "verified" : item.demoInfo ? "partial" : "muted"}"><b>${demoHasStats ? "1 · Demo confirmada" : item.demoInfo?.extractionStatus === "skipped-large" ? "1 · Demo grande" : item.demoInfo ? "1 · Demo anexada" : "1 · Sem demo"}</b><small>${item.demoInfo ? `${escapeHtml(item.demoInfo.fileName)}${demoHasStats ? ` · ${(item.statistics || []).length} jogadores` : item.demoInfo.extractionStatus === "skipped-large" ? " · leitura local ignorada" : " · extração pendente"}` : "Fonte primária opcional"}</small></span><span class="${leetifyHasStats ? "verified" : item.leetifyUrl ? "partial" : "muted"}"><b>2 · Leetify</b><small>${leetifyHasStats ? `${(item.statistics || []).length} jogadores · ${escapeHtml(item.leetifyInfo.mapName || "mapa identificado")}` : item.leetifySyncError ? escapeHtml(item.leetifySyncError) : item.leetifyUrl ? "Link salvo · aguarda importação" : "Fonte secundária opcional"}</small></span><span class="${item.scoreboardImage ? "verified" : "muted"}"><b>3 · Print</b><small>${item.scoreboardImage ? "Imagem salva como comprovação" : "Evidência visual opcional"}</small></span><span class="${manualResult ? "verified" : "muted"}"><b>4 · Manual</b><small>${manualResult ? `Resultado confirmado: ${escapeHtml(item.score || "—")}` : "Disponível mesmo sem arquivos"}</small></span></div>` : "";
-      const manualFields = `<fieldset class="manual-result"><legend>Resultado manual</legend><label class="manual-result-toggle"><input type="checkbox" name="manualResult" value="true" ${manualResult ? "checked" : ""} /><span><b>Informar o placar manualmente</b><small>Use quando não houver demo, Leetify ou print completo. O placar manual sempre tem prioridade sobre a importação.</small></span></label><div class="manual-score-fields" ${manualResult ? "" : "hidden"}><label>${escapeHtml(item.teamA || "Time A")}<input type="number" name="manualScoreA" min="0" max="99" step="1" value="${escapeHtml(savedScores[0] || "")}" /></label><i>×</i><label>${escapeHtml(item.teamB || "Time B")}<input type="number" name="manualScoreB" min="0" max="99" step="1" value="${escapeHtml(savedScores[1] || "")}" /></label></div></fieldset>`;
+      const manualFields = manualResultFields(item, maps, manualResult);
       return `${tournamentField}${teamsField}${textField("name", "Fase", item.name, "Ex.: Semifinal", true)}${selectField("status", item.status)}${seriesMaps}${manualFields}<fieldset class="match-evidence"><legend>Fontes dos dados</legend><div class="evidence-order"><b>1</b><span><strong>Demo · fonte principal</strong><small>Até 500 MB, o painel tenta extrair data e estatísticas. Acima disso, ignora somente a leitura local e continua salvando as outras fontes.</small></span></div>${fileField("demo", "Selecionar arquivo .dem", ".dem")}${urlField("demoUrl", "Ou link da demo no Google Drive", item.demoUrl, "https://drive.google.com/file/d/...")}${item.demoInfo ? `<div class="demo-result ${demoHasStats ? "" : "partial"}"><b>${demoHasStats ? "✓ Demo processada" : item.demoInfo.extractionStatus === "skipped-large" ? "⚠ Demo grande registrada; leitura local ignorada" : item.demoUrl ? "✓ Demo vinculada pelo Drive" : "⚠ Demo anexada, sem estatísticas automáticas"}</b><span>${escapeHtml(item.demoInfo.fileName)} · ${escapeHtml(item.demoInfo.mapName || "mapa não identificado")} · ${item.demoInfo.rounds || 0} rounds</span><small>${escapeHtml(item.demoInfo.playedAtLabel || item.subtitle || "Data não identificada")} · ${(item.statistics || []).length} jogadores extraídos</small>${item.demoInfo.warnings?.length ? `<small>${escapeHtml(item.demoInfo.warnings.join(" · "))}</small>` : ""}</div>` : ""}<div class="evidence-order"><b>2</b><span><strong>Leetify · fonte secundária</strong><small>Use sozinho ou para complementar rating/KAST quando a demo estiver disponível.</small></span></div>${urlField("leetifyUrl", "Link da partida no Leetify", item.leetifyUrl, "https://leetify.com/app/match-details/...")}<div class="evidence-order"><b>3</b><span><strong>Print do placar · comprovação visual</strong><small>Envie a tela final quando a demo ou o Leetify não trouxerem tudo.</small></span></div>${fileField("scoreboardImage", item.scoreboardImage ? "Substituir print do placar" : "Enviar print do placar", "image/*")}${item.scoreboardImage ? `<div class="scoreboard-preview"><img src="${escapeHtml(item.scoreboardImage)}" alt="Print do placar salvo" /><span><b>Print salvo</b><small>Um novo arquivo substituirá esta imagem.</small><label><input type="checkbox" name="removeScoreboardImage" value="true" /> Remover print atual</label></span></div>` : ""}</fieldset>${sourceSummary}<div class="helper" id="matchHelper">${generated ? "A data será extraída do nome da demo quando ela puder ser lida. Cada fonte funciona de forma independente e fica ligada somente a este confronto." : "Escolha uma edição: os times serão limitados exclusivamente às escalações daquele campeonato."}</div>`;
     }
     return `${textField("name", "Título", item.name, "Título da notícia", true)}<label>Texto / resumo<textarea name="subtitle" placeholder="Escreva a notícia...">${escapeHtml(item.subtitle)}</textarea></label><div class="field-row">${textField("author", "Autor", item.author, "HLTPC")}${textField("date", "Data", item.date, "2026-08-10", true)}</div>${selectField("status", item.status)}${fileField("image", "Imagem de destaque", "image/*")}`;
@@ -501,12 +528,33 @@
       document.querySelector("#matchTournament")?.addEventListener("change", () => populateMatchTeams());
       populateMatchTeams(current?.teamA || "", current?.teamB || "");
       const manualToggle = document.querySelector('input[name="manualResult"]');
-      const manualFields = document.querySelector(".manual-score-fields");
+      const manualFields = document.querySelector(".manual-score-fields, .manual-map-score-fields");
+      const refreshSeriesResult = () => {
+        const summary = document.querySelector(".manual-series-live b");
+        if (!summary) return;
+        let winsA = 0;
+        let winsB = 0;
+        document.querySelectorAll("[data-manual-map]").forEach((row) => {
+          const index = row.dataset.manualMap;
+          const scoreA = Number(document.querySelector(`[name="manualMapScoreA_${index}"]`)?.value);
+          const scoreB = Number(document.querySelector(`[name="manualMapScoreB_${index}"]`)?.value);
+          if (!Number.isFinite(scoreA) || !Number.isFinite(scoreB) || scoreA === scoreB) return;
+          if (scoreA > scoreB) winsA += 1; else winsB += 1;
+        });
+        summary.textContent = `${current?.teamA || "Time A"} ${winsA} × ${winsB} ${current?.teamB || "Time B"}`;
+      };
       manualToggle?.addEventListener("change", () => {
         manualFields.hidden = !manualToggle.checked;
-        manualFields.querySelectorAll("input").forEach((input) => { input.required = manualToggle.checked; });
+        refreshSeriesResult();
       });
-      if (manualToggle?.checked) manualFields?.querySelectorAll("input").forEach((input) => { input.required = true; });
+      manualFields?.querySelectorAll('input[type="number"]').forEach((input) => input.addEventListener("input", refreshSeriesResult));
+      document.querySelectorAll("[data-edit-map]").forEach((button) => button.addEventListener("click", () => {
+        if (manualToggle) manualToggle.checked = true;
+        if (manualFields) manualFields.hidden = false;
+        document.querySelector(`[name="manualMapScoreA_${button.dataset.editMap}"]`)?.focus();
+        refreshSeriesResult();
+      }));
+      refreshSeriesResult();
     }
   }
 
@@ -909,11 +957,62 @@
     if (section === "matches") {
       const manualResult = values.manualResult === "true";
       record.manualResult = manualResult;
-      if (manualResult) {
+      const manualMapCount = Number(values.manualMapCount || 0);
+      if (manualResult && manualMapCount > 0) {
+        const originalMaps = editableSeriesMaps(previousRecord);
+        const maps = [];
+        let winsA = 0;
+        let winsB = 0;
+        for (let mapIndex = 0; mapIndex < manualMapCount; mapIndex += 1) {
+          const original = originalMaps[mapIndex] || {};
+          const rawA = String(values[`manualMapScoreA_${mapIndex}`] || "").trim();
+          const rawB = String(values[`manualMapScoreB_${mapIndex}`] || "").trim();
+          const mapName = String(values[`manualMapName_${mapIndex}`] || original.name || `Mapa ${mapIndex + 1}`).trim();
+          if (!rawA && !rawB) {
+            if (original.demoUrl || original.leetifyUrl || (original.statistics || []).length) maps.push({ ...original, name: mapName });
+            continue;
+          }
+          const scoreA = Number(rawA);
+          const scoreB = Number(rawB);
+          if (!Number.isInteger(scoreA) || !Number.isInteger(scoreB) || scoreA < 0 || scoreB < 0 || scoreA === scoreB) {
+            showToast(`Informe dois placares inteiros e diferentes no ${mapName}`);
+            return;
+          }
+          if (scoreA > scoreB) winsA += 1; else winsB += 1;
+          maps.push({
+            ...original,
+            id: original.id || `${record.id}-map-${mapIndex + 1}`,
+            order: original.order || mapIndex + 1,
+            name: mapName,
+            scoreA,
+            scoreB,
+            score: `${scoreA} - ${scoreB}`,
+            rounds: scoreA + scoreB,
+            winner: scoreA > scoreB ? record.teamA : record.teamB,
+            resultSource: "manual",
+            scoreSource: "manual",
+            statisticsSource: (original.statistics || []).length ? original.statisticsSource : "manual",
+            evidenceNote: "Placar oficial confirmado manualmente no painel; estatísticas mantêm sua fonte original."
+          });
+        }
+        if (!maps.some((map) => map.score)) {
+          showToast("Informe o placar de pelo menos um mapa");
+          return;
+        }
+        const winsNeeded = Math.ceil(Number(record.bestOf || manualMapCount) / 2);
+        const seriesFinished = Math.max(winsA, winsB) >= winsNeeded;
+        record.maps = maps;
+        record.score = seriesFinished ? `${winsA} - ${winsB}` : "";
+        record.winner = seriesFinished ? (winsA > winsB ? record.teamA : record.teamB) : "";
+        record.winnerId = seriesFinished ? (winsA > winsB ? record.teamAId || "" : record.teamBId || "") : "";
+        record.resultSource = "manual-maps";
+        record.evidenceNote = seriesFinished ? `Resultado oficial calculado pelos mapas: ${record.teamA} ${winsA}–${winsB} ${record.teamB}.` : `Série em andamento: ${winsA}–${winsB} em mapas com placar confirmado.`;
+        if (seriesFinished) record.status = "finished";
+      } else if (manualResult) {
         const scoreA = Number(values.manualScoreA);
         const scoreB = Number(values.manualScoreB);
         if (!Number.isInteger(scoreA) || !Number.isInteger(scoreB) || scoreA < 0 || scoreB < 0 || scoreA === scoreB) {
-          showToast("Informe dois placares inteiros e diferentes para o resultado manual");
+          showToast("Informe os rounds oficiais do mapa com dois placares inteiros e diferentes");
           return;
         }
         record.score = `${scoreA} - ${scoreB}`;
@@ -921,7 +1020,7 @@
         record.winnerId = scoreA > scoreB ? record.teamAId || "" : record.teamBId || "";
         record.resultSource = "manual";
         record.evidenceNote = "Resultado informado manualmente pelo painel administrativo.";
-      } else if (previousRecord.resultSource === "manual") {
+      } else if (["manual", "manual-maps"].includes(previousRecord.resultSource)) {
         record.score = "";
         record.winner = "";
         record.winnerId = "";
@@ -930,6 +1029,8 @@
       }
       delete record.manualScoreA;
       delete record.manualScoreB;
+      delete record.manualMapCount;
+      Object.keys(record).filter((key) => /^manualMap(Name|ScoreA|ScoreB)_\d+$/.test(key)).forEach((key) => delete record[key]);
     }
     if (demoFile?.size) {
       try {
