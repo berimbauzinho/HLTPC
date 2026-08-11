@@ -5,7 +5,7 @@
   const state = {
     players: source.players.map((name, index) => ({ id: `player-${index}`, name, alias: "", status: "published", photo: "", teams: [...new Set(source.tournaments.flatMap((event) => event.entries.filter((entry) => entry.players.includes(name)).map((entry) => entry.team)))], updated: "Dados históricos" })),
     teams: [...new Set(source.tournaments.flatMap((event) => event.entries.map((entry) => entry.team)))].map((name, index) => ({ id: `team-${index}`, name, acronym: initials(name), status: "published", logo: "", updated: "Derivado das edições" })),
-    tournaments: source.tournaments.map((event) => ({ id: event.id, name: event.name, subtitle: String(event.year), status: "published", logo: "", format: event.format, formatType: event.id === "pgl-abadia-2026" ? "three_team_series" : "custom", teams: event.entries.map((entry) => entry.team), updated: event.status === "ongoing" ? "Em andamento" : `Campeão: ${event.champion}` })),
+    tournaments: source.tournaments.map((event) => ({ id: event.id, name: event.name, subtitle: String(event.year), status: "published", logo: "", format: event.format, formatType: event.entries.length === 2 ? "two_team_md3" : event.entries.length === 3 ? "three_team_series" : "four_team_groups", teams: event.entries.map((entry) => entry.team), updated: event.status === "ongoing" ? "Em andamento" : `Campeão: ${event.champion}` })),
     matches: [],
     news: source.news.map((item) => ({ id: item.id, name: item.title, subtitle: item.summary, author: item.author, date: item.date, tournamentId: item.tournamentId, status: "published", updated: item.date }))
   };
@@ -83,7 +83,7 @@
     const descriptions = {
       players: "Cadastre nicks, aliases e fotos sem duplicar o histórico.",
       teams: "Gerencie organizações e logos; elencos continuam ligados às edições.",
-      tournaments: "Crie edições, formato, status, campeão e identidade visual.",
+      tournaments: "Escolha o formato, selecione os participantes e confira toda a estrutura antes de gerar as partidas.",
       matches: "Abra uma partida pré-gerada pelo formato para definir horário, publicar e anexar a demo.",
       news: "Prepare notícias compartilhadas e escolha quando publicar."
     };
@@ -169,7 +169,11 @@
   function formFields(item) {
     if (section === "players") return `<div class="editor-tabs"><button type="button" class="active" data-editor-tab="profile">Dados do jogador</button><button type="button" data-editor-tab="teams">Equipes</button></div><div data-editor-panel="profile">${textField("name", "Nick principal", item.name, "Ex.: lanches", true)}<div class="field-row">${textField("alias", "Nome / alias", item.alias, "Ex.: Mathieu Herbaut")}${selectField("status", item.status)}</div>${fileField("photo", "Foto do jogador", "image/*")}<div class="helper">Títulos e participações são calculados pelas escalações dos campeonatos.</div></div><div data-editor-panel="teams" hidden><span class="field-title">Equipes defendidas</span><div class="team-checklist">${state.teams.map((team) => `<label><input type="checkbox" name="teams" value="${escapeHtml(team.name)}" ${(item.teams || []).includes(team.name) ? "checked" : ""} /><span><b>${escapeHtml(team.name)}</b><small>${escapeHtml(team.acronym)}</small></span></label>`).join("")}</div><div class="helper">As equipes encontradas nas escalações históricas já aparecem marcadas. Use esta área para complementar ou corrigir o perfil.</div></div>`;
     if (section === "teams") return `${textField("name", "Nome oficial do time", item.name, "Ex.: Deftones", true)}<div class="field-row">${textField("acronym", "Sigla", item.acronym, "Ex.: DFT")}${selectField("status", item.status)}</div>${fileField("logo", "Logo do time", "image/*")}<div class="helper">O elenco mais recente e as formações históricas serão derivados de cada participação.</div>`;
-    if (section === "tournaments") return `${textField("name", "Nome do campeonato", item.name, "Ex.: PGL Major Abadia", true)}<div class="field-row">${textField("subtitle", "Ano", item.subtitle, "2026", true)}${selectField("status", item.status)}</div><label>Modelo de formato<select name="formatType" id="formatType">${formatOptions(item.formatType)}</select></label><label>Descrição do formato<input name="format" id="formatDescription" value="${escapeHtml(item.format || "")}" placeholder="Será preenchido pelo modelo escolhido" /></label><div class="format-preview" id="formatPreview"></div>${fileField("logo", "Logo do campeonato", "image/*")}<div class="helper">Depois de criar a edição, você adicionará os times e os cinco jogadores de cada escalação. O formato define como classificação e chave serão exibidas.</div>`;
+    if (section === "tournaments") {
+      const selectedFormat = item.formatType || "three_team_series";
+      const selectedTeams = item.teams || [];
+      return `${textField("name", "Nome do campeonato", item.name, "Ex.: PGL Major Abadia", true)}<div class="field-row">${textField("subtitle", "Ano", item.subtitle, "2026", true)}${selectField("status", item.status)}</div><fieldset class="format-picker"><legend>Formato do campeonato</legend><div class="format-card-grid">${formatCards(selectedFormat)}</div></fieldset><input type="hidden" name="format" id="formatDescription" value="${escapeHtml(item.format || "")}" /><fieldset class="tournament-team-picker"><legend>Times participantes</legend><div class="participant-counter" id="participantCounter"></div><div class="team-checklist tournament-teams">${state.teams.map((team) => `<label><input type="checkbox" name="teams" value="${escapeHtml(team.name)}" ${selectedTeams.includes(team.name) ? "checked" : ""} /><span><b>${escapeHtml(team.name)}</b><small>${escapeHtml(team.acronym)}</small></span></label>`).join("")}</div></fieldset><div class="format-preview" id="formatPreview"></div>${fileField("logo", "Logo do campeonato", "image/*")}<div class="helper">Ao salvar, as partidas são geradas pelo formato escolhido. Partidas que já tenham placar ou demo nunca serão apagadas automaticamente.</div>`;
+    }
     if (section === "matches") {
       const generated = Boolean(item.slotA || item.slotB);
       const lockedGroupMatch = item.round === "group" && item.teamA && item.teamB;
@@ -185,37 +189,67 @@
   function selectField(name, value = "draft") { return `<label>Status<select name="${name}"><option value="draft" ${value === "draft" ? "selected" : ""}>Rascunho</option><option value="published" ${value === "published" ? "selected" : ""}>Publicado</option></select></label>`; }
   function fileField(name, label, accept) { return `<label>${label}<input class="file-field" name="${name}" type="file" accept="${accept}" /></label>`; }
 
-  function formatOptions(value = "custom") {
-    const options = [["three_team_series", "3 times: ida e volta + semifinal + final"], ["round_robin", "Pontos corridos"], ["single_elimination", "Eliminação simples"], ["double_elimination", "Eliminação dupla"], ["groups_playoffs", "Grupos + playoffs"], ["custom", "Personalizado"]];
-    return options.map(([key, label]) => `<option value="${key}" ${value === key ? "selected" : ""}>${label}</option>`).join("");
+  function formatCards(value = "three_team_series") {
+    return [
+      ["two_team_md3", "2 times", "Final direta", "1 partida · MD3"],
+      ["three_team_series", "3 times", "Grupos + semifinal", "8 partidas"],
+      ["four_team_groups", "4 times", "Grupos + chave", "9 partidas"]
+    ].map(([key, title, subtitle, detail]) => `<label class="format-card"><input type="radio" name="formatType" value="${key}" ${value === key ? "checked" : ""} /><span><i>${title.split(" ")[0]}</i><b>${title}</b><small>${subtitle}</small><em>${detail}</em></span></label>`).join("");
   }
 
   function formatDefinition(type) {
     return {
-      three_team_series: { label: "3 times · série dupla + playoffs", description: "Cada time enfrenta os outros duas vezes. O 2º e o 3º jogam a semifinal; o 1º colocado avança direto para a final.", steps: ["6 jogos de grupos", "Semifinal: 2º × 3º", "Final: 1º × vencedor"] },
-      round_robin: { label: "Pontos corridos", description: "Todos jogam contra todos. Vitória vale 3 pontos; empate, 1.", steps: ["Liga", "Classificação", "Campeão"] },
-      single_elimination: { label: "Eliminação simples", description: "Quem perde é eliminado. Ideal para uma chave rápida.", steps: ["Semifinais", "Final", "Campeão"] },
-      double_elimination: { label: "Eliminação dupla", description: "Uma derrota envia o time à chave inferior; a segunda elimina.", steps: ["Chave superior", "Chave inferior", "Grande final"] },
-      groups_playoffs: { label: "Grupos + playoffs", description: "Fase de grupos classificatória seguida por mata-mata.", steps: ["Grupos", "Semifinais", "Final"] },
-      custom: { label: "Personalizado", description: "Descreva manualmente as regras do campeonato.", steps: ["Formato livre"] }
-    }[type];
+      two_team_md3: { teamCount: 2, matchCount: 1, label: "Final direta · 2 times", description: "Os dois times disputam uma única série MD3. O vencedor da série é o campeão.", steps: ["Final MD3", "Campeão"] },
+      three_team_series: { teamCount: 3, matchCount: 8, label: "3 times · grupos e playoffs", description: "Cada time enfrenta os outros duas vezes em MD1. O 2º e o 3º jogam uma semifinal MD3; o 1º colocado avança direto para a final MD3.", steps: ["6 jogos MD1", "Semifinal MD3", "Final MD3"] },
+      four_team_groups: { teamCount: 4, matchCount: 9, label: "4 times · grupos e chave", description: "Os quatro times jogam entre si uma vez em MD1. As semifinais MD3 são 1º × 4º e 2º × 3º; os vencedores disputam a final MD3.", steps: ["6 jogos MD1", "2 semifinais MD3", "Final MD3"] }
+    }[type] || null;
   }
 
   function tournamentFixtures(tournament) {
-    if (tournament.formatType !== "three_team_series" || (tournament.teams || []).length !== 3) return [];
-    const [a, b, c] = tournament.teams;
-    const group = [[a, b], [a, c], [b, c], [b, a], [c, a], [c, b]];
-    return [
-      ...group.map(([teamA, teamB], index) => ({ id: `${tournament.id}-group-${index + 1}`, tournamentId: tournament.id, name: `Fase de grupos · Jogo ${index + 1}`, subtitle: "Data a definir", teamA, teamB, slotA: teamA, slotB: teamB, score: "", status: "draft", round: "group", order: index + 1, updated: "Gerada pelo formato do campeonato" })),
-      { id: `${tournament.id}-semifinal`, tournamentId: tournament.id, name: "Semifinal", subtitle: "Data a definir", teamA: "", teamB: "", slotA: "2º colocado", slotB: "3º colocado", score: "", status: "draft", round: "semifinal", order: 7, updated: "Aguardando classificação da fase de grupos" },
-      { id: `${tournament.id}-final`, tournamentId: tournament.id, name: "Final", subtitle: "Data a definir", teamA: "", teamB: "", slotA: "1º colocado", slotB: "Vencedor da semifinal", score: "", status: "draft", round: "final", order: 8, updated: "Aguardando classificação e semifinal" }
-    ];
+    const teams = tournament.teams || [];
+    const common = { tournamentId: tournament.id, subtitle: "Data a definir", score: "", status: "draft", generatedByFormat: true, formatType: tournament.formatType };
+    if (tournament.formatType === "two_team_md3" && teams.length === 2) {
+      return [{ ...common, id: `${tournament.id}-final`, name: "Final · MD3", teamA: teams[0], teamB: teams[1], slotA: teams[0], slotB: teams[1], round: "final", bestOf: 3, order: 1, updated: "Final gerada pelo formato" }];
+    }
+    if (tournament.formatType === "three_team_series" && teams.length === 3) {
+      const [a, b, c] = teams;
+      const group = [[a, b], [a, c], [b, c], [b, a], [c, a], [c, b]];
+      return [
+        ...group.map(([teamA, teamB], index) => ({ ...common, id: `${tournament.id}-group-${index + 1}`, name: `Fase de grupos · Jogo ${index + 1}`, teamA, teamB, slotA: teamA, slotB: teamB, round: "group", bestOf: 1, order: index + 1, updated: "Jogo MD1 gerado pelo formato" })),
+        { ...common, id: `${tournament.id}-semifinal`, name: "Semifinal · MD3", teamA: "", teamB: "", slotA: "2º colocado", slotB: "3º colocado", round: "semifinal", bestOf: 3, order: 7, updated: "Aguardando classificação da fase de grupos" },
+        { ...common, id: `${tournament.id}-final`, name: "Final · MD3", teamA: "", teamB: "", slotA: "1º colocado", slotB: "Vencedor da semifinal", round: "final", bestOf: 3, order: 8, updated: "Aguardando classificação e semifinal" }
+      ];
+    }
+    if (tournament.formatType === "four_team_groups" && teams.length === 4) {
+      const group = [];
+      for (let first = 0; first < teams.length; first += 1) for (let second = first + 1; second < teams.length; second += 1) group.push([teams[first], teams[second]]);
+      return [
+        ...group.map(([teamA, teamB], index) => ({ ...common, id: `${tournament.id}-group-${index + 1}`, name: `Fase de grupos · Jogo ${index + 1}`, teamA, teamB, slotA: teamA, slotB: teamB, round: "group", bestOf: 1, order: index + 1, updated: "Jogo MD1 gerado pelo formato" })),
+        { ...common, id: `${tournament.id}-semifinal-1`, name: "Semifinal 1 · MD3", teamA: "", teamB: "", slotA: "1º colocado", slotB: "4º colocado", round: "semifinal", bestOf: 3, order: 7, updated: "Aguardando classificação da fase de grupos" },
+        { ...common, id: `${tournament.id}-semifinal-2`, name: "Semifinal 2 · MD3", teamA: "", teamB: "", slotA: "2º colocado", slotB: "3º colocado", round: "semifinal", bestOf: 3, order: 8, updated: "Aguardando classificação da fase de grupos" },
+        { ...common, id: `${tournament.id}-final`, name: "Final · MD3", teamA: "", teamB: "", slotA: "Vencedor da semifinal 1", slotB: "Vencedor da semifinal 2", round: "final", bestOf: 3, order: 9, updated: "Aguardando as semifinais" }
+      ];
+    }
+    return [];
   }
 
   function ensureTournamentFixtures(tournament) {
+    const expected = tournamentFixtures(tournament);
+    const expectedIds = new Set(expected.map((fixture) => fixture.id));
     let changed = false;
-    tournamentFixtures(tournament).forEach((fixture) => {
-      if (!state.matches.some((match) => match.id === fixture.id)) { state.matches.push(fixture); changed = true; }
+    expected.forEach((fixture) => {
+      const current = state.matches.find((match) => match.id === fixture.id);
+      if (!current) { state.matches.push(fixture); changed = true; return; }
+      const structure = { slotA: fixture.slotA, slotB: fixture.slotB, round: fixture.round, bestOf: fixture.bestOf, order: fixture.order, generatedByFormat: true, formatType: tournament.formatType };
+      if (!current.demoInfo && !current.score && fixture.teamA && fixture.teamB) { structure.teamA = fixture.teamA; structure.teamB = fixture.teamB; }
+      Object.entries(structure).forEach(([key, value]) => { if (current[key] !== value) { current[key] = value; changed = true; } });
+    });
+    state.matches = state.matches.filter((match) => {
+      const stale = match.tournamentId === tournament.id && match.generatedByFormat && !expectedIds.has(match.id);
+      if (!stale) return true;
+      if (match.demoInfo || match.score || match.status === "published") { match.legacyFormat = true; return true; }
+      changed = true;
+      return false;
     });
     state.matches.sort((a, b) => (a.tournamentId || "").localeCompare(b.tournamentId || "") || (a.order || 999) - (b.order || 999));
     return changed;
@@ -223,22 +257,37 @@
 
   function normalizeTournamentStructures() {
     let changed = false;
-    const pgl = state.tournaments.find((event) => event.id === "pgl-abadia-2026");
-    if (pgl && pgl.formatType !== "three_team_series") {
-      pgl.formatType = "three_team_series";
-      pgl.format = formatDefinition("three_team_series").description;
-      pgl.updated = "Formato e partidas pré-gerados";
-      changed = true;
-    }
-    state.tournaments.forEach((event) => { if (ensureTournamentFixtures(event)) changed = true; });
+    state.tournaments.forEach((event) => {
+      const count = (event.teams || []).length;
+      const inferred = count === 2 ? "two_team_md3" : count === 3 ? "three_team_series" : count === 4 ? "four_team_groups" : null;
+      if (!formatDefinition(event.formatType) && inferred) { event.formatType = inferred; changed = true; }
+      const definition = formatDefinition(event.formatType);
+      if (definition && event.format !== definition.description) { event.format = definition.description; event.updated = "Formato e partidas pré-gerados"; changed = true; }
+      if (ensureTournamentFixtures(event)) changed = true;
+    });
     return changed;
   }
 
   function renderFormatPreview() {
-    const definition = formatDefinition(document.querySelector("#formatType")?.value || "custom");
+    const type = document.querySelector('input[name="formatType"]:checked')?.value || "three_team_series";
+    const definition = formatDefinition(type);
     const preview = document.querySelector("#formatPreview");
-    if (!preview) return;
-    preview.innerHTML = `<span>PRÉVIA DO FORMATO</span><h4>${definition.label}</h4><p>${definition.description}</p><div>${definition.steps.map((step, index) => `<b>${step}${index < definition.steps.length - 1 ? " →" : ""}</b>`).join("")}</div>`;
+    const selectedTeams = [...document.querySelectorAll('.tournament-teams input[name="teams"]:checked')].map((input) => input.value);
+    const counter = document.querySelector("#participantCounter");
+    if (!preview || !definition) return;
+    const teamName = (index, fallback) => escapeHtml(selectedTeams[index] || fallback);
+    let diagram = "";
+    if (type === "two_team_md3") diagram = `<div class="format-diagram final-only"><div class="diagram-stage"><small>FINAL · MD3</small><b>${teamName(0, "Time 1")}</b><i>×</i><b>${teamName(1, "Time 2")}</b></div><span>🏆 Campeão</span></div>`;
+    if (type === "three_team_series") diagram = `<div class="format-diagram"><div class="diagram-groups"><small>FASE DE GRUPOS · MD1</small><b>${teamName(0, "Time 1")} × ${teamName(1, "Time 2")} · 2 jogos</b><b>${teamName(0, "Time 1")} × ${teamName(2, "Time 3")} · 2 jogos</b><b>${teamName(1, "Time 2")} × ${teamName(2, "Time 3")} · 2 jogos</b></div><span>→</span><div class="diagram-playoffs"><small>SEMIFINAL · MD3</small><b>2º colocado × 3º colocado</b><small>FINAL · MD3</small><b>1º colocado × vencedor</b></div></div>`;
+    if (type === "four_team_groups") diagram = `<div class="format-diagram"><div class="diagram-groups"><small>FASE DE GRUPOS · MD1</small><b>Todos contra todos · 6 jogos</b><em>${[0, 1, 2, 3].map((index) => teamName(index, `Time ${index + 1}`)).join(" · ")}</em></div><span>→</span><div class="diagram-playoffs"><small>SEMIFINAIS · MD3</small><b>1º × 4º</b><b>2º × 3º</b><small>FINAL · MD3</small><b>Vencedor 1 × Vencedor 2</b></div></div>`;
+    preview.innerHTML = `<header><div><span>PRÉVIA DA ESTRUTURA</span><h4>${definition.label}</h4></div><strong>${definition.matchCount} partida${definition.matchCount === 1 ? "" : "s"}</strong></header><p>${definition.description}</p><div class="format-steps">${definition.steps.map((step, index) => `<b>${step}${index < definition.steps.length - 1 ? " →" : ""}</b>`).join("")}</div>${diagram}`;
+    if (counter) {
+      const valid = selectedTeams.length === definition.teamCount;
+      counter.className = `participant-counter ${valid ? "valid" : "invalid"}`;
+      counter.innerHTML = `<b>${selectedTeams.length}/${definition.teamCount} times selecionados</b><span>${valid ? "Estrutura pronta para gerar" : `Selecione exatamente ${definition.teamCount} times`}</span>`;
+    }
+    const description = document.querySelector("#formatDescription");
+    if (description) description.value = definition.description;
   }
 
   function populateMatchTeams(selectedA = "", selectedB = "") {
@@ -262,13 +311,7 @@
       document.querySelectorAll("[data-editor-panel]").forEach((panel) => { panel.hidden = panel.dataset.editorPanel !== button.dataset.editorTab; });
     }));
     if (section === "tournaments") {
-      const formatType = document.querySelector("#formatType");
-      formatType?.addEventListener("change", () => {
-        const definition = formatDefinition(formatType.value);
-        const description = document.querySelector("#formatDescription");
-        if (description && formatType.value !== "custom") description.value = definition.description;
-        renderFormatPreview();
-      });
+      document.querySelectorAll('input[name="formatType"], .tournament-teams input[name="teams"]').forEach((input) => input.addEventListener("change", renderFormatPreview));
       renderFormatPreview();
     }
     if (section === "matches") {
@@ -363,6 +406,12 @@
     const values = {};
     for (const [key, value] of formData.entries()) if (!(typeof File !== "undefined" && value instanceof File)) values[key] = value;
     if (section === "players") values.teams = formData.getAll("teams");
+    if (section === "tournaments") {
+      values.teams = formData.getAll("teams");
+      const definition = formatDefinition(values.formatType);
+      if (!definition || values.teams.length !== definition.teamCount) { showToast(`Selecione exatamente ${definition?.teamCount || "os"} times exigidos pelo formato`); return; }
+      values.format = definition.description;
+    }
     if (section === "news" && !values.date) values.date = new Date().toISOString().slice(0, 10);
     const imageField = section === "players" ? "photo" : ["teams", "tournaments"].includes(section) ? "logo" : section === "news" ? "image" : null;
     const imageFile = imageField ? formData.get(imageField) : null;
