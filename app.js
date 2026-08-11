@@ -17,8 +17,26 @@
     if (saved.name) event.name = saved.name;
     if (saved.subtitle && Number(saved.subtitle)) event.year = Number(saved.subtitle);
     if (saved.format && saved.format !== "A definir") event.format = saved.format;
+    if (Array.isArray(saved.teams) && saved.teams.length) {
+      const historicEntries = new Map(event.entries.map((entry) => [entry.team, entry]));
+      event.entries = saved.teams.map((team) => historicEntries.get(team) || { team, players: [] });
+    }
   });
-  if (Array.isArray(shared.matches)) data.matches = shared.matches.filter((item) => item.status === "published");
+  (shared.tournaments || []).filter((saved) => saved.status === "published" && !data.tournaments.some((event) => event.id === saved.id)).forEach((saved) => {
+    data.tournaments.push({
+      id: saved.id,
+      name: saved.name,
+      year: Number(saved.subtitle) || new Date().getFullYear(),
+      category: saved.category || "official",
+      status: saved.eventStatus || "ongoing",
+      champion: saved.champion || null,
+      format: saved.format || "Formato a definir",
+      demos: "future",
+      note: "Estrutura e confrontos publicados pelo painel administrativo.",
+      entries: (saved.teams || []).map((team) => ({ team, players: [] }))
+    });
+  });
+  if (Array.isArray(shared.matches)) data.matches = shared.matches.filter((item) => ["published", "scheduled", "live", "finished"].includes(item.status));
   if (Array.isArray(shared.news) && shared.news.length) data.news = shared.news.filter((item) => item.status === "published").map((item) => ({ id: item.id, title: item.name, summary: item.subtitle, author: item.author || "HLTPC", date: /^\d{4}-\d{2}-\d{2}$/.test(item.date || "") ? item.date : new Date().toISOString().slice(0, 10), tournamentId: item.tournamentId || null, image: item.image || "" }));
   const isOfficialEvent = (event) => ["major", "official"].includes(event.category);
   const officialEvents = data.tournaments.filter(isOfficialEvent);
@@ -222,10 +240,22 @@
   }
 
   function matchMarkup(match) {
-    const teamA = match.teamA || match.teams?.[0] || "A definir";
-    const teamB = match.teamB || match.teams?.[1] || "A definir";
+    const teamA = match.teamA || match.teams?.[0] || match.slotA || "A decidir";
+    const teamB = match.teamB || match.teams?.[1] || match.slotB || "A decidir";
     const stats = Array.isArray(match.statistics) ? match.statistics : [];
-    return `<article class="event-match-card"><div class="event-match"><span>${escapeHtml(match.name || match.phase || "Partida")}${match.bestOf ? `<i>MD${match.bestOf}</i>` : ""}</span><div><a href="#time/${encodeURIComponent(teamA)}">${escapeHtml(teamA)}</a><b>${escapeHtml(match.score || "—")}</b><a href="#time/${encodeURIComponent(teamB)}">${escapeHtml(teamB)}</a></div><small>${escapeHtml(match.subtitle || match.date || "Data a definir")}</small></div>${match.demoInfo ? `<details class="demo-analysis"><summary><span>◉ Demo analisada</span><b>${escapeHtml(match.demoInfo.mapName || "Mapa não identificado")} · ${match.demoInfo.rounds || 0} rounds</b></summary>${stats.length ? `<div class="demo-stats"><div class="demo-stats-head"><span>Jogador</span><span>K</span><span>D</span><span>A</span><span>ADR</span><span>HS</span></div>${stats.map((player) => `<div>${playerHistory.has(player.name) ? `<a href="#jogador/${encodeURIComponent(player.name)}">${escapeHtml(player.name)}</a>` : `<strong>${escapeHtml(player.name)}</strong>`}<span>${player.kills}</span><span>${player.deaths}</span><span>${player.assists}</span><span>${player.adr ?? "—"}</span><span>${player.headshots}</span></div>`).join("")}</div>` : `<p>A demo foi reconhecida, mas não retornou estatísticas individuais.</p>`}</details>` : ""}</article>`;
+    const teamLink = (team, confirmed) => confirmed && teams.has(team) ? `<a href="#time/${encodeURIComponent(team)}">${escapeHtml(team)}</a>` : `<span class="pending-team">${escapeHtml(team)}</span>`;
+    return `<article class="event-match-card"><div class="event-match"><span>${escapeHtml(match.name || match.phase || "Partida")}${match.bestOf ? `<i>MD${match.bestOf}</i>` : ""}</span><div>${teamLink(teamA, Boolean(match.teamA))}<b>${escapeHtml(match.score || "—")}</b>${teamLink(teamB, Boolean(match.teamB))}</div><small>${escapeHtml(match.subtitle || match.date || "Data a definir")}</small></div>${match.demoInfo ? `<details class="demo-analysis"><summary><span>◉ Demo analisada</span><b>${escapeHtml(match.demoInfo.mapName || "Mapa não identificado")} · ${match.demoInfo.rounds || 0} rounds</b></summary>${stats.length ? `<div class="demo-stats"><div class="demo-stats-head"><span>Jogador</span><span>K</span><span>D</span><span>A</span><span>ADR</span><span>HS</span></div>${stats.map((player) => `<div>${playerHistory.has(player.name) ? `<a href="#jogador/${encodeURIComponent(player.name)}">${escapeHtml(player.name)}</a>` : `<strong>${escapeHtml(player.name)}</strong>`}<span>${player.kills}</span><span>${player.deaths}</span><span>${player.assists}</span><span>${player.adr ?? "—"}</span><span>${player.headshots}</span></div>`).join("")}</div>` : `<p>A demo foi reconhecida, mas não retornou estatísticas individuais.</p>`}</details>` : ""}</article>`;
+  }
+
+  function eventBracketMarkup(matches) {
+    const groups = matches.filter((match) => match.round === "group");
+    const semifinals = matches.filter((match) => match.round === "semifinal");
+    const finals = matches.filter((match) => match.round === "final");
+    const columns = [];
+    if (groups.length) columns.push(`<section><header><b>Fase de grupos</b><small>${groups.length} partidas</small></header>${groups.map(matchMarkup).join("")}</section>`);
+    if (semifinals.length) columns.push(`<section><header><b>Semifinal${semifinals.length > 1 ? "is" : ""}</b><small>${semifinals.length} partida${semifinals.length > 1 ? "s" : ""}</small></header>${semifinals.map(matchMarkup).join("")}</section>`);
+    if (finals.length) columns.push(`<section><header><b>Final</b><small>Decisão do título</small></header>${finals.map(matchMarkup).join("")}</section>`);
+    return columns.length ? `<div class="public-bracket ${columns.length === 1 ? "single" : ""}>${columns.join(`<i class="public-bracket-arrow">→</i>`)}</div>` : "";
   }
 
   function renderTournamentPage(event, tab = "overview") {
@@ -235,9 +265,9 @@
     const base = `#campeonato/${encodeURIComponent(event.id)}`;
     const tabs = `<nav class="event-tabs"><a class="${validTab === "overview" ? "active" : ""}" href="${base}/overview">Visão geral</a><a class="${validTab === "matches" ? "active" : ""}" href="${base}/matches">Partidas</a><a class="${validTab === "participants" ? "active" : ""}" href="${base}/participants">Participantes</a></nav>`;
     let body;
-    if (validTab === "matches") body = `<section class="event-tab-body"><div class="section-heading"><div><span>CONFRONTOS</span><h2>Partidas do campeonato</h2></div></div>${eventMatches.length ? `<div class="event-matches">${eventMatches.map(matchMarkup).join("")}</div>` : `<div class="empty"><b>Calendário ainda não divulgado</b>Nenhum confronto foi cadastrado para esta edição. O painel administrativo só publicará partidas confirmadas.</div>`}</section>`;
+    if (validTab === "matches") body = `<section class="event-tab-body"><div class="section-heading"><div><span>ESTRUTURA OFICIAL</span><h2>Formato e confrontos</h2></div></div>${eventMatches.length ? eventBracketMarkup(eventMatches) : `<div class="empty"><b>Calendário ainda não divulgado</b>Nenhum confronto foi cadastrado para esta edição.</div>`}</section>`;
     else if (validTab === "participants") body = `<section class="event-tab-body"><div class="section-heading"><div><span>ESCALAÇÕES</span><h2>Times participantes</h2></div></div><div class="participant-grid">${event.entries.map((entry) => `<article><a class="participant-team" href="#time/${encodeURIComponent(entry.team)}"><span>${teamBadge(entry.team)}</span><b>${escapeHtml(entry.team)}</b></a><ul>${entry.players.map((player) => `<li><a href="#jogador/${encodeURIComponent(player)}">${escapeHtml(player)}</a></li>`).join("")}</ul></article>`).join("")}</div></section>`;
-    else body = `<section class="event-tab-body"><div class="event-overview-grid"><article><small>FORMATO</small><b>${escapeHtml(event.format)}</b><p>${escapeHtml(event.note)}</p></article><article><small>CAMPEÃO</small><b>${escapeHtml(event.champion || "A definir")}</b><p>${event.status === "ongoing" ? "Campeonato em andamento." : "Resultado histórico confirmado."}</p></article><article><small>DADOS DISPONÍVEIS</small><b>${demoLabel(event.demos)}</b><p>${event.demos === "partial" ? "Estatísticas futuras devem ser identificadas como parciais." : "Nenhuma estatística será inventada."}</p></article></div><div class="section-heading spaced"><div><span>RESUMO</span><h2>Participantes confirmados</h2></div><a href="${base}/participants">Ver escalações →</a></div><div class="participant-summary">${event.entries.map((entry) => `<a href="#time/${encodeURIComponent(entry.team)}"><span>${teamBadge(entry.team)}</span><b>${escapeHtml(entry.team)}</b><small>${entry.players.length} jogadores</small></a>`).join("")}</div></section>`;
+    else body = `<section class="event-tab-body"><div class="event-overview-grid"><article><small>FORMATO</small><b>${escapeHtml(event.format)}</b><p>${escapeHtml(event.note)}</p></article><article><small>CAMPEÃO</small><b>${escapeHtml(event.champion || "A definir")}</b><p>${event.status === "ongoing" ? "Campeonato em andamento." : "Resultado histórico confirmado."}</p></article><article><small>DADOS DISPONÍVEIS</small><b>${demoLabel(event.demos)}</b><p>${event.demos === "partial" ? "Estatísticas futuras devem ser identificadas como parciais." : "Nenhuma estatística será inventada."}</p></article></div>${eventMatches.length ? `<div class="section-heading spaced"><div><span>CHAVE DO CAMPEONATO</span><h2>Previsão dos confrontos</h2></div><a href="${base}/matches">Abrir partidas →</a></div>${eventBracketMarkup(eventMatches)}` : ""}<div class="section-heading spaced"><div><span>RESUMO</span><h2>Participantes confirmados</h2></div><a href="${base}/participants">Ver escalações →</a></div><div class="participant-summary">${event.entries.map((entry) => `<a href="#time/${encodeURIComponent(entry.team)}"><span>${teamBadge(entry.team)}</span><b>${escapeHtml(entry.team)}</b><small>${entry.players.length} jogadores</small></a>`).join("")}</div></section>`;
     document.querySelector("#tournamentPage").innerHTML = `<a class="profile-back" href="#campeonatos">← Voltar aos campeonatos</a><header class="event-hero">${savedEvent.logo ? `<img class="event-logo" src="${escapeHtml(savedEvent.logo)}" alt="" />` : ""}<span>${event.status === "ongoing" ? "EM ANDAMENTO" : "FINALIZADO"}</span><h1>${escapeHtml(event.name)} <b>${event.year}</b></h1><p>${categoryLabel(event.category)} · ${event.entries.length} times</p></header>${tabs}${body}`;
   }
 
