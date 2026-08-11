@@ -523,9 +523,13 @@
 
   function showToast(message) {
     const toast = document.querySelector("#toast");
+    const isError = /não foi|erro|unreachable|falhou|inválid|ultrapassa/i.test(String(message));
     toast.querySelector("span").textContent = message;
+    toast.querySelector("i").textContent = isError ? "!" : "✓";
+    toast.classList.toggle("error", isError);
     toast.classList.add("show");
-    setTimeout(() => toast.classList.remove("show"), 2400);
+    window.clearTimeout(showToast.timer);
+    showToast.timer = window.setTimeout(() => toast.classList.remove("show"), isError ? 9000 : 3200);
   }
 
   function bindActions() {
