@@ -506,7 +506,9 @@
     if (!match) return `<article class="event-overview-match empty-match"><span>${label}</span><b>${emptyText}</b><small>Aguardando atualização do formato.</small></article>`;
     const scores = String(match.score || "").match(/\d+/g) || [];
     const score = scores.length ? `${scores[0]} <i>:</i> ${scores[1]}` : "×";
-    return `<article class="event-overview-match clickable-match" data-open-match="${escapeHtml(match.id)}" role="link" tabindex="0"><header><span>${label}</span><time>${escapeHtml(match.subtitle || "Data a definir")}</time></header><div><a href="#time/${encodeURIComponent(match.teamA)}"><span>${teamBadge(match.teamA)}</span><b>${escapeHtml(match.teamA)}</b></a><strong>${score}</strong><a href="#time/${encodeURIComponent(match.teamB)}"><span>${teamBadge(match.teamB)}</span><b>${escapeHtml(match.teamB)}</b></a></div><footer>${escapeHtml(match.name || "Partida")} · MD${match.bestOf || 1}<em>Abrir partida →</em></footer></article>`;
+    const matchName = match.name || "Partida";
+    const descriptor = /\bMD\d\b/i.test(matchName) ? matchName : `${matchName} · MD${match.bestOf || 1}`;
+    return `<article class="event-overview-match clickable-match" data-open-match="${escapeHtml(match.id)}" role="link" tabindex="0"><header><span>${label}</span><time>${escapeHtml(match.subtitle || "Data a definir")}</time></header><div><a href="#time/${encodeURIComponent(match.teamA)}"><span>${teamBadge(match.teamA)}</span><b>${escapeHtml(match.teamA)}</b></a><strong>${score}</strong><a href="#time/${encodeURIComponent(match.teamB)}"><span>${teamBadge(match.teamB)}</span><b>${escapeHtml(match.teamB)}</b></a></div><footer>${escapeHtml(descriptor)}<em>Abrir partida →</em></footer></article>`;
   }
 
   function renderTournamentPage(event, tab = "overview") {
