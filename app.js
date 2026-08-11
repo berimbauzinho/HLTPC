@@ -5,7 +5,7 @@
   if (window.HLTPC_LOGO) {
     document.querySelectorAll("[data-hltpc-logo]").forEach((image) => { image.src = window.HLTPC_LOGO; });
     const icon = document.querySelector("#siteIcon");
-    if (icon) icon.href = window.HLTPC_LOGO;
+    if (icon) icon.href = window.HLTPC_FAVICON || window.HLTPC_LOGO;
   }
   let shared = {};
   try {
@@ -310,10 +310,12 @@
     document.querySelector("#players").innerHTML = visible.map((player) => {
       const history = [...(playerHistory.get(player) || [])].sort(byNewest);
       const meta = playerMeta.get(player) || {};
-      return `<a class="profile-card player-card" href="#jogador/${encodeURIComponent(player)}">
-        <div class="player-card-head"><span>${meta.photo ? `<img src="${escapeHtml(meta.photo)}" alt="" />` : escapeHtml(player.slice(0, 2).toUpperCase())}</span><div><h3>${escapeHtml(player)}</h3><p class="profile-meta">${history.length} participaç${history.length === 1 ? "ão" : "ões"}</p></div></div>
-        <div class="trophies"><div class="trophy-count"><b>${officialTitleCount(player)}</b><small>títulos oficiais</small></div><div class="trophy-count major-count"><b>${titleCount(player, "major")}</b><small>Majors</small></div></div>
-        <ul class="history">${history.map(({ event, team }) => `<li><b>${event.year} · ${escapeHtml(team)}</b>${escapeHtml(event.name)}</li>`).join("")}</ul>
+      const latest = history[0];
+      const secondary = meta.alias || (latest ? latest.team : "Competidor HLTPC");
+      return `<a class="player-directory-card" href="#jogador/${encodeURIComponent(player)}" aria-label="Abrir perfil de ${escapeHtml(player)}">
+        <div class="player-directory-copy"><span>PLAYER HLTPC</span><h3>${escapeHtml(player)}</h3><p>${escapeHtml(secondary)}</p><div><b>${latest ? escapeHtml(latest.team) : "Sem equipe recente"}</b><small>${history.length} participaç${history.length === 1 ? "ão" : "ões"} · ${officialTitleCount(player)} título${officialTitleCount(player) === 1 ? "" : "s"}</small></div></div>
+        <div class="player-directory-portrait">${meta.photo ? `<img src="${escapeHtml(meta.photo)}" alt="${escapeHtml(player)}" />` : `<strong>${escapeHtml(player.slice(0, 2).toUpperCase())}</strong>`}</div>
+        <i>Ver perfil →</i>
       </a>`;
     }).join("");
   }
