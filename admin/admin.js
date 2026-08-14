@@ -44,6 +44,14 @@
   const deleteButton = document.querySelector("#deleteButton");
   const escapeHtml = (value) => String(value ?? "").replace(/[&<>'"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[char]));
 
+  const mediaImage = (src, alt, fallback) => src ? `<img data-media-image src="${escapeHtml(src)}" alt="${escapeHtml(alt || "")}" /><b class="media-image-fallback" hidden>${escapeHtml(fallback)}</b>` : `<b class="media-image-fallback">${escapeHtml(fallback)}</b>`;
+  document.addEventListener("error", (event) => {
+    const image = event.target;
+    if (!(image instanceof HTMLImageElement) || !image.matches("[data-media-image]")) return;
+    image.hidden = true;
+    if (image.nextElementSibling?.classList.contains("media-image-fallback")) image.nextElementSibling.hidden = false;
+  }, true);
+
   function initials(value) {
     return value.replace(/gaming|e-sports/ig, "").trim().split(/\s+/).map((part) => part[0]).join("").slice(0, 3).toUpperCase();
   }
@@ -270,7 +278,7 @@
         const completed = matches.filter((match) => match.score || match.status === "finished").length;
         const expanded = expandedTournaments.has(tournament.id);
         return `<article class="admin-championship ${expanded ? "expanded" : ""}" data-championship="${escapeHtml(tournament.id)}">
-          <header><div class="championship-identity">${tournament.logo ? `<img src="${escapeHtml(tournament.logo)}" alt="" />` : `<span>${initials(tournament.name)}</span>`}<div><small>${escapeHtml(tournament.subtitle || "ANO A DEFINIR")}</small><h2>${escapeHtml(tournament.name)}</h2><p>${definition ? escapeHtml(definition.label) : "Formato a definir"} · ${(tournament.teams || []).length} times</p></div></div><div class="championship-actions"><span class="championship-count"><b>${completed}/${matches.length}</b> concluídas</span><span class="badge ${tournament.status === "draft" ? "draft" : ""}">${tournament.status === "draft" ? "Rascunho" : "Publicado"}</span><a class="ghost" href="../#campeonato/${encodeURIComponent(tournament.id)}/overview" target="_blank">Ver público ↗</a><button class="ghost" data-edit-event="${escapeHtml(tournament.id)}">Editar</button><button class="primary championship-toggle" data-toggle-event="${escapeHtml(tournament.id)}" aria-expanded="${expanded}">${expanded ? "Recolher" : "Expandir estrutura"} <i>⌄</i></button></div></header>
+          <header><div class="championship-identity"><span class="championship-logo">${mediaImage(tournament.logo, `Logo de ${tournament.name}`, initials(tournament.name))}</span><div><small>${escapeHtml(tournament.subtitle || "ANO A DEFINIR")}</small><h2>${escapeHtml(tournament.name)}</h2><p>${definition ? escapeHtml(definition.label) : "Formato a definir"} · ${(tournament.teams || []).length} times</p></div></div><div class="championship-actions"><span class="championship-count"><b>${completed}/${matches.length}</b> concluídas</span><span class="badge ${tournament.status === "draft" ? "draft" : ""}">${tournament.status === "draft" ? "Rascunho" : "Publicado"}</span><a class="ghost" href="../#campeonato/${encodeURIComponent(tournament.id)}/overview" target="_blank">Ver público ↗</a><button class="ghost" data-edit-event="${escapeHtml(tournament.id)}">Editar</button><button class="primary championship-toggle" data-toggle-event="${escapeHtml(tournament.id)}" aria-expanded="${expanded}">${expanded ? "Recolher" : "Expandir estrutura"} <i>⌄</i></button></div></header>
           <div class="championship-details" ${expanded ? "" : "hidden"}><div class="championship-progress"><span><b>${completed}/${matches.length}</b> partidas concluídas</span><span>${matches.length ? "Clique em qualquer partida para lançar os dados" : "Salve um formato válido para gerar o bracket"}</span></div>
           ${matches.length ? adminBracket(tournament, matches) : `<div class="empty compact"><h3>Estrutura ainda não gerada</h3><p>Edite o campeonato e selecione o formato e os participantes.</p></div>`}</div>
         </article>`;
@@ -297,7 +305,7 @@
   function tableRow(item) {
     const image = item.photo || item.logo;
     return `<div class="table-row" data-edit="${escapeHtml(item.id)}">
-      <div class="identity"><span class="avatar">${image ? `<img src="${escapeHtml(image)}" alt="" />` : initials(item.name)}</span><div><b>${escapeHtml(item.name)}</b><small>${escapeHtml(item.alias || item.acronym || singular[section])}</small></div></div>
+      <div class="identity"><span class="avatar">${mediaImage(image, item.name, initials(item.name))}</span><div><b>${escapeHtml(item.name)}</b><small>${escapeHtml(item.alias || item.acronym || singular[section])}</small></div></div>
       <span>${escapeHtml(item.subtitle || item.acronym || "—")}</span><span>${escapeHtml(item.updated || "Agora")}</span>
       <span class="badge ${item.status === "draft" ? "draft" : ""}">${item.status === "draft" ? "Rascunho" : "Publicado"}</span><button class="more">•••</button>
     </div>`;
@@ -435,7 +443,7 @@
   function fileField(name, label, accept) { return `<label>${label}<input class="file-field" name="${name}" type="file" accept="${accept}" /></label>`; }
   function imageFileField(name, label, current = "", kind = "image") {
     const reference = kind === "logo" ? "Referência: 1200 × 1200 px, PNG transparente" : kind === "photo" ? "Referência: 1200 × 1600 px, PNG transparente" : "Referência: 1920 × 1080 px";
-    return `<div class="image-upload" data-image-kind="${kind}"><label>${label}<input class="file-field" name="${name}" type="file" accept="image/png,image/jpeg,image/webp" /><small class="image-guidance">${reference} · até 30 MB. O painel adapta automaticamente.</small></label><div class="image-upload-preview ${current ? "has-image" : ""}" data-image-preview="${name}">${current ? `<img src="${escapeHtml(current)}" alt="Prévia atual" />` : `<span>PNG, JPG ou WebP<br>${reference}</span>`}</div></div>`;
+    return `<div class="image-upload" data-image-kind="${kind}"><label>${label}<input class="file-field" name="${name}" type="file" accept="image/png,image/jpeg,image/webp" /><small class="image-guidance">${reference} · até 30 MB. O painel adapta automaticamente.</small></label><div class="image-upload-preview ${current ? "has-image" : ""}" data-image-preview="${name}">${current ? mediaImage(current, "Prévia atual", "Arquivo indisponível") : `<span>PNG, JPG ou WebP<br>${reference}</span>`}</div></div>`;
   }
 
   function normalizedLeetifyUrl(value) {
