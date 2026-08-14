@@ -28,7 +28,9 @@
   }
   const confirmedPlayerIdentities = [
     { name: "cuavila", steamId: "76561199001115634", aliases: ["MANO CHORIS", "KMKZ | MANO CHORIS"] },
-    { name: "Cuazzi", steamId: "76561198359845217", aliases: ["Voulin Raba", "cuallen", "cualy", "KMKZ | cuallen"] }
+    { name: "Cuazzi", steamId: "76561198359845217", aliases: ["Voulin Raba", "cuallen", "cualy", "KMKZ | cuallen"] },
+    { name: "JohnWeed", steamId: "76561198090993134", aliases: ["ᴊʜᴏɴʏsᴋ8🛹"] },
+    { name: "Oblivion", steamId: "76561199591751431", aliases: ["DEF | Oblivion"] }
   ];
   const identityNick = (value) => String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("pt-BR").replace(/[^a-z0-9]/g, "");
   const identityBySteam = new Map(confirmedPlayerIdentities.map((identity) => [identity.steamId, identity]));
