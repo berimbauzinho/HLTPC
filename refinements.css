@@ -1334,11 +1334,12 @@ footer p {
   .news-detail-body p { font-size: 15px; }
 }
 
-/* Fotos reais substituem iniciais decorativas; espaços vazios aguardam o upload. */
-.player-directory-card.without-photo .player-directory-portrait { background: linear-gradient(135deg, transparent, #17181d); }
+/* Fotos reais e o fallback por iniciais preservam o mesmo espaço visual. */
+.player-directory-card.without-photo .player-directory-portrait { background: radial-gradient(circle at 60% 55%, #f29d2425, transparent 45%), linear-gradient(135deg, transparent, #17181d); }
 .rank-row { grid-template-columns: 28px 46px minmax(0, 1fr) auto; gap: 10px; }
 .rank-avatar { width: 42px; height: 42px; display: grid; place-items: end center; overflow: hidden; background: linear-gradient(145deg, #272a31, #14161b); border: 1px solid #383b44; font-style: normal; }
 .rank-avatar img { width: 100%; height: 100%; object-fit: contain; object-position: center bottom; }
+.rank-avatar > b { align-self: center; color: #a0712c; font: 700 14px Oswald, sans-serif; }
 .event-team-identity { min-width: 0; display: inline-flex; align-items: center; justify-content: center; gap: 10px; }
 .event-team-identity > span { width: 42px; height: 42px; flex: none; display: grid; place-items: center; color: var(--amber2); font: 700 8px JetBrains Mono, monospace; }
 .event-team-identity > span img { width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 6px 8px #0008); }
@@ -1356,9 +1357,28 @@ footer p {
 .individual-award.bagre > i { color: #e9f7f5; background: linear-gradient(145deg, #47978e, #204e49); }
 .individual-award.major-award { border-color: #a77528; box-shadow: inset 0 0 24px #d6972524; }
 
+.team-power-heading { align-items: flex-end; }
+.team-power-heading > small { max-width: 390px; color: #777c86; text-align: right; font: 600 7px/1.5 JetBrains Mono, monospace; }
+.team-power-ranking { background: #15171c; border: 1px solid #30333b; }
+.team-power-row { min-height: 72px; display: grid; grid-template-columns: 34px 54px minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 9px 15px; color: #f5f2ec; text-decoration: none; border-bottom: 1px solid #30333b; transition: background .15s, border-color .15s; }
+.team-power-row:last-child { border-bottom: 0; }
+.team-power-row:hover { background: #201d18; box-shadow: inset 3px 0 var(--amber); }
+.team-power-row > span { color: #8a8f99; font: 700 9px JetBrains Mono, monospace; }
+.team-power-row > i { width: 50px; height: 50px; display: grid; place-items: center; color: var(--amber2); font: 700 8px JetBrains Mono, monospace; font-style: normal; }
+.team-power-row > i img { width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 7px 8px #0009); }
+.team-power-row > b { min-width: 0; font: 600 16px Oswald, sans-serif; }
+.team-power-row > b small { display: block; margin-top: 4px; color: #858b95; font: 600 8px JetBrains Mono, monospace; }
+.team-power-row > strong { color: var(--amber2); text-align: right; font: 700 20px Oswald, sans-serif; }
+.team-power-row > strong small { display: block; color: #777c86; font: 600 7px JetBrains Mono, monospace; text-transform: uppercase; }
+
 @media (max-width: 650px) {
   .rank-row { grid-template-columns: 23px 40px minmax(0, 1fr) auto; gap: 7px; }
   .rank-avatar { width: 38px; height: 38px; }
   .event-team-identity { flex-direction: column; gap: 5px; }
   .event-team-identity > span, .home-match .event-team-identity > span { width: 44px; height: 44px; }
+  .team-power-heading { align-items: flex-start; flex-direction: column; gap: 7px; }
+  .team-power-heading > small { text-align: left; }
+  .team-power-row { grid-template-columns: 25px 44px minmax(0, 1fr) auto; gap: 8px; padding-inline: 10px; }
+  .team-power-row > i { width: 42px; height: 42px; }
+  .team-power-row > strong { font-size: 17px; }
 }
