@@ -77,7 +77,7 @@
     });
   });
   if (Array.isArray(shared.matches)) data.matches = shared.matches.filter((item) => ["published", "scheduled", "live", "finished"].includes(item.status)).map((match) => ({ ...match, teamA: canonicalTeamName(match.teamA, match.teamAId), teamB: canonicalTeamName(match.teamB, match.teamBId), winner: canonicalTeamName(match.winner, match.winnerId) }));
-  if (Array.isArray(shared.news) && shared.news.length) data.news = shared.news.filter((item) => item.status === "published").map((item) => ({ id: item.id, title: item.name, summary: item.subtitle, author: item.author || "HLTPC", date: /^\d{4}-\d{2}-\d{2}$/.test(item.date || "") ? item.date : new Date().toISOString().slice(0, 10), tournamentId: item.tournamentId || null, image: item.image || "" }));
+  if (Array.isArray(shared.news) && shared.news.length) data.news = shared.news.filter((item) => item.status === "published").map((item) => ({ id: item.id, title: item.name, summary: item.subtitle, body: item.body || item.subtitle, author: item.author || "HLTPC", date: /^\d{4}-\d{2}-\d{2}$/.test(item.date || "") ? item.date : new Date().toISOString().slice(0, 10), tournamentId: item.tournamentId || null, image: item.image || "" }));
   const isOfficialEvent = (event) => ["major", "official"].includes(event.category);
   const officialEvents = data.tournaments.filter(isOfficialEvent);
   const playerHistory = new Map(data.players.map((player) => [player, []]));
@@ -267,8 +267,9 @@
     let timer = null;
     const draw = () => {
       const item = news[index];
-      document.querySelector("#hero").innerHTML = item ? `<article class="hero news-hero" ${item.image ? `style="--hero-image:url('${escapeHtml(item.image)}')"` : ""}>
-        <div class="hero-content"><span class="hero-tag">NOTÍCIA EM DESTAQUE</span><h1>${escapeHtml(item.title)}</h1><p>${escapeHtml(item.summary)}</p><div class="hero-news-meta"><time>${formatDate(item.date)}</time><span>por ${escapeHtml(item.author)}</span><a href="#noticias">Ver todas as notícias →</a></div></div>
+      document.querySelector("#hero").innerHTML = item ? `<article class="hero news-hero ${item.image ? "has-image" : ""}">
+        ${item.image ? `<a class="news-hero-art" href="#noticia/${encodeURIComponent(item.id)}" aria-label="Ler ${escapeHtml(item.title)}"><img src="${escapeHtml(item.image)}" alt="" /></a>` : ""}
+        <div class="hero-content"><span class="hero-tag">NOTÍCIA EM DESTAQUE</span><h1><a href="#noticia/${encodeURIComponent(item.id)}">${escapeHtml(item.title)}</a></h1><p>${escapeHtml(item.summary)}</p><div class="hero-news-meta"><time>${formatDate(item.date)}</time><span>por ${escapeHtml(item.author)}</span><a href="#noticia/${encodeURIComponent(item.id)}">Ler notícia completa →</a><a class="hero-history-link" href="#noticias">Histórico</a></div></div>
         ${news.length > 1 ? `<div class="hero-progress" aria-label="Notícia ${index + 1} de ${news.length}">${news.map((_, dot) => `<button type="button" class="${dot === index ? "active" : ""}" data-hero-index="${dot}" aria-label="Mostrar notícia ${dot + 1}"></button>`).join("")}</div>` : ""}
       </article>` : `<article class="hero"><div class="hero-content"><span class="hero-tag">HLTPC</span><h1>A Plataforma Oficial do <span>TAMPICOUNTERS</span></h1><p>Campeonatos, equipes, jogadores e partidas reunidos em um só lugar.</p></div></article>`;
       document.querySelectorAll("[data-hero-index]").forEach((button) => button.addEventListener("click", () => select(Number(button.dataset.heroIndex))));
@@ -321,11 +322,12 @@
 
   function newsMarkup(items) {
     return items.map((item) => `
-      <article class="news-item">
+      <a class="news-item" href="#noticia/${encodeURIComponent(item.id)}">
+        ${item.image ? `<span class="news-thumb"><img src="${escapeHtml(item.image)}" alt="" /></span>` : ""}
         <time class="news-date">${formatDate(item.date)}</time>
         <div><h3>${escapeHtml(item.title)}</h3><p>${escapeHtml(item.summary)} · por ${escapeHtml(item.author)}</p></div>
         <span>›</span>
-      </article>`).join("");
+      </a>`).join("");
   }
 
   function renderNews() {
@@ -356,12 +358,15 @@
   }
 
   function tournamentMarkup(event) {
+    const saved = tournamentMeta.get(event.id) || {};
+    const fallback = event.name.split(/\s+/).filter(Boolean).slice(0, 3).map((part) => part[0]).join("").toUpperCase();
     return `
       <article class="tournament" data-category="${event.category}">
         <a class="tournament-link" href="#campeonato/${encodeURIComponent(event.id)}/overview">
-          <span class="event-year">${event.year}</span>
+          <span class="event-list-brand">${saved.logo ? `<img src="${escapeHtml(saved.logo)}" alt="Logo de ${escapeHtml(event.name)}" />` : `<b>${escapeHtml(fallback)}</b>`}</span>
           <div class="event-main"><h3>${escapeHtml(event.name)}</h3><p>${categoryLabel(event.category)} · ${event.entries.length} times</p></div>
           <span class="event-status ${event.status}">${event.status === "ongoing" ? "EM ANDAMENTO" : "FINALIZADO"}</span>
+          <time class="event-year">${event.year}</time>
           <span class="event-enter">Ver campeonato <i>→</i></span>
         </a>
       </article>`;
@@ -530,6 +535,13 @@
     document.querySelector("#tournamentPage").innerHTML = `<a class="profile-back" href="#campeonatos">← Voltar aos campeonatos</a><header class="event-hero">${savedEvent.logo ? `<div class="event-brand-art"><img class="event-logo" src="${escapeHtml(savedEvent.logo)}" alt="Logo de ${escapeHtml(event.name)}" /></div>` : ""}<span>${event.status === "ongoing" ? "EM ANDAMENTO" : "FINALIZADO"}</span><h1>${escapeHtml(event.name)} <b>${event.year}</b></h1><p>${categoryLabel(event.category)} · ${event.entries.length} times</p></header>${tabs}${body}`;
   }
 
+  function renderNewsPage(item) {
+    const event = item.tournamentId ? data.tournaments.find((candidate) => candidate.id === item.tournamentId) : null;
+    const eventLogo = event ? tournamentMeta.get(event.id)?.logo : "";
+    const body = String(item.body || item.summary || "").split(/\n{2,}/).map((paragraph) => paragraph.trim()).filter(Boolean).map((paragraph) => `<p>${escapeHtml(paragraph).replace(/\n/g, "<br />")}</p>`).join("");
+    document.querySelector("#newsPage").innerHTML = `<a class="profile-back" href="#noticias">← Voltar às notícias</a><article class="news-detail-page"><header class="news-detail-header">${event ? `<a class="news-event-chip" href="#campeonato/${encodeURIComponent(event.id)}/overview">${eventLogo ? `<img src="${escapeHtml(eventLogo)}" alt="" />` : ""}<span>${escapeHtml(event.name)} <b>${event.year}</b></span></a>` : `<span class="news-detail-kicker">NOTÍCIA HLTPC</span>`}<h1>${escapeHtml(item.title)}</h1><p>${escapeHtml(item.summary)}</p><div><span>por <b>${escapeHtml(item.author)}</b></span><time>${formatDate(item.date)}</time></div></header>${item.image ? `<figure class="news-detail-image"><img src="${escapeHtml(item.image)}" alt="Imagem de ${escapeHtml(item.title)}" /></figure>` : ""}<div class="news-detail-body">${body || `<p>${escapeHtml(item.summary)}</p>`}</div>${event ? `<footer><span>CAMPEONATO RELACIONADO</span><a href="#campeonato/${encodeURIComponent(event.id)}/overview">${escapeHtml(event.name)} ${event.year} →</a></footer>` : ""}</article>`;
+  }
+
   const mapLabel = (value) => ({ de_inferno: "Inferno", de_mirage: "Mirage", de_nuke: "Nuke", de_anubis: "Anubis", de_ancient: "Ancient", de_dust2: "Dust II", de_vertigo: "Vertigo", de_overpass: "Overpass", de_train: "Train", de_cache: "Cache" }[String(value || "").toLowerCase()] || String(value || "Mapa a definir").replace(/^de_/, ""));
   const teamLogoMarkup = (team) => `<span class="match-team-logo">${teamBadge(team)}</span>`;
   const ratingTone = (rating) => Number(rating) >= 1.1 ? "high" : Number(rating) < .9 ? "low" : "mid";
@@ -596,7 +608,8 @@
     const back = event ? `#campeonato/${encodeURIComponent(event.id)}/matches` : "#campeonatos";
     const statsBody = matchStatsViewsMarkup(match, teamA, teamB, options);
     const mapPanel = matchMapPanelMarkup(match, teamA, teamB, scores);
-    document.querySelector("#matchPage").innerHTML = `<a class="profile-back" href="${back}">← Voltar ao campeonato</a><article class="match-detail-page"><header class="match-detail-hero"><a class="match-event-link" href="#campeonato/${encodeURIComponent(event?.id || "")}/overview">${escapeHtml(event?.name || "Campeonato HLTPC")} ${event?.year || ""}</a><div class="match-detail-team team-a">${teamLogoMarkup(teamA)}<a href="#time/${encodeURIComponent(teamA)}">${escapeHtml(teamA)}</a></div><div class="match-detail-score"><time>${escapeHtml(match.subtitle || "Data a definir")}</time><strong>${scores.length ? `${scores[0]} <i>:</i> ${scores[1]}` : "VS"}</strong><span>${escapeHtml(matchDescriptor)}</span></div><div class="match-detail-team team-b">${teamLogoMarkup(teamB)}<a href="#time/${encodeURIComponent(teamB)}">${escapeHtml(teamB)}</a></div></header><div class="match-detail-grid">${mapPanel}<section class="match-proof-panel"><header><span>FONTES</span><b>Conferência dos dados</b></header>${matchSourcesMarkup(match)}${match.evidenceNote ? `<p class="match-evidence-note">${escapeHtml(match.evidenceNote)}</p>` : ""}${scoreboardImage ? `<a class="scoreboard-evidence" href="${escapeHtml(scoreboardImage)}" target="_blank" rel="noopener"><img src="${escapeHtml(scoreboardImage)}" alt="Print do placar final" /><span>Abrir print do placar ↗</span></a>` : ""}${leetifyUrl ? `<a class="external-source" href="${escapeHtml(leetifyUrl)}" target="_blank" rel="noopener">Abrir partida no Leetify ↗</a>` : ""}</section></div><section class="match-stats-section"><header><div><span>DESEMPENHO</span><h2>Estatísticas da partida</h2></div><small>Fonte geral: ${sourceLabel}</small></header>${statsBody}</section>${stats.length ? `<section class="match-lineups-section"><header><span>ESCALAÇÕES</span><h2>Lineups</h2></header><div>${matchLineup(teamA, event, stats)}${matchLineup(teamB, event, stats)}</div></section>` : ""}${mvp ? `<section class="match-mvp"><div class="match-mvp-photo">${mvpMeta.photo ? `<img src="${escapeHtml(mvpMeta.photo)}" alt="" />` : escapeHtml((mvp.name || "MVP").slice(0, 2).toUpperCase())}</div><div><span>DESTAQUE DA PARTIDA</span><h2>${playerHistory.has(mvp.name) ? `<a href="#jogador/${encodeURIComponent(mvp.name)}">${escapeHtml(mvp.name)}</a>` : escapeHtml(mvp.demoName || mvp.name)}</h2><p>${mvp.kills}-${mvp.deaths} · ${mvp.adr} ADR · ${mvp.kast}% KAST</p></div><strong>${mvp.rating}<small>Rating</small></strong></section>` : ""}</article>`;
+    const eventLogo = tournamentMeta.get(event?.id)?.logo || "";
+    document.querySelector("#matchPage").innerHTML = `<a class="profile-back" href="${back}">← Voltar ao campeonato</a><article class="match-detail-page"><header class="match-detail-hero"><a class="match-event-link" href="#campeonato/${encodeURIComponent(event?.id || "")}/overview">${eventLogo ? `<img src="${escapeHtml(eventLogo)}" alt="" />` : ""}<span><b>${escapeHtml(event?.name || "Campeonato HLTPC")}</b><small>${event?.year || ""}</small></span></a><div class="match-detail-team team-a"><div class="match-team-art">${teamLogoMarkup(teamA)}</div><a href="#time/${encodeURIComponent(teamA)}">${escapeHtml(teamA)}</a></div><div class="match-detail-score"><time>${escapeHtml(match.subtitle || "Data a definir")}</time><strong>${scores.length ? `${scores[0]} <i>:</i> ${scores[1]}` : "VS"}</strong><span>${escapeHtml(matchDescriptor)}</span></div><div class="match-detail-team team-b"><div class="match-team-art">${teamLogoMarkup(teamB)}</div><a href="#time/${encodeURIComponent(teamB)}">${escapeHtml(teamB)}</a></div></header><div class="match-detail-grid">${mapPanel}<section class="match-proof-panel"><header><span>FONTES</span><b>Conferência dos dados</b></header>${matchSourcesMarkup(match)}${match.evidenceNote ? `<p class="match-evidence-note">${escapeHtml(match.evidenceNote)}</p>` : ""}${scoreboardImage ? `<a class="scoreboard-evidence" href="${escapeHtml(scoreboardImage)}" target="_blank" rel="noopener"><img src="${escapeHtml(scoreboardImage)}" alt="Print do placar final" /><span>Abrir print do placar ↗</span></a>` : ""}${leetifyUrl ? `<a class="external-source" href="${escapeHtml(leetifyUrl)}" target="_blank" rel="noopener">Abrir partida no Leetify ↗</a>` : ""}</section></div><section class="match-stats-section"><header><div><span>DESEMPENHO</span><h2>Estatísticas da partida</h2></div><small>Fonte geral: ${sourceLabel}</small></header>${statsBody}</section>${stats.length ? `<section class="match-lineups-section"><header><span>ESCALAÇÕES</span><h2>Lineups</h2></header><div>${matchLineup(teamA, event, stats)}${matchLineup(teamB, event, stats)}</div></section>` : ""}${mvp ? `<section class="match-mvp"><div class="match-mvp-photo">${mvpMeta.photo ? `<img src="${escapeHtml(mvpMeta.photo)}" alt="" />` : escapeHtml((mvp.name || "MVP").slice(0, 2).toUpperCase())}</div><div><span>DESTAQUE DA PARTIDA</span><h2>${playerHistory.has(mvp.name) ? `<a href="#jogador/${encodeURIComponent(mvp.name)}">${escapeHtml(mvp.name)}</a>` : escapeHtml(mvp.demoName || mvp.name)}</h2><p>${mvp.kills}-${mvp.deaths} · ${mvp.adr} ADR · ${mvp.kast}% KAST</p></div><strong>${mvp.rating}<small>Rating</small></strong></section>` : ""}</article>`;
     document.querySelectorAll("[data-match-stats-tab]").forEach((button) => button.addEventListener("click", () => {
       document.querySelectorAll("[data-match-stats-tab]").forEach((tab) => tab.classList.toggle("active", tab === button));
       document.querySelectorAll("[data-match-stats-panel]").forEach((panel) => { panel.hidden = panel.dataset.matchStatsPanel !== button.dataset.matchStatsTab; });
@@ -642,8 +655,12 @@
       const match = data.matches.find((item) => item.id === decodeURIComponent(parameter));
       if (match) renderMatchPage(match); else location.hash = "campeonatos";
     }
+    if (route === "noticia" && parameter) {
+      const item = data.news.find((candidate) => candidate.id === decodeURIComponent(parameter));
+      if (item) renderNewsPage(item); else location.hash = "noticias";
+    }
     document.querySelectorAll(".view").forEach((view) => view.classList.toggle("active", view.dataset.view === route));
-    const navRoute = ({ jogador: "jogadores", time: "times", campeonato: "campeonatos", partida: "campeonatos" })[route] || route;
+    const navRoute = ({ jogador: "jogadores", time: "times", campeonato: "campeonatos", partida: "campeonatos", noticia: "inicio", noticias: "inicio" })[route] || route;
     document.querySelectorAll("[data-route]").forEach((link) => link.classList.toggle("active", link.dataset.route === navRoute));
     window.scrollTo({ top: 0, behavior: "instant" });
   }
