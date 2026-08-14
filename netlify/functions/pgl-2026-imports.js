@@ -86,7 +86,16 @@ function fillMissing(target, imported) {
 
 function applyPgl2026Imports(content) {
   if (!content || !Array.isArray(content.matches)) return content || {};
-  content.matches = content.matches.map((match) => IMPORTS[match.id] ? fillMissing({ ...match }, IMPORTS[match.id]) : match);
+  content.matches = content.matches.map((match) => {
+    if (!IMPORTS[match.id]) return match;
+    const merged = fillMissing({ ...match }, IMPORTS[match.id]);
+    if (match.id === "pgl-abadia-2026-group-2" && match.resultSource !== "manual" && match.scoreSource !== "manual") {
+      merged.score = "13 - 9";
+      merged.winner = "BOCA DE FUMO Gaming";
+      merged.statisticsStatus = "partial";
+    }
+    return merged;
+  });
   return content;
 }
 
