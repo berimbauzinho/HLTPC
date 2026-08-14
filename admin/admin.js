@@ -13,7 +13,9 @@
   ]);
   const confirmedPlayerIdentities = [
     { name: "cuavila", steamId: "76561199001115634", aliases: ["MANO CHORIS", "KMKZ | MANO CHORIS"] },
-    { name: "Cuazzi", steamId: "76561198359845217", aliases: ["Voulin Raba", "cuallen", "cualy", "KMKZ | cuallen"] }
+    { name: "Cuazzi", steamId: "76561198359845217", aliases: ["Voulin Raba", "cuallen", "cualy", "KMKZ | cuallen"] },
+    { name: "JohnWeed", steamId: "76561198090993134", aliases: ["ᴊʜᴏɴʏsᴋ8🛹"] },
+    { name: "Oblivion", steamId: "76561199591751431", aliases: ["DEF | Oblivion"] }
   ];
   const baselineTeamNames = [...new Set(source.tournaments.flatMap((event) => event.entries.map((entry) => entry.team)))];
   const baselineTeams = baselineTeamNames.map((name, index) => ({ id: `team-${index}`, name, acronym: initials(name), aliases: [], status: "published", logo: "", updated: "Derivado das edições" }));
