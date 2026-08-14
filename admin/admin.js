@@ -1005,14 +1005,15 @@
     };
     let allEvents = [];
     try {
-      allEvents = demoRows(parser.parseEvents(bytes, ["begin_new_match", "round_end", "player_death", "player_hurt"], ["team_name"], ["total_rounds_played", "is_warmup_period"]));
+      allEvents = demoRows(parser.parseEvents(bytes, ["begin_new_match", "round_end", "player_death", "player_hurt", "weapon_fire"], ["team_name"], ["total_rounds_played", "is_warmup_period"]));
     } catch (reason) {
       warnings.push(`leitura conjunta: ${reason.message || reason}`);
       allEvents = [
         ...parseEventSafely("begin_new_match"),
         ...parseEventSafely("round_end", [], ["total_rounds_played", "is_warmup_period"]),
         ...parseEventSafely("player_death", ["team_name"], ["total_rounds_played", "is_warmup_period"]),
-        ...parseEventSafely("player_hurt", ["team_name"], ["total_rounds_played", "is_warmup_period"])
+        ...parseEventSafely("player_hurt", ["team_name"], ["total_rounds_played", "is_warmup_period"]),
+        ...parseEventSafely("weapon_fire", ["team_name"], ["total_rounds_played", "is_warmup_period"])
       ];
     }
     const starts = allEvents.filter((event) => event.event_name === "begin_new_match").sort((a, b) => numberValue(a.tick) - numberValue(b.tick));
@@ -1020,11 +1021,12 @@
     const matchEvents = allEvents.filter((event) => numberValue(event.tick) >= matchStartTick && !booleanValue(event.is_warmup_period));
     const deaths = matchEvents.filter((event) => event.event_name === "player_death");
     const hurts = matchEvents.filter((event) => event.event_name === "player_hurt");
+    const weaponFires = matchEvents.filter((event) => event.event_name === "weapon_fire");
     const roundEnds = matchEvents.filter((event) => event.event_name === "round_end");
     const stats = new Map();
     const getPlayer = (steamid, name, team) => {
       const id = String(steamid || name || "desconhecido");
-      if (!stats.has(id)) stats.set(id, { steamid: String(steamid || ""), name: canonicalPlayerName(name, steamid, true), demoName: String(name || ""), team: String(team || ""), kills: 0, deaths: 0, assists: 0, headshots: 0, damage: 0, hits: 0, headHits: 0, utilityDamage: 0, openingKills: 0, openingDeaths: 0, multiKill2: 0, multiKill3: 0, multiKill4: 0, multiKill5: 0 });
+      if (!stats.has(id)) stats.set(id, { steamid: String(steamid || ""), name: canonicalPlayerName(name, steamid, true), demoName: String(name || ""), team: String(team || ""), kills: 0, deaths: 0, assists: 0, headshots: 0, damage: 0, shots: 0, hits: 0, headHits: 0, utilityDamage: 0, openingKills: 0, openingDeaths: 0, multiKill2: 0, multiKill3: 0, multiKill4: 0, multiKill5: 0 });
       const player = stats.get(id);
       if (!player.team && team) player.team = String(team);
       return player;
@@ -1068,6 +1070,11 @@
         if (["head", "1"].includes(String(event.hitgroup || event.hit_group || "").toLowerCase())) attacker.headHits += 1;
         if (/hegrenade|inferno|molotov|incgrenade/i.test(String(event.weapon || event.weapon_name || ""))) attacker.utilityDamage += damage;
       }
+    });
+    weaponFires.forEach((event) => {
+      const weapon = String(event.weapon || event.weapon_name || "").toLowerCase();
+      if (!event.user_name || /knife|bayonet|grenade|molotov|incgrenade|decoy|flashbang|c4/.test(weapon)) return;
+      getPlayer(event.user_steamid, event.user_name, event.user_team_name).shots += 1;
     });
     const observedRounds = [...deaths, ...hurts].map((event) => numberValue(event.total_rounds_played)).filter((round) => round >= 0);
     const rounds = roundEnds.length || (observedRounds.length ? Math.max(...observedRounds) + 1 : 0);
