@@ -7,8 +7,14 @@
   const confirmedPlayerAliases = new Map([
     ["GJota", ["GJ"]],
     ["Downey", ["Mikasa es su kasa"]],
-    ["190", ["fraquinho"]]
+    ["190", ["fraquinho"]],
+    ["cuavila", ["MANO CHORIS", "KMKZ | MANO CHORIS"]],
+    ["Cuazzi", ["Voulin Raba", "cuallen", "cualy", "KMKZ | cuallen"]]
   ]);
+  const confirmedPlayerIdentities = [
+    { name: "cuavila", steamId: "76561199001115634", aliases: ["MANO CHORIS", "KMKZ | MANO CHORIS"] },
+    { name: "Cuazzi", steamId: "76561198359845217", aliases: ["Voulin Raba", "cuallen", "cualy", "KMKZ | cuallen"] }
+  ];
   const baselineTeamNames = [...new Set(source.tournaments.flatMap((event) => event.entries.map((entry) => entry.team)))];
   const baselineTeams = baselineTeamNames.map((name, index) => ({ id: `team-${index}`, name, acronym: initials(name), aliases: [], status: "published", logo: "", updated: "Derivado das edições" }));
   const baselineTeamNameById = new Map(baselineTeams.map((team) => [team.id, team.name]));
@@ -127,6 +133,31 @@
     return changed;
   }
 
+  function enforceConfirmedPlayerIdentities() {
+    let changed = false;
+    const bySteamId = new Map(confirmedPlayerIdentities.map((identity) => [identity.steamId, identity]));
+    confirmedPlayerIdentities.forEach((identity) => {
+      const player = state.players.find((item) => normalizedNick(item.name) === normalizedNick(identity.name));
+      if (!player) return;
+      const reservedAliases = new Set(confirmedPlayerIdentities.flatMap((candidate) => candidate === identity ? [] : candidate.aliases).map(normalizedNick));
+      const retained = [...(player.aliases || []), ...String(player.alias || "").split(/[,;|]/)].map((alias) => String(alias || "").trim()).filter((alias) => alias && !reservedAliases.has(normalizedNick(alias)));
+      const aliases = [...new Set([...retained, ...identity.aliases])];
+      if (player.steamId !== identity.steamId || JSON.stringify(player.aliases || []) !== JSON.stringify(aliases) || player.alias !== aliases.join(", ")) {
+        Object.assign(player, { steamId: identity.steamId, aliases, alias: aliases.join(", "), identityCorrectionVersion: 1, updated: "Identidade confirmada por SteamID64" });
+        changed = true;
+      }
+    });
+    const correctStatistics = (statistics) => (statistics || []).forEach((player) => {
+      const identity = bySteamId.get(String(player.steamid || player.steam64Id || "").trim());
+      if (identity && player.name !== identity.name) { player.name = identity.name; changed = true; }
+    });
+    state.matches.forEach((match) => {
+      correctStatistics(match.statistics);
+      (match.maps || []).forEach((map) => correctStatistics(map.statistics));
+    });
+    return changed;
+  }
+
   async function contentRequest(options = {}) {
     const response = await fetch("/api/admin/content", { credentials: "same-origin", ...options });
     const result = await response.json().catch(() => ({}));
@@ -139,10 +170,11 @@
       const saved = await contentRequest();
       ["players", "teams", "tournaments", "matches", "news"].forEach((key) => { if (Array.isArray(saved[key])) state[key] = saved[key]; });
       const historicalImported = applyHistoricalImport2025();
+      const identitiesChanged = enforceConfirmedPlayerIdentities();
       const referencesChanged = normalizeTeamReferences();
       const structureChanged = normalizeTournamentStructures();
       const leetifyImported = await syncPendingLeetifyMatches();
-      if (historicalImported || referencesChanged || structureChanged || leetifyImported) await persistContent();
+      if (historicalImported || identitiesChanged || referencesChanged || structureChanged || leetifyImported) await persistContent();
       go(section);
       showToast(historicalImported ? `Histórico de 2025 importado: ${historicalImported} registros atualizados` : leetifyImported ? `${leetifyImported} partida sincronizada com o Leetify` : "Conteúdo compartilhado carregado");
     } catch (reason) {
