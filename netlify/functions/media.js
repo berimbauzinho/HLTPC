@@ -6,7 +6,10 @@ exports.handler = async (event) => {
     const id = String(event.queryStringParameters?.id || "");
     if (!/^[0-9a-f-]{36}$/i.test(id)) return { statusCode: 404, body: "" };
     connectLambda(event);
-    const result = await getStore("hltpc-media").getWithMetadata(id, { type: "arrayBuffer" });
+    const currentStore = getStore("hltpc-content");
+    const legacyStore = getStore("hltpc-media");
+    const result = await currentStore.getWithMetadata(`media/${id}`, { type: "arrayBuffer", consistency: "eventual" })
+      || await legacyStore.getWithMetadata(id, { type: "arrayBuffer", consistency: "eventual" });
     if (!result) return { statusCode: 404, body: "" };
     return {
       statusCode: 200,
