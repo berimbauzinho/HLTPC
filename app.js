@@ -657,7 +657,8 @@
   }
 
   function tournamentTeamStatistics(event, matches) {
-    const rows = new Map(event.entries.map((entry) => [entry.team, { team: entry.team, series: 0, wins: 0, losses: 0, mapsWon: 0, mapsLost: 0, roundsFor: 0, roundsAgainst: 0, kills: 0, deaths: 0 }]));
+    const participating = matches.length ? [...new Set(matches.flatMap((match) => [match.teamA, match.teamB]).filter(Boolean))] : event.entries.map((entry) => entry.team);
+    const rows = new Map(participating.map((team) => [team, { team, series: 0, wins: 0, losses: 0, mapsWon: 0, mapsLost: 0, roundsFor: 0, roundsAgainst: 0, kills: 0, deaths: 0 }]));
     const ensure = (team) => {
       if (!rows.has(team)) rows.set(team, { team, series: 0, wins: 0, losses: 0, mapsWon: 0, mapsLost: 0, roundsFor: 0, roundsAgainst: 0, kills: 0, deaths: 0 });
       return rows.get(team);
