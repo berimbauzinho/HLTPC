@@ -2,7 +2,8 @@ const crypto = require("node:crypto");
 const { connectLambda, getStore } = require("@netlify/blobs");
 const { configuration, readSession, json } = require("./auth-utils");
 
-const STORE_NAME = "hltpc-media";
+const STORE_NAME = "hltpc-content";
+const MEDIA_PREFIX = "media/";
 const MAX_OPTIMIZED_BYTES = 1_500_000;
 
 function authorized(event) {
@@ -21,7 +22,12 @@ exports.handler = async (event) => {
     if (!bytes.length || bytes.length > MAX_OPTIMIZED_BYTES) return json(413, { error: "A imagem otimizada ultrapassou 1,5 MB." });
     connectLambda(event);
     const id = crypto.randomUUID();
-    await getStore(STORE_NAME).set(id, bytes, { metadata: { contentType, uploadedAt: new Date().toISOString() } });
+    const key = `${MEDIA_PREFIX}${id}`;
+    const payload = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+    const store = getStore(STORE_NAME);
+    const written = await store.set(key, payload, { metadata: { contentType, uploadedAt: new Date().toISOString() }, onlyIfNew: true });
+    const verification = written.modified && await store.getMetadata(key, { consistency: "eventual" });
+    if (!verification) throw new Error("O Netlify não confirmou o armazenamento do arquivo.");
     return json(201, { ok: true, url: `/api/media/${id}` });
   } catch (reason) {
     console.error("HLTPC media upload error", reason);
