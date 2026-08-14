@@ -26,6 +26,29 @@
     shared.players = mergeVersioned(shared.players, historicalImport2025.players, "identityImportVersion");
     shared.matches = mergeVersioned(shared.matches, historicalImport2025.matches, "importVersion");
   }
+  const confirmedPlayerIdentities = [
+    { name: "cuavila", steamId: "76561199001115634", aliases: ["MANO CHORIS", "KMKZ | MANO CHORIS"] },
+    { name: "Cuazzi", steamId: "76561198359845217", aliases: ["Voulin Raba", "cuallen", "cualy", "KMKZ | cuallen"] }
+  ];
+  const identityNick = (value) => String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("pt-BR").replace(/[^a-z0-9]/g, "");
+  const identityBySteam = new Map(confirmedPlayerIdentities.map((identity) => [identity.steamId, identity]));
+  (shared.players || []).forEach((player) => {
+    const identity = confirmedPlayerIdentities.find((candidate) => identityNick(candidate.name) === identityNick(player.name));
+    if (!identity) return;
+    const reservedAliases = new Set(confirmedPlayerIdentities.flatMap((candidate) => candidate === identity ? [] : candidate.aliases).map(identityNick));
+    const retained = [...(player.aliases || []), ...String(player.alias || "").split(/[,;|]/)].map((alias) => String(alias || "").trim()).filter((alias) => alias && !reservedAliases.has(identityNick(alias)));
+    player.steamId = identity.steamId;
+    player.aliases = [...new Set([...retained, ...identity.aliases])];
+    player.alias = player.aliases.join(", ");
+  });
+  (shared.matches || []).forEach((match) => {
+    const correct = (player) => {
+      const identity = identityBySteam.get(String(player.steamid || player.steam64Id || "").trim());
+      return identity ? { ...player, name: identity.name } : player;
+    };
+    if (Array.isArray(match.statistics)) match.statistics = match.statistics.map(correct);
+    (match.maps || []).forEach((map) => { if (Array.isArray(map.statistics)) map.statistics = map.statistics.map(correct); });
+  });
   const baselineTeamNames = [...new Set(data.tournaments.flatMap((event) => event.entries.map((entry) => entry.team)))];
   const baselineTeamIdByName = new Map(baselineTeamNames.map((name, index) => [name, `team-${index}`]));
   const sharedTeamById = new Map((shared.teams || []).map((team) => [team.id, team]));
@@ -123,7 +146,9 @@
   const confirmedPlayerAliases = new Map([
     ["GJota", ["GJ"]],
     ["Downey", ["Mikasa es su kasa"]],
-    ["190", ["fraquinho"]]
+    ["190", ["fraquinho"]],
+    ["cuavila", ["MANO CHORIS", "KMKZ | MANO CHORIS"]],
+    ["Cuazzi", ["Voulin Raba", "cuallen", "cualy", "KMKZ | cuallen"]]
   ]);
 
   function publicPlayerNames(name) {
@@ -340,7 +365,8 @@
 
   function renderNews() {
     const sorted = [...data.news].sort((a, b) => b.date.localeCompare(a.date));
-    document.querySelector("#homeNews").innerHTML = newsMarkup(sorted.slice(0, 3));
+    const homeNews = document.querySelector("#homeNews");
+    if (homeNews) homeNews.innerHTML = newsMarkup(sorted.slice(0, 3));
     document.querySelector("#news").innerHTML = newsMarkup(sorted);
   }
 
@@ -351,13 +377,62 @@
       .slice(0, 8);
     document.querySelector("#titleRanking").innerHTML = ranking.map((row, index) => {
       const meta = playerMeta.get(row.player) || {};
-      return `<div class="rank-row"><span>${String(index + 1).padStart(2, "0")}</span><i class="rank-avatar">${meta.photo ? `<img src="${escapeHtml(meta.photo)}" alt="${escapeHtml(row.player)}" />` : ""}</i><b>${escapeHtml(row.player)}<small>${row.majors} Major${row.majors === 1 ? "" : "s"}</small></b><em>${row.official} título${row.official === 1 ? "" : "s"}</em></div>`;
+      return `<div class="rank-row"><span>${String(index + 1).padStart(2, "0")}</span><i class="rank-avatar">${meta.photo ? `<img src="${escapeHtml(meta.photo)}" alt="${escapeHtml(row.player)}" />` : `<b>${escapeHtml(row.player.slice(0, 2).toUpperCase())}</b>`}</i><b>${escapeHtml(row.player)}<small>${row.majors} Major${row.majors === 1 ? "" : "s"}</small></b><em>${row.official} título${row.official === 1 ? "" : "s"}</em></div>`;
     }).join("");
   }
 
   function renderHomeUpcoming() {
     const upcoming = nextSiteMatch();
     document.querySelector("#homeUpcoming").innerHTML = upcoming ? `<div class="event-matches home-match">${matchMarkup(upcoming)}</div>` : `<div class="empty compact"><b>Próxima partida ainda não divulgada</b>Assim que um confronto for publicado no painel, ele aparecerá aqui.</div>`;
+  }
+
+  function renderTeamPowerRanking() {
+    const candidates = [...data.tournaments].sort((a, b) => (b.status === "ongoing") - (a.status === "ongoing") || b.year - a.year || b.id.localeCompare(a.id));
+    const event = candidates.find((candidate) => orderedEventMatches(candidate).some((match) => match.score)) || candidates[0];
+    const target = document.querySelector("#teamPowerRanking");
+    const context = document.querySelector("#teamPowerContext");
+    if (!target || !event) return;
+    const matches = orderedEventMatches(event).filter((match) => match.score && match.teamA && match.teamB);
+    const blank = (team) => ({ team, played: 0, wins: 0, weightedPlayed: 0, weightedWins: 0, roundsFor: 0, roundsAgainst: 0, playoff: 0 });
+    const rows = new Map(event.entries.map((entry) => [entry.team, blank(entry.team)]));
+    const stageWeight = (round) => round === "final" ? 1.5 : round === "semifinal" ? 1.25 : 1;
+    const addRounds = (rowA, rowB, first, second) => {
+      rowA.roundsFor += first; rowA.roundsAgainst += second;
+      rowB.roundsFor += second; rowB.roundsAgainst += first;
+    };
+    matches.forEach((match) => {
+      if (!rows.has(match.teamA)) rows.set(match.teamA, blank(match.teamA));
+      if (!rows.has(match.teamB)) rows.set(match.teamB, blank(match.teamB));
+      const rowA = rows.get(match.teamA);
+      const rowB = rows.get(match.teamB);
+      const score = String(match.score).match(/\d+/g)?.map(Number) || [];
+      if (score.length < 2 || score[0] === score[1]) return;
+      const weight = stageWeight(match.round);
+      rowA.played += 1; rowB.played += 1;
+      rowA.weightedPlayed += weight; rowB.weightedPlayed += weight;
+      const winner = score[0] > score[1] ? rowA : rowB;
+      winner.wins += 1; winner.weightedWins += weight;
+      if (match.round === "final") winner.playoff = Math.max(winner.playoff, 1);
+      else if (match.round === "semifinal") winner.playoff = Math.max(winner.playoff, .78);
+      const maps = (match.maps || []).map((map) => String(map.score || "").match(/\d+/g)?.map(Number)).filter((mapScore) => mapScore?.length >= 2);
+      if (maps.length) maps.forEach(([first, second]) => addRounds(rowA, rowB, first, second));
+      else if (Number(match.bestOf || 1) === 1) addRounds(rowA, rowB, score[0], score[1]);
+    });
+    const orderedGroup = [...rows.values()].sort((a, b) => b.wins - a.wins || (b.roundsFor - b.roundsAgainst) - (a.roundsFor - a.roundsAgainst) || b.roundsFor - a.roundsFor || a.team.localeCompare(b.team, "pt-BR"));
+    orderedGroup.forEach((row, index) => { row.campaign = orderedGroup.length === 1 ? 1 : .35 + .4 * ((orderedGroup.length - 1 - index) / (orderedGroup.length - 1)); });
+    const ranked = [...rows.values()].map((row) => {
+      const form = row.weightedPlayed ? row.weightedWins / row.weightedPlayed : 0;
+      const roundShare = row.roundsFor + row.roundsAgainst ? row.roundsFor / (row.roundsFor + row.roundsAgainst) : .5;
+      const campaign = Math.max(row.campaign || 0, row.playoff || 0);
+      return { ...row, raw: .55 * form + .25 * roundShare + .2 * campaign };
+    }).sort((a, b) => b.raw - a.raw || (b.roundsFor - b.roundsAgainst) - (a.roundsFor - a.roundsAgainst) || a.team.localeCompare(b.team, "pt-BR"));
+    const ceiling = ranked[0]?.raw || 1;
+    context.textContent = `${event.name} ${event.year} · forma 55% · rounds 25% · campanha 20%`;
+    target.innerHTML = ranked.map((row, index) => {
+      const score = Math.round((row.raw / ceiling) * 1000);
+      const balance = row.roundsFor - row.roundsAgainst;
+      return `<a class="team-power-row" href="#time/${encodeURIComponent(row.team)}"><span>${String(index + 1).padStart(2, "0")}</span><i>${teamBadge(row.team)}</i><b>${escapeHtml(row.team)}<small>${row.wins}–${Math.max(0, row.played - row.wins)} · saldo ${balance > 0 ? "+" : ""}${balance}</small></b><strong>${score}<small>pontos</small></strong></a>`;
+    }).join("");
   }
 
   function renderMatches() {
@@ -394,10 +469,9 @@
       const history = [...(playerHistory.get(player) || [])].sort(byNewest);
       const meta = playerMeta.get(player) || {};
       const latest = history[0];
-      const secondary = meta.alias || (latest ? latest.team : "Competidor HLTPC");
       return `<a class="player-directory-card ${meta.photo ? "has-photo" : "without-photo"}" href="#jogador/${encodeURIComponent(player)}" aria-label="Abrir perfil de ${escapeHtml(player)}">
-        <div class="player-directory-copy"><span>PLAYER HLTPC</span><h3>${escapeHtml(player)}</h3><p>${escapeHtml(secondary)}</p><div><b>${latest ? escapeHtml(latest.team) : "Sem equipe recente"}</b><small>${history.length} participaç${history.length === 1 ? "ão" : "ões"} · ${officialTitleCount(player)} título${officialTitleCount(player) === 1 ? "" : "s"}</small></div></div>
-        <div class="player-directory-portrait">${meta.photo ? `<img src="${escapeHtml(meta.photo)}" alt="${escapeHtml(player)}" />` : ""}</div>
+        <div class="player-directory-copy"><span>PLAYER HLTPC</span><h3>${escapeHtml(player)}</h3><div><b>${latest ? escapeHtml(latest.team) : "Sem equipe recente"}</b><small>${history.length} participaç${history.length === 1 ? "ão" : "ões"} · ${officialTitleCount(player)} título${officialTitleCount(player) === 1 ? "" : "s"}</small></div></div>
+        <div class="player-directory-portrait">${meta.photo ? `<img src="${escapeHtml(meta.photo)}" alt="${escapeHtml(player)}" />` : `<strong>${escapeHtml(player.slice(0, 2).toUpperCase())}</strong>`}</div>
         <i>Ver perfil →</i>
       </a>`;
     }).join("");
@@ -700,6 +774,7 @@
   renderTicker();
   renderNews();
   renderHomeUpcoming();
+  renderTeamPowerRanking();
   renderRanking();
   renderMatches();
   renderTournaments();
