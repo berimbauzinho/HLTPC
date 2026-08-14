@@ -26,8 +26,7 @@ exports.handler = async (event) => {
     const payload = { version: 2, contentType, bytes: bytes.length, data: bytes.toString("base64"), uploadedAt: new Date().toISOString() };
     const store = getStore(STORE_NAME);
     const written = await store.setJSON(key, payload, { onlyIfNew: true });
-    const verification = written.modified && await store.get(key, { type: "json", consistency: "eventual" });
-    if (!verification || verification.data !== payload.data || verification.contentType !== contentType) throw new Error("O Netlify não devolveu a imagem gravada corretamente.");
+    if (written?.modified === false) throw new Error("O identificador da imagem já estava em uso.");
     return json(201, { ok: true, url: `/api/media/${id}` });
   } catch (reason) {
     console.error("HLTPC media upload error", reason);
