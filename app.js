@@ -485,13 +485,98 @@
     }).join("");
   }
 
-  function renderPlayerProfile(player) {
+  function playerCareerStatistics(player) {
+    const events = data.tournaments.map((event) => {
+      const matches = data.matches.filter((match) => match.tournamentId === event.id && statisticalSlices(match).length);
+      const rows = tournamentPlayerStatistics(matches).filter((row) => row.name === player);
+      if (!rows.length) return null;
+      const combined = rows.reduce((total, row) => {
+        ["matches", "rounds", "kills", "deaths", "assists", "headshots", "damage", "shots", "hits", "headHits", "utilityDamage", "openingKills", "openingDeaths", "multiKill2", "multiKill3", "multiKill4", "multiKill5"].forEach((key) => { total[key] += numberOrZero(row[key]); });
+        total.ratingWeighted += numberOrZero(row.rating) * (row.rounds || 1);
+        total.ratingWeight += row.rounds || 1;
+        total.kastWeighted += numberOrZero(row.kast) * (row.rounds || 0);
+        total.kastWeight += row.kast === null ? 0 : row.rounds || 0;
+        total.teams.add(row.team);
+        return total;
+      }, { matches: 0, rounds: 0, kills: 0, deaths: 0, assists: 0, headshots: 0, damage: 0, shots: 0, hits: 0, headHits: 0, utilityDamage: 0, openingKills: 0, openingDeaths: 0, multiKill2: 0, multiKill3: 0, multiKill4: 0, multiKill5: 0, ratingWeighted: 0, ratingWeight: 0, kastWeighted: 0, kastWeight: 0, teams: new Set() });
+      return {
+        ...combined,
+        event,
+        team: [...combined.teams].join(" / "),
+        adr: combined.rounds ? combined.damage / combined.rounds : 0,
+        kd: combined.deaths ? combined.kills / combined.deaths : combined.kills,
+        kpr: combined.rounds ? combined.kills / combined.rounds : 0,
+        dpr: combined.rounds ? combined.deaths / combined.rounds : 0,
+        apr: combined.rounds ? combined.assists / combined.rounds : 0,
+        hs: combined.kills ? (combined.headshots / combined.kills) * 100 : 0,
+        kast: combined.kastWeight ? combined.kastWeighted / combined.kastWeight : null,
+        rating: combined.ratingWeight ? combined.ratingWeighted / combined.ratingWeight : 0
+      };
+    }).filter(Boolean).sort((a, b) => a.event.year - b.event.year || a.event.name.localeCompare(b.event.name, "pt-BR"));
+    const matches = data.matches.filter((match) => statisticalSlices(match).some((slice) => slice.statistics.some((record) => canonicalPublicPlayer(record.name || record.demoName, record.steamid || record.steam64Id) === player)));
+    const totals = tournamentPlayerStatistics(matches).filter((row) => row.name === player);
+    const summary = events.reduce((total, row) => {
+      ["matches", "rounds", "kills", "deaths", "assists", "headshots", "damage"].forEach((key) => { total[key] += numberOrZero(row[key]); });
+      total.ratingWeighted += row.rating * (row.rounds || 1);
+      total.ratingWeight += row.rounds || 1;
+      total.kastWeighted += numberOrZero(row.kast) * (row.rounds || 0);
+      total.kastWeight += row.kast === null ? 0 : row.rounds || 0;
+      return total;
+    }, { matches: 0, rounds: 0, kills: 0, deaths: 0, assists: 0, headshots: 0, damage: 0, ratingWeighted: 0, ratingWeight: 0, kastWeighted: 0, kastWeight: 0 });
+    return {
+      events,
+      matches,
+      rows: totals,
+      summary: {
+        ...summary,
+        adr: summary.rounds ? summary.damage / summary.rounds : 0,
+        kd: summary.deaths ? summary.kills / summary.deaths : summary.kills,
+        kpr: summary.rounds ? summary.kills / summary.rounds : 0,
+        dpr: summary.rounds ? summary.deaths / summary.rounds : 0,
+        apr: summary.rounds ? summary.assists / summary.rounds : 0,
+        hs: summary.kills ? (summary.headshots / summary.kills) * 100 : 0,
+        kast: summary.kastWeight ? summary.kastWeighted / summary.kastWeight : null,
+        rating: summary.ratingWeight ? summary.ratingWeighted / summary.ratingWeight : 0
+      }
+    };
+  }
+
+  function playerCareerChartMarkup(events) {
+    if (!events.length) return "";
+    return `<section class="player-career-chart"><header><div><span>EVOLUÇÃO HLTPC</span><h2>Desempenho por campeonato</h2></div><label>Métrica<select data-career-metric><option value="rating">Rating</option><option value="adr">ADR</option><option value="kd">K/D</option><option value="kpr">Kills / round</option><option value="kast">KAST</option></select></label></header><div data-career-chart></div></section>`;
+  }
+
+  function bindPlayerCareerChart(scope, events) {
+    const select = scope?.querySelector("[data-career-metric]");
+    const target = scope?.querySelector("[data-career-chart]");
+    if (!select || !target) return;
+    const metrics = { rating: { label: "Rating", digits: 2 }, adr: { label: "ADR", digits: 1 }, kd: { label: "K/D", digits: 2 }, kpr: { label: "K/R", digits: 2 }, kast: { label: "KAST", digits: 1, suffix: "%" } };
+    const render = () => {
+      const metric = metrics[select.value] || metrics.rating;
+      const available = events.filter((row) => row[select.value] !== null && Number.isFinite(Number(row[select.value])));
+      const maximum = Math.max(...available.map((row) => Number(row[select.value])), 1);
+      const minimum = Math.min(...available.map((row) => Number(row[select.value])), 0);
+      const spread = maximum - minimum || 1;
+      const points = available.map((row, index) => ({ row, x: available.length === 1 ? 450 : 80 + (index / (available.length - 1)) * 740, y: 245 - ((Number(row[select.value]) - minimum) / spread) * 165 }));
+      target.innerHTML = `<svg viewBox="0 0 900 320" role="img" aria-label="Evolução de ${metric.label}"><g class="timeline-grid"><line x1="80" y1="80" x2="820" y2="80"></line><line x1="80" y1="162" x2="820" y2="162"></line><line x1="80" y1="245" x2="820" y2="245"></line></g><polyline points="${points.map((point) => `${point.x},${point.y}`).join(" ")}"></polyline>${points.map((point) => `<g><circle cx="${point.x}" cy="${point.y}" r="8"><title>${escapeHtml(point.row.event.name)} · ${formattedMetric(point.row[select.value], metric)}</title></circle><text class="point-value" x="${point.x}" y="${point.y - 15}">${formattedMetric(point.row[select.value], metric)}</text><text class="point-label" x="${point.x}" y="282">${point.row.event.year}</text></g>`).join("")}</svg>`;
+    };
+    select.addEventListener("change", render);
+    render();
+  }
+
+  function renderPlayerProfile(player, tab = "overview") {
     const history = [...(playerHistory.get(player) || [])].sort(byNewest);
     const current = history[0];
     const meta = playerMeta.get(player) || {};
     const wins = data.tournaments.filter((event) => event.champion && event.entries.some((entry) => entry.team === event.champion && entry.players.includes(player)));
     const awards = (Array.isArray(meta.awards) ? meta.awards : []).map((award) => ({ award, event: data.tournaments.find((candidate) => candidate.id === award.tournamentId), details: awardDetails[award.type] || awardDetails.mvp })).filter((item) => item.event);
     const uniqueTeams = [...new Set([...history.map((item) => item.team), ...(meta.teams || [])])];
+    const validTab = ["overview", "statistics"].includes(tab) ? tab : "overview";
+    const base = `#jogador/${encodeURIComponent(player)}`;
+    const profileTabs = `<nav class="player-profile-tabs"><a class="${validTab === "overview" ? "active" : ""}" href="${base}/overview">Visão geral</a><a class="${validTab === "statistics" ? "active" : ""}" href="${base}/statistics">Estatísticas</a></nav>`;
+    const career = validTab === "statistics" ? playerCareerStatistics(player) : null;
+    const statsBody = career && career.events.length ? `<section class="player-statistics-page"><div class="player-stat-kpis"><article><span>RATING</span><b>${career.summary.rating ? career.summary.rating.toFixed(2) : "—"}</b><small>${career.summary.matches} partidas</small></article><article><span>ADR</span><b>${career.summary.adr ? career.summary.adr.toFixed(1) : "—"}</b><small>${career.summary.rounds} rounds</small></article><article><span>K/D</span><b>${career.summary.kd.toFixed(2)}</b><small>${career.summary.kills}–${career.summary.deaths}</small></article><article><span>KAST</span><b>${career.summary.kast === null ? "—" : `${career.summary.kast.toFixed(1)}%`}</b><small>${career.summary.assists} assistências</small></article></div>${playerCareerChartMarkup(career.events)}<div class="section-heading spaced"><div><span>CAMPEONATOS HLTPC</span><h2>Retrospecto estatístico</h2></div></div><div class="player-event-stat-table"><header><span>Campeonato</span><span>Equipe</span><span>J</span><span>K–D</span><span>ADR</span><span>KAST</span><span>Rating</span></header>${career.events.map((row) => `<div><a href="#campeonato/${encodeURIComponent(row.event.id)}/statistics">${escapeHtml(row.event.name)}<small>${row.event.year}</small></a><span>${escapeHtml(row.team)}</span><span>${row.matches}</span><strong>${row.kills}–${row.deaths}</strong><span>${row.adr.toFixed(1)}</span><span>${row.kast === null ? "—" : `${row.kast.toFixed(1)}%`}</span><strong class="rating ${ratingTone(row.rating)}">${row.rating ? row.rating.toFixed(2) : "—"}</strong></div>`).join("")}</div><div class="section-heading spaced"><div><span>PARTIDAS</span><h2>Desempenhos recentes</h2></div></div><div class="player-recent-matches">${career.matches.slice(-6).reverse().map((match) => { const row = tournamentPlayerStatistics([match]).find((candidate) => candidate.name === player); const event = data.tournaments.find((candidate) => candidate.id === match.tournamentId); return row ? `<a href="#partida/${encodeURIComponent(match.id)}/overview"><span>${escapeHtml(event?.name || "Campeonato HLTPC")}</span><b>${escapeHtml(match.name || "Partida")}</b><div><strong>${row.rating ? row.rating.toFixed(2) : "—"}<small>Rating</small></strong><strong>${row.adr ? row.adr.toFixed(1) : "—"}<small>ADR</small></strong><strong>${row.kills}–${row.deaths}<small>K–D</small></strong></div></a>` : ""; }).join("")}</div></section>` : `<div class="advanced-empty player-empty-stats"><span>ESTATÍSTICAS HLTPC</span><h3>Ainda não há partidas processadas para ${escapeHtml(player)}</h3><p>Quando uma demo ou uma fonte com estatísticas for vinculada, o histórico aparecerá aqui automaticamente.</p></div>`;
+    const overviewBody = `${awards.length ? `<section class="achievement-strip individual-awards"><header><span>PRÊMIOS INDIVIDUAIS</span><b>${awards.length} reconhecimento${awards.length === 1 ? "" : "s"}</b></header><div>${awards.map(({ event, details }) => `<a class="individual-award ${details.className} ${event.category === "major" ? "major-award" : ""}" href="#campeonato/${encodeURIComponent(event.id)}/overview"><i>${details.icon}</i><span><b>${escapeHtml(details.label)}${details.className === "mvp" && event.category === "major" ? " MAJOR" : ""}</b><small>${escapeHtml(event.name)} · ${event.year}</small></span></a>`).join("")}</div></section>` : ""}<section class="achievement-strip"><header><span>CONQUISTAS</span><b>${officialTitleCount(player)} título${officialTitleCount(player) === 1 ? "" : "s"} oficial${officialTitleCount(player) === 1 ? "" : "is"} · ${titleCount(player, "major")} Major${titleCount(player, "major") === 1 ? "" : "s"}</b></header><div>${wins.length ? wins.map((event) => `<article class="${event.category === "major" ? "major-win" : ""}"><i>${event.category === "major" ? "♛" : "★"}</i><span><b>${escapeHtml(event.name)}</b><small>${event.year} · ${categoryLabel(event.category)}</small></span></article>`).join("") : `<p>Nenhum título registrado até o momento.</p>`}</div></section><div class="player-detail-grid"><section><div class="section-heading"><div><span>CARREIRA</span><h2>Histórico por campeonato</h2></div></div><div class="career-list">${history.map(({ event, team }) => `<article><time>${event.year}</time><div><b><a class="entity-link" href="#time/${encodeURIComponent(team)}">${escapeHtml(team)}</a></b><span><a class="entity-link" href="#campeonato/${encodeURIComponent(event.id)}/overview">${escapeHtml(event.name)}</a></span></div><em>${event.champion === team ? "CAMPEÃO" : event.status === "ongoing" ? "EM ANDAMENTO" : "PARTICIPANTE"}</em></article>`).join("")}</div></section><aside><div class="section-heading"><div><span>ORGANIZAÇÕES</span><h2>Equipes</h2></div></div><div class="profile-teams">${uniqueTeams.map((team) => `<a href="#time/${encodeURIComponent(team)}">${escapeHtml(team)}</a>`).join("")}</div></aside></div>`;
     document.querySelector("#playerProfile").innerHTML = `<a class="profile-back" href="#jogadores">← Voltar aos jogadores</a>
       <article class="player-hero">
         <div class="player-portrait">${meta.photo ? `<img src="${escapeHtml(meta.photo)}" alt="${escapeHtml(player)}" />` : `<span>${escapeHtml(player.slice(0, 2).toUpperCase())}</span>`}<small>PLAYER</small></div>
@@ -500,9 +585,8 @@
         </div>
         <div class="player-rating major-rating"><small>MAJORS</small><b>${titleCount(player, "major")}</b><span>conquistados</span></div>
       </article>
-      ${awards.length ? `<section class="achievement-strip individual-awards"><header><span>PRÊMIOS INDIVIDUAIS</span><b>${awards.length} reconhecimento${awards.length === 1 ? "" : "s"}</b></header><div>${awards.map(({ event, details }) => `<a class="individual-award ${details.className} ${event.category === "major" ? "major-award" : ""}" href="#campeonato/${encodeURIComponent(event.id)}/overview"><i>${details.icon}</i><span><b>${escapeHtml(details.label)}${details.className === "mvp" && event.category === "major" ? " MAJOR" : ""}</b><small>${escapeHtml(event.name)} · ${event.year}</small></span></a>`).join("")}</div></section>` : ""}
-      <section class="achievement-strip"><header><span>CONQUISTAS</span><b>${officialTitleCount(player)} título${officialTitleCount(player) === 1 ? "" : "s"} oficial${officialTitleCount(player) === 1 ? "" : "is"} · ${titleCount(player, "major")} Major${titleCount(player, "major") === 1 ? "" : "s"}</b></header><div>${wins.length ? wins.map((event) => `<article class="${event.category === "major" ? "major-win" : ""}"><i>${event.category === "major" ? "♛" : "★"}</i><span><b>${escapeHtml(event.name)}</b><small>${event.year} · ${categoryLabel(event.category)}</small></span></article>`).join("") : `<p>Nenhum título registrado até o momento.</p>`}</div></section>
-      <div class="player-detail-grid"><section><div class="section-heading"><div><span>CARREIRA</span><h2>Histórico por campeonato</h2></div></div><div class="career-list">${history.map(({ event, team }) => `<article><time>${event.year}</time><div><b><a class="entity-link" href="#time/${encodeURIComponent(team)}">${escapeHtml(team)}</a></b><span><a class="entity-link" href="#campeonato/${encodeURIComponent(event.id)}/overview">${escapeHtml(event.name)}</a></span></div><em>${event.champion === team ? "CAMPEÃO" : event.status === "ongoing" ? "EM ANDAMENTO" : "PARTICIPANTE"}</em></article>`).join("")}</div></section><aside><div class="section-heading"><div><span>ORGANIZAÇÕES</span><h2>Equipes</h2></div></div><div class="profile-teams">${uniqueTeams.map((team) => `<a href="#time/${encodeURIComponent(team)}">${escapeHtml(team)}</a>`).join("")}</div></aside></div>`;
+      ${profileTabs}${validTab === "statistics" ? statsBody : overviewBody}`;
+    if (validTab === "statistics" && career?.events.length) bindPlayerCareerChart(document.querySelector("#playerProfile"), career.events);
   }
 
   function renderTeams() {
@@ -633,7 +717,7 @@
     matches.forEach((match) => statisticalSlices(match).forEach((slice) => slice.statistics.forEach((record) => {
       const name = canonicalPublicPlayer(record.name || record.demoName, record.steamid || record.steam64Id);
       const key = `${name}::${record.team || ""}`;
-      if (!players.has(key)) players.set(key, { name, team: record.team || "Sem equipe", matchIds: new Set(), kills: 0, deaths: 0, assists: 0, headshots: 0, damage: 0, hits: 0, headHits: 0, utilityDamage: 0, openingKills: 0, openingDeaths: 0, multiKill2: 0, multiKill3: 0, multiKill4: 0, multiKill5: 0, rounds: 0, kastTotal: 0, kastRounds: 0, ratingTotal: 0, ratingRounds: 0 });
+      if (!players.has(key)) players.set(key, { name, team: record.team || "Sem equipe", matchIds: new Set(), kills: 0, deaths: 0, assists: 0, headshots: 0, damage: 0, shots: 0, hits: 0, headHits: 0, utilityDamage: 0, openingKills: 0, openingDeaths: 0, multiKill2: 0, multiKill3: 0, multiKill4: 0, multiKill5: 0, rounds: 0, kastTotal: 0, kastRounds: 0, ratingTotal: 0, ratingRounds: 0 });
       const row = players.get(key);
       const rounds = slice.rounds || numberOrZero(record.rounds);
       row.matchIds.add(match.id);
@@ -641,6 +725,7 @@
       row.deaths += numberOrZero(record.deaths);
       row.assists += numberOrZero(record.assists);
       row.headshots += numberOrZero(record.headshots);
+      row.shots += numberOrZero(record.shots);
       row.hits += numberOrZero(record.hits);
       row.headHits += numberOrZero(record.headHits);
       row.utilityDamage += numberOrZero(record.utilityDamage);
@@ -664,8 +749,11 @@
       kpr: row.rounds ? row.kills / row.rounds : 0,
       dpr: row.rounds ? row.deaths / row.rounds : 0,
       apr: row.rounds ? row.assists / row.rounds : 0,
+      accuracy: row.shots ? (row.hits / row.shots) * 100 : null,
       headAccuracy: row.hits ? (row.headHits / row.hits) * 100 : null,
       openingSuccess: row.openingKills + row.openingDeaths ? (row.openingKills / (row.openingKills + row.openingDeaths)) * 100 : null,
+      utilityPerRound: row.rounds ? row.utilityDamage / row.rounds : 0,
+      multiKillRounds: row.multiKill2 + row.multiKill3 + row.multiKill4 + row.multiKill5,
       kast: row.kastRounds ? row.kastTotal / row.kastRounds : null,
       rating: row.ratingRounds ? row.ratingTotal / row.ratingRounds : 0
     })).sort((a, b) => b.rating - a.rating || (b.kills - b.deaths) - (a.kills - a.deaths) || b.kills - a.kills);
@@ -770,38 +858,188 @@
     render();
   }
 
-  function tournamentStatisticsContent(event, matches) {
+  const dashboardMetricGroups = {
+    aim: [
+      { key: "hs", label: "HS kill", suffix: "%", digits: 1 },
+      { key: "headAccuracy", label: "Head accuracy", suffix: "%", digits: 1, nullable: true },
+      { key: "accuracy", label: "Precisão geral", suffix: "%", digits: 1, nullable: true },
+      { key: "kpr", label: "Kills / round", digits: 2 }
+    ],
+    activity: [
+      { key: "rating", label: "Rating", digits: 2 },
+      { key: "adr", label: "ADR", digits: 1 },
+      { key: "kd", label: "K/D", digits: 2 },
+      { key: "kpr", label: "Kills / round", digits: 2 },
+      { key: "apr", label: "Assistências / round", digits: 2 },
+      { key: "dpr", label: "Mortes / round", digits: 2, lowerIsBetter: true },
+      { key: "kast", label: "KAST", suffix: "%", digits: 1, nullable: true }
+    ],
+    utility: [
+      { key: "utilityDamage", label: "Dano utilitário", digits: 0 },
+      { key: "utilityPerRound", label: "Dano utilitário / round", digits: 2 }
+    ],
+    openings: [
+      { key: "openingKills", label: "Opening kills", digits: 0 },
+      { key: "openingDeaths", label: "Opening deaths", digits: 0, lowerIsBetter: true },
+      { key: "openingSuccess", label: "Sucesso em openings", suffix: "%", digits: 1, nullable: true },
+      { key: "openingDiff", label: "Saldo de openings", digits: 0, signed: true }
+    ],
+    multikills: [
+      { key: "multiKillRounds", label: "Rounds multi-kill", digits: 0 },
+      { key: "multiKill2", label: "2K", digits: 0 },
+      { key: "multiKill3", label: "3K", digits: 0 },
+      { key: "multiKill4", label: "4K", digits: 0 },
+      { key: "multiKill5", label: "Ace / 5K", digits: 0 }
+    ],
+    teams: [
+      { key: "rating", label: "Rating médio", digits: 2 },
+      { key: "adr", label: "ADR", digits: 1 },
+      { key: "wins", label: "Séries vencidas", digits: 0 },
+      { key: "roundDiff", label: "Saldo de rounds", digits: 0, signed: true },
+      { key: "kdDiff", label: "Saldo K–D", digits: 0, signed: true }
+    ]
+  };
+
+  function enrichedPlayerRows(matches) {
+    return tournamentPlayerStatistics(matches).map((row) => ({ ...row, openingDiff: row.openingKills - row.openingDeaths }));
+  }
+
+  function metricValueAvailable(row, metric) {
+    return !(metric.nullable && row[metric.key] === null) && Number.isFinite(Number(row[metric.key]));
+  }
+
+  function formattedMetric(value, metric) {
+    if (!Number.isFinite(Number(value))) return "—";
+    const numeric = Number(value);
+    return `${metric.signed && numeric > 0 ? "+" : ""}${numeric.toFixed(metric.digits ?? 1)}${metric.suffix || ""}`;
+  }
+
+  function metricDashboardMarkup(rows, title, description, metrics, emptyText) {
+    const available = metrics.filter((metric) => rows.some((row) => metricValueAvailable(row, metric) && Number(row[metric.key]) !== 0));
+    if (!rows.length || !available.length) return `<div class="advanced-empty"><span>DADOS AVANÇADOS</span><h3>${escapeHtml(title)}</h3><p>${escapeHtml(emptyText)}</p><small>Reprocesse uma demo no painel para preencher este módulo. O site não estima valores ausentes.</small></div>`;
+    return `<section class="metric-dashboard"><header><div><span>DASHBOARD HLTPC</span><h3>${escapeHtml(title)}</h3><p>${escapeHtml(description)}</p></div><label>Métrica<select data-dashboard-metric>${available.map((metric) => `<option value="${metric.key}">${escapeHtml(metric.label)}</option>`).join("")}</select></label></header><div class="metric-leaderboard" data-dashboard-bars></div></section>`;
+  }
+
+  function bindMetricDashboard(scope, rows, metrics, identityKey = "name") {
+    const select = scope?.querySelector("[data-dashboard-metric]");
+    const target = scope?.querySelector("[data-dashboard-bars]");
+    if (!select || !target) return;
+    const render = () => {
+      const metric = metrics.find((item) => item.key === select.value) || metrics[0];
+      const available = rows.filter((row) => metricValueAvailable(row, metric));
+      const ordered = [...available].sort((a, b) => metric.lowerIsBetter ? Number(a[metric.key]) - Number(b[metric.key]) : Number(b[metric.key]) - Number(a[metric.key]));
+      const absoluteMax = Math.max(...ordered.map((row) => Math.abs(Number(row[metric.key]))), 1);
+      target.innerHTML = ordered.map((row, index) => {
+        const value = Number(row[metric.key]);
+        const width = Math.max(value === 0 ? 1 : 5, Math.min(100, (Math.abs(value) / absoluteMax) * 100));
+        const identity = row[identityKey];
+        const avatar = identityKey === "team" ? teamBadge(identity) : mediaImage((playerMeta.get(identity) || {}).photo, identity, entityInitials(identity));
+        const href = identityKey === "team" ? `#time/${encodeURIComponent(identity)}` : `#jogador/${encodeURIComponent(identity)}/statistics`;
+        return `<article class="metric-bar-row"><span>${String(index + 1).padStart(2, "0")}</span><i>${avatar}</i><a href="${href}">${escapeHtml(identity)}<small>${identityKey === "team" ? `${row.wins || 0}–${row.losses || 0} em séries` : escapeHtml(row.team || "")}</small></a><div><b style="width:${width}%"></b></div><strong>${formattedMetric(value, metric)}</strong></article>`;
+      }).join("");
+    };
+    select.addEventListener("change", render);
+    render();
+  }
+
+  function activityScatterMarkup(rows) {
+    if (!rows.length) return "";
+    const maxAdr = Math.max(...rows.map((row) => row.adr), 100);
+    const maxRating = Math.max(...rows.map((row) => row.rating), 1.25);
+    const points = rows.map((row, index) => {
+      const x = 70 + (row.adr / maxAdr) * 760;
+      const y = 270 - (row.rating / maxRating) * 220;
+      return `<a href="#jogador/${encodeURIComponent(row.name)}/statistics"><circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${index < 3 ? 10 : 8}" class="${index < 3 ? "top" : ""}"><title>${escapeHtml(row.name)} · ${row.adr.toFixed(1)} ADR · ${row.rating.toFixed(2)} rating</title></circle><text x="${(x + 13).toFixed(1)}" y="${(y + 4).toFixed(1)}">${escapeHtml(row.name)}</text></a>`;
+    }).join("");
+    return `<section class="scatter-panel"><header><div><span>MAPA DE IMPACTO</span><h3>ADR × Rating</h3></div><small>Passe o mouse sobre os pontos · clique para abrir o jogador</small></header><svg viewBox="0 0 900 320" role="img" aria-label="Comparação entre ADR e rating"><g class="scatter-grid"><line x1="70" y1="50" x2="70" y2="270"></line><line x1="70" y1="270" x2="850" y2="270"></line><line x1="70" y1="160" x2="850" y2="160"></line></g><text class="axis-y" x="18" y="42">RATING</text><text class="axis-x" x="815" y="305">ADR</text>${points}</svg></section>`;
+  }
+
+  function timelineDashboardMarkup(rows) {
+    if (!rows.length) return `<div class="empty compact"><b>Evolução indisponível</b>Nenhuma partida com estatísticas foi encontrada neste recorte.</div>`;
+    const options = rows.map((row, index) => `<option value="${index}">${escapeHtml(row.name)} · ${escapeHtml(row.team)}</option>`).join("");
+    return `<section class="timeline-dashboard"><header><div><span>EVOLUÇÃO POR PARTIDA</span><h3>Linha de desempenho</h3><p>Compare a sequência real de partidas registradas no campeonato.</p></div><div><label>Jogador<select data-timeline-player>${options}</select></label><label>Métrica<select data-timeline-metric><option value="rating">Rating</option><option value="adr">ADR</option><option value="kd">K/D</option><option value="kpr">Kills / round</option><option value="kast">KAST</option></select></label></div></header><div class="timeline-chart" data-timeline-chart></div></section>`;
+  }
+
+  function bindTimelineDashboard(scope, matches, rows) {
+    const playerSelect = scope?.querySelector("[data-timeline-player]");
+    const metricSelect = scope?.querySelector("[data-timeline-metric]");
+    const target = scope?.querySelector("[data-timeline-chart]");
+    if (!playerSelect || !metricSelect || !target) return;
+    const metrics = { rating: { label: "Rating", digits: 2 }, adr: { label: "ADR", digits: 1 }, kd: { label: "K/D", digits: 2 }, kpr: { label: "K/R", digits: 2 }, kast: { label: "KAST", digits: 1, suffix: "%" } };
+    const render = () => {
+      const selected = rows[Number(playerSelect.value)] || rows[0];
+      const metric = metrics[metricSelect.value] || metrics.rating;
+      const points = matches.map((match) => {
+        const row = enrichedPlayerRows([match]).find((candidate) => candidate.name === selected.name);
+        const value = row?.[metricSelect.value];
+        return row && Number.isFinite(Number(value)) ? { match, value: Number(value) } : null;
+      }).filter(Boolean);
+      if (!points.length) { target.innerHTML = `<div class="empty compact"><b>Sem pontos para esta combinação</b>Escolha outra métrica ou jogador.</div>`; return; }
+      const maximum = Math.max(...points.map((point) => point.value), 1);
+      const minimum = Math.min(...points.map((point) => point.value), 0);
+      const spread = maximum - minimum || 1;
+      const coords = points.map((point, index) => ({ ...point, x: points.length === 1 ? 450 : 70 + (index / (points.length - 1)) * 760, y: 260 - ((point.value - minimum) / spread) * 190 }));
+      const polyline = coords.map((point) => `${point.x.toFixed(1)},${point.y.toFixed(1)}`).join(" ");
+      target.innerHTML = `<div class="timeline-summary"><b>${escapeHtml(selected.name)}</b><span>${metric.label} · ${points.length} partida${points.length === 1 ? "" : "s"}</span></div><svg viewBox="0 0 900 330" role="img" aria-label="Evolução de ${escapeHtml(selected.name)}"><g class="timeline-grid"><line x1="70" y1="70" x2="830" y2="70"></line><line x1="70" y1="165" x2="830" y2="165"></line><line x1="70" y1="260" x2="830" y2="260"></line></g><polyline points="${polyline}"></polyline>${coords.map((point, index) => `<g><circle cx="${point.x}" cy="${point.y}" r="8"><title>${escapeHtml(point.match.name || `Partida ${index + 1}`)} · ${formattedMetric(point.value, metric)}</title></circle><text class="point-value" x="${point.x}" y="${point.y - 15}">${formattedMetric(point.value, metric)}</text><text class="point-label" x="${point.x}" y="294">${escapeHtml((point.match.name || `J${index + 1}`).replace(/Fase de grupos · /i, ""))}</text></g>`).join("")}</svg>`;
+    };
+    playerSelect.addEventListener("change", render);
+    metricSelect.addEventListener("change", render);
+    render();
+  }
+
+  function playerStatsTableMarkup(playerRows) {
+    const signed = (value) => `${value > 0 ? "+" : ""}${value}`;
+    return playerRows.length ? `<div class="section-heading compact-heading"><div><span>DETALHAMENTO</span><h3>Todos os jogadores</h3></div></div><div class="tournament-stats-scroll"><div class="tournament-stats-table player-stats-table"><header><span>Jogador</span><span>J</span><span>R</span><span>K–D</span><span>A</span><span>+/−</span><span>K/D</span><span>K/R</span><span>D/R</span><span>Dano</span><span>ADR</span><span>HS%</span><span>KAST</span><span>Rating</span></header>${playerRows.map((row, index) => `<div><span class="stats-player"><i>${String(index + 1).padStart(2, "0")}</i><b>${playerHistory.has(row.name) ? `<a href="#jogador/${encodeURIComponent(row.name)}/statistics">${escapeHtml(row.name)}</a>` : escapeHtml(row.name)}<small>${teams.has(row.team) ? `<a href="#time/${encodeURIComponent(row.team)}">${escapeHtml(row.team)}</a>` : escapeHtml(row.team)}</small></b></span><span>${row.matches}</span><span>${row.rounds || "—"}</span><strong>${row.kills}–${row.deaths}</strong><span>${row.assists}</span><span class="${row.kills - row.deaths > 0 ? "positive" : row.kills - row.deaths < 0 ? "negative" : ""}">${signed(row.kills - row.deaths)}</span><span>${row.kd.toFixed(2)}</span><span>${row.rounds ? row.kpr.toFixed(2) : "—"}</span><span>${row.rounds ? row.dpr.toFixed(2) : "—"}</span><span>${row.damage ? Math.round(row.damage).toLocaleString("pt-BR") : "—"}</span><span>${row.rounds ? row.adr.toFixed(1) : "—"}</span><span>${row.kills ? `${row.hs.toFixed(1)}%` : "—"}</span><span>${row.kast === null ? "—" : `${row.kast.toFixed(1)}%`}</span><strong class="rating ${ratingTone(row.rating)}">${row.rating ? row.rating.toFixed(2) : "—"}</strong></div>`).join("")}</div></div>` : `<div class="empty compact"><b>Sem estatísticas individuais neste recorte</b>O placar continua válido, mas nenhuma fonte anexada retornou dados de jogadores.</div>`;
+  }
+
+  function teamStatsTableMarkup(teamRows) {
+    const signed = (value) => `${value > 0 ? "+" : ""}${value}`;
+    return `<div class="tournament-stats-scroll"><div class="tournament-stats-table team-stats-table"><header><span>Equipe</span><span>Séries</span><span>Campanha</span><span>Mapas</span><span>Rounds</span><span>SR</span><span>K–D–A</span><span>ADR</span><span>Rating</span></header>${teamRows.map((row, index) => `<div><span class="stats-team"><i>${String(index + 1).padStart(2, "0")}</i><span>${teamBadge(row.team)}</span><b><a href="#time/${encodeURIComponent(row.team)}">${escapeHtml(row.team)}</a></b></span><span>${row.series}</span><strong>${row.wins}–${row.losses}</strong><span>${row.mapsWon}–${row.mapsLost}</span><span>${row.roundsFor}–${row.roundsAgainst}</span><span class="${row.roundDiff > 0 ? "positive" : row.roundDiff < 0 ? "negative" : ""}">${signed(row.roundDiff)}</span><span>${row.kills || row.deaths ? `${row.kills}–${row.deaths}–${row.assists}` : "—"}</span><span>${row.adr ? row.adr.toFixed(1) : "—"}</span><strong class="rating ${ratingTone(row.rating)}">${row.rating ? row.rating.toFixed(2) : "—"}</strong></div>`).join("")}</div></div>`;
+  }
+
+  function tournamentStatisticsContent(event, matches, section = "general") {
     const playerRows = tournamentPlayerStatistics(matches);
     const teamRows = tournamentTeamStatistics(event, matches);
-    const signed = (value) => `${value > 0 ? "+" : ""}${value}`;
-    const playerTable = playerRows.length ? `${playerHighlightsMarkup(playerRows)}${playerComparisonMarkup(playerRows)}<div class="section-heading compact-heading"><div><span>DETALHAMENTO</span><h3>Todos os jogadores</h3></div></div><div class="tournament-stats-scroll"><div class="tournament-stats-table player-stats-table"><header><span>Jogador</span><span>J</span><span>R</span><span>K–D</span><span>A</span><span>+/−</span><span>K/D</span><span>K/R</span><span>D/R</span><span>Dano</span><span>ADR</span><span>HS%</span><span>KAST</span><span>Rating</span></header>${playerRows.map((row, index) => `<div><span class="stats-player"><i>${String(index + 1).padStart(2, "0")}</i><b>${playerHistory.has(row.name) ? `<a href="#jogador/${encodeURIComponent(row.name)}">${escapeHtml(row.name)}</a>` : escapeHtml(row.name)}<small>${teams.has(row.team) ? `<a href="#time/${encodeURIComponent(row.team)}">${escapeHtml(row.team)}</a>` : escapeHtml(row.team)}</small></b></span><span>${row.matches}</span><span>${row.rounds || "—"}</span><strong>${row.kills}–${row.deaths}</strong><span>${row.assists}</span><span class="${row.kills - row.deaths > 0 ? "positive" : row.kills - row.deaths < 0 ? "negative" : ""}">${signed(row.kills - row.deaths)}</span><span>${row.kd.toFixed(2)}</span><span>${row.rounds ? row.kpr.toFixed(2) : "—"}</span><span>${row.rounds ? row.dpr.toFixed(2) : "—"}</span><span>${row.damage ? Math.round(row.damage).toLocaleString("pt-BR") : "—"}</span><span>${row.rounds ? row.adr.toFixed(1) : "—"}</span><span>${row.kills ? `${row.hs.toFixed(1)}%` : "—"}</span><span>${row.kast === null ? "—" : `${row.kast.toFixed(1)}%`}</span><strong class="rating ${ratingTone(row.rating)}">${row.rating ? row.rating.toFixed(2) : "—"}</strong></div>`).join("")}</div></div>` : `<div class="empty compact"><b>Sem estatísticas individuais neste recorte</b>O placar continua válido, mas nenhuma fonte anexada retornou dados de jogadores.</div>`;
-    const teamTable = `<div class="tournament-stats-scroll"><div class="tournament-stats-table team-stats-table"><header><span>Equipe</span><span>Séries</span><span>Campanha</span><span>Mapas</span><span>Rounds</span><span>SR</span><span>K–D–A</span><span>ADR</span><span>Rating</span></header>${teamRows.map((row, index) => `<div><span class="stats-team"><i>${String(index + 1).padStart(2, "0")}</i><span>${teamBadge(row.team)}</span><b><a href="#time/${encodeURIComponent(row.team)}">${escapeHtml(row.team)}</a></b></span><span>${row.series}</span><strong>${row.wins}–${row.losses}</strong><span>${row.mapsWon}–${row.mapsLost}</span><span>${row.roundsFor}–${row.roundsAgainst}</span><span class="${row.roundDiff > 0 ? "positive" : row.roundDiff < 0 ? "negative" : ""}">${signed(row.roundDiff)}</span><span>${row.kills || row.deaths ? `${row.kills}–${row.deaths}–${row.assists}` : "—"}</span><span>${row.adr ? row.adr.toFixed(1) : "—"}</span><strong class="rating ${ratingTone(row.rating)}">${row.rating ? row.rating.toFixed(2) : "—"}</strong></div>`).join("")}</div></div>`;
-    return `<div class="tournament-stats-panels"><section data-statistics-panel="players">${playerTable}</section><section data-statistics-panel="teams" hidden>${teamTable}</section></div>`;
+    const enriched = playerRows.map((row) => ({ ...row, openingDiff: row.openingKills - row.openingDeaths }));
+    if (section === "timeline") return timelineDashboardMarkup(enriched);
+    if (section === "aim") return metricDashboardMarkup(enriched, "Aim", "Precisão e conversão dos tiros registrados nas demos.", dashboardMetricGroups.aim, "Esta edição ainda não possui tiros e impactos reprocessados.");
+    if (section === "activity") return `${activityScatterMarkup(enriched)}${metricDashboardMarkup(enriched, "Atividade", "Impacto, sobrevivência e participação por round.", dashboardMetricGroups.activity, "Nenhum dado individual foi encontrado neste recorte.")}`;
+    if (section === "utility") return metricDashboardMarkup(enriched, "Utilitários", "Dano causado por HE, molotov e incendiária.", dashboardMetricGroups.utility, "As demos salvas antes deste dashboard precisam ser reprocessadas para identificar dano utilitário.");
+    if (section === "openings") return metricDashboardMarkup(enriched, "Opening Duels", "Primeiro duelo válido de cada round: vitórias, derrotas e aproveitamento.", dashboardMetricGroups.openings, "As demos salvas antes deste dashboard precisam ser reprocessadas para identificar openings.");
+    if (section === "multikills") return metricDashboardMarkup(enriched, "Multi-kills", "Rounds com 2K, 3K, 4K e ace registrados na demo.", dashboardMetricGroups.multikills, "As demos salvas antes deste dashboard precisam ser reprocessadas para identificar multi-kills.");
+    if (section === "teams") return `${metricDashboardMarkup(teamRows, "Comparativo de equipes", "Campanha, rounds e produção agregada no campeonato.", dashboardMetricGroups.teams, "Ainda não há partidas suficientes para comparar as equipes.")}${teamStatsTableMarkup(teamRows)}`;
+    return `${playerHighlightsMarkup(enriched)}${playerComparisonMarkup(enriched)}${playerStatsTableMarkup(enriched)}`;
   }
 
   function tournamentStatisticsMarkup(event, matches) {
     const completed = matches.filter((match) => match.score || statisticalSlices(match).length);
     const options = completed.map((match) => `<option value="${escapeHtml(match.id)}">${escapeHtml(match.name || "Partida")} · ${escapeHtml(match.teamA)} × ${escapeHtml(match.teamB)}</option>`).join("");
-    return `<section class="event-tab-body tournament-statistics"><div class="section-heading"><div><span>DADOS CONFIRMADOS</span><h2>Estatísticas do campeonato</h2></div></div><div class="tournament-stats-toolbar"><label>Recorte<select id="tournamentStatsMatch"><option value="">Campeonato completo</option>${options}</select></label><div class="tournament-stats-switch" role="tablist"><button class="active" type="button" data-statistics-view="players">Por jogador</button><button type="button" data-statistics-view="teams">Por time</button></div></div><p class="tournament-stats-note">Somente números disponíveis nas fontes anexadas. “—” indica dado não retornado; nenhum valor é estimado.</p><div id="tournamentStatsContent">${tournamentStatisticsContent(event, completed)}</div></section>`;
+    const sections = [["general", "Geral"], ["timeline", "Evolução"], ["aim", "Aim"], ["activity", "Atividade"], ["utility", "Utilitários"], ["openings", "Opening Duels"], ["multikills", "Multi-kills"], ["teams", "Times"]];
+    return `<section class="event-tab-body tournament-statistics"><div class="section-heading"><div><span>DADOS CONFIRMADOS</span><h2>Dashboard do campeonato</h2></div></div><div class="tournament-stats-toolbar"><label>Recorte<select id="tournamentStatsMatch"><option value="">Campeonato completo</option>${options}</select></label><small>Filtre o campeonato inteiro ou uma partida específica.</small></div><nav class="statistics-section-tabs" aria-label="Áreas de estatísticas">${sections.map(([key, label], index) => `<button class="${index === 0 ? "active" : ""}" type="button" data-statistics-section="${key}">${label}</button>`).join("")}</nav><p class="tournament-stats-note">Somente números disponíveis nas fontes anexadas. “—” indica dado não retornado; nenhum valor é estimado.</p><div id="tournamentStatsContent">${tournamentStatisticsContent(event, completed)}</div></section>`;
   }
 
   function bindTournamentStatistics(event, matches) {
     const select = document.querySelector("#tournamentStatsMatch");
     const target = document.querySelector("#tournamentStatsContent");
-    let view = "players";
-    const applyView = () => {
-      document.querySelectorAll("[data-statistics-view]").forEach((button) => button.classList.toggle("active", button.dataset.statisticsView === view));
-      target?.querySelectorAll("[data-statistics-panel]").forEach((panel) => { panel.hidden = panel.dataset.statisticsPanel !== view; });
-      if (view === "players") bindPlayerComparison(tournamentPlayerStatistics(select?.value ? matches.filter((match) => match.id === select.value) : matches.filter((match) => match.score || statisticalSlices(match).length)));
+    let section = "general";
+    const selectedMatches = () => select?.value ? matches.filter((match) => match.id === select.value) : matches.filter((match) => match.score || statisticalSlices(match).length);
+    const bindSection = (selected) => {
+      const scope = document.querySelector("#tournamentStatsContent");
+      const rows = enrichedPlayerRows(selected);
+      if (section === "general") bindPlayerComparison(rows);
+      else if (section === "timeline") bindTimelineDashboard(scope, selected, rows);
+      else if (["aim", "activity", "utility", "openings", "multikills"].includes(section)) bindMetricDashboard(scope, rows, dashboardMetricGroups[section]);
+      else if (section === "teams") bindMetricDashboard(scope, tournamentTeamStatistics(event, selected), dashboardMetricGroups.teams, "team");
     };
     const refresh = () => {
-      const selected = select?.value ? matches.filter((match) => match.id === select.value) : matches.filter((match) => match.score || statisticalSlices(match).length);
-      if (target) target.innerHTML = tournamentStatisticsContent(event, selected);
-      applyView();
+      const selected = selectedMatches();
+      if (target) target.innerHTML = tournamentStatisticsContent(event, selected, section);
+      document.querySelectorAll("[data-statistics-section]").forEach((button) => button.classList.toggle("active", button.dataset.statisticsSection === section));
+      bindSection(selected);
     };
-    document.querySelectorAll("[data-statistics-view]").forEach((button) => button.addEventListener("click", () => { view = button.dataset.statisticsView; applyView(); }));
+    document.querySelectorAll("[data-statistics-section]").forEach((button) => button.addEventListener("click", () => { section = button.dataset.statisticsSection; refresh(); }));
     select?.addEventListener("change", refresh);
-    applyView();
+    refresh();
   }
 
   function renderTournamentPage(event, tab = "overview") {
@@ -927,7 +1165,7 @@
     const route = document.querySelector(`[data-view="${CSS.escape(requestedRoute)}"]`) ? requestedRoute : "inicio";
     if (route === "jogador" && parameter) {
       const player = decodeURIComponent(parameter);
-      if (playerHistory.has(player)) renderPlayerProfile(player); else location.hash = "jogadores";
+      if (playerHistory.has(player)) renderPlayerProfile(player, detail); else location.hash = "jogadores";
     }
     if (route === "time" && parameter) {
       const requestedTeam = decodeURIComponent(parameter);
