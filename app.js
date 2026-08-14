@@ -100,6 +100,11 @@
   const escapeHtml = (value) => String(value).replace(/[&<>'"]/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[character]));
   const formatDate = (value) => new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(`${value}T12:00:00`));
   const categoryLabel = (category) => ({ major: "Major", official: "Campeonato oficial", resenha: "Campeonato de resenha" }[category] || "Campeonato");
+  const awardDetails = {
+    mvp: { label: "MVP", icon: "★", className: "mvp" },
+    crowd: { label: "Craque da galera", icon: "♥", className: "crowd" },
+    bagre: { label: "Troféu Bagre", icon: "♟", className: "bagre" }
+  };
   const demoLabel = (demos) => ({ unavailable: "Sem demo", partial: "Demos parciais", future: "Aguardando campeonato" }[demos] || "Não informado");
   const teamBadge = (team) => { const meta = teamMeta.get(team) || {}; return meta.logo ? `<img src="${escapeHtml(meta.logo)}" alt="" />` : escapeHtml((meta.acronym || team.split(/\s+/).map((part) => part[0]).join("").slice(0, 3)).toUpperCase()); };
   const safeLeetifyUrl = (value) => {
@@ -110,7 +115,10 @@
     try { const url = new URL(String(value || "")); return url.protocol === "https:" && /(^|\.)drive\.google\.com$/i.test(url.hostname) ? url.href : ""; }
     catch (_) { return ""; }
   };
-  const safeScoreboardImage = (value) => /^data:image\/(png|jpe?g|webp|gif);base64,/i.test(String(value || "")) ? String(value) : "";
+  const safeScoreboardImage = (value) => {
+    const raw = String(value || "");
+    return /^data:image\/(png|jpe?g|webp|gif);base64,/i.test(raw) || /^\/api\/media\/[0-9a-f-]{36}$/i.test(raw) ? raw : "";
+  };
   const normalizedNick = (value) => String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("pt-BR").replace(/[^a-z0-9]/g, "");
   const confirmedPlayerAliases = new Map([
     ["GJota", ["GJ"]],
@@ -262,14 +270,14 @@
   }
 
   function renderHero() {
-    const news = [...data.news].sort((a, b) => b.date.localeCompare(a.date));
+    const news = [...data.news].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 3);
     let index = 0;
     let timer = null;
     const draw = () => {
       const item = news[index];
       document.querySelector("#hero").innerHTML = item ? `<article class="hero news-hero ${item.image ? "has-image" : ""}">
         ${item.image ? `<a class="news-hero-art" href="#noticia/${encodeURIComponent(item.id)}" aria-label="Ler ${escapeHtml(item.title)}"><img src="${escapeHtml(item.image)}" alt="" /></a>` : ""}
-        <div class="hero-content"><span class="hero-tag">NOTÍCIA EM DESTAQUE</span><h1><a href="#noticia/${encodeURIComponent(item.id)}">${escapeHtml(item.title)}</a></h1><p>${escapeHtml(item.summary)}</p><div class="hero-news-meta"><time>${formatDate(item.date)}</time><span>por ${escapeHtml(item.author)}</span><a href="#noticia/${encodeURIComponent(item.id)}">Ler notícia completa →</a><a class="hero-history-link" href="#noticias">Histórico</a></div></div>
+        <div class="hero-content"><span class="hero-tag">ÚLTIMAS NOTÍCIAS</span><h1><a href="#noticia/${encodeURIComponent(item.id)}">${escapeHtml(item.title)}</a></h1><p>${escapeHtml(item.summary)}</p><div class="hero-news-meta"><time>${formatDate(item.date)}</time><span>por ${escapeHtml(item.author)}</span><a href="#noticia/${encodeURIComponent(item.id)}">Ler notícia completa →</a><a class="hero-history-link" href="#noticias">Histórico</a></div></div>
         ${news.length > 1 ? `<div class="hero-progress" aria-label="Notícia ${index + 1} de ${news.length}">${news.map((_, dot) => `<button type="button" class="${dot === index ? "active" : ""}" data-hero-index="${dot}" aria-label="Mostrar notícia ${dot + 1}"></button>`).join("")}</div>` : ""}
       </article>` : `<article class="hero"><div class="hero-content"><span class="hero-tag">HLTPC</span><h1>A Plataforma Oficial do <span>TAMPICOUNTERS</span></h1><p>Campeonatos, equipes, jogadores e partidas reunidos em um só lugar.</p></div></article>`;
       document.querySelectorAll("[data-hero-index]").forEach((button) => button.addEventListener("click", () => select(Number(button.dataset.heroIndex))));
@@ -332,7 +340,7 @@
 
   function renderNews() {
     const sorted = [...data.news].sort((a, b) => b.date.localeCompare(a.date));
-    document.querySelector("#homeNews").innerHTML = newsMarkup(sorted.slice(0, 1));
+    document.querySelector("#homeNews").innerHTML = newsMarkup(sorted.slice(0, 3));
     document.querySelector("#news").innerHTML = newsMarkup(sorted);
   }
 
@@ -341,8 +349,10 @@
       .map((player) => ({ player, official: officialTitleCount(player), majors: titleCount(player, "major") }))
       .sort((a, b) => b.official - a.official || b.majors - a.majors || a.player.localeCompare(b.player, "pt-BR"))
       .slice(0, 8);
-    document.querySelector("#titleRanking").innerHTML = ranking.map((row, index) => `
-      <div class="rank-row"><span>${String(index + 1).padStart(2, "0")}</span><b>${escapeHtml(row.player)}<small>${row.majors} Major${row.majors === 1 ? "" : "s"}</small></b><em>${row.official} título${row.official === 1 ? "" : "s"}</em></div>`).join("");
+    document.querySelector("#titleRanking").innerHTML = ranking.map((row, index) => {
+      const meta = playerMeta.get(row.player) || {};
+      return `<div class="rank-row"><span>${String(index + 1).padStart(2, "0")}</span><i class="rank-avatar">${meta.photo ? `<img src="${escapeHtml(meta.photo)}" alt="${escapeHtml(row.player)}" />` : ""}</i><b>${escapeHtml(row.player)}<small>${row.majors} Major${row.majors === 1 ? "" : "s"}</small></b><em>${row.official} título${row.official === 1 ? "" : "s"}</em></div>`;
+    }).join("");
   }
 
   function renderHomeUpcoming() {
@@ -385,9 +395,9 @@
       const meta = playerMeta.get(player) || {};
       const latest = history[0];
       const secondary = meta.alias || (latest ? latest.team : "Competidor HLTPC");
-      return `<a class="player-directory-card" href="#jogador/${encodeURIComponent(player)}" aria-label="Abrir perfil de ${escapeHtml(player)}">
+      return `<a class="player-directory-card ${meta.photo ? "has-photo" : "without-photo"}" href="#jogador/${encodeURIComponent(player)}" aria-label="Abrir perfil de ${escapeHtml(player)}">
         <div class="player-directory-copy"><span>PLAYER HLTPC</span><h3>${escapeHtml(player)}</h3><p>${escapeHtml(secondary)}</p><div><b>${latest ? escapeHtml(latest.team) : "Sem equipe recente"}</b><small>${history.length} participaç${history.length === 1 ? "ão" : "ões"} · ${officialTitleCount(player)} título${officialTitleCount(player) === 1 ? "" : "s"}</small></div></div>
-        <div class="player-directory-portrait">${meta.photo ? `<img src="${escapeHtml(meta.photo)}" alt="${escapeHtml(player)}" />` : `<strong>${escapeHtml(player.slice(0, 2).toUpperCase())}</strong>`}</div>
+        <div class="player-directory-portrait">${meta.photo ? `<img src="${escapeHtml(meta.photo)}" alt="${escapeHtml(player)}" />` : ""}</div>
         <i>Ver perfil →</i>
       </a>`;
     }).join("");
@@ -398,6 +408,7 @@
     const current = history[0];
     const meta = playerMeta.get(player) || {};
     const wins = data.tournaments.filter((event) => event.champion && event.entries.some((entry) => entry.team === event.champion && entry.players.includes(player)));
+    const awards = (Array.isArray(meta.awards) ? meta.awards : []).map((award) => ({ award, event: data.tournaments.find((candidate) => candidate.id === award.tournamentId), details: awardDetails[award.type] || awardDetails.mvp })).filter((item) => item.event);
     const uniqueTeams = [...new Set([...history.map((item) => item.team), ...(meta.teams || [])])];
     document.querySelector("#playerProfile").innerHTML = `<a class="profile-back" href="#jogadores">← Voltar aos jogadores</a>
       <article class="player-hero">
@@ -407,6 +418,7 @@
         </div>
         <div class="player-rating major-rating"><small>MAJORS</small><b>${titleCount(player, "major")}</b><span>conquistados</span></div>
       </article>
+      ${awards.length ? `<section class="achievement-strip individual-awards"><header><span>PRÊMIOS INDIVIDUAIS</span><b>${awards.length} reconhecimento${awards.length === 1 ? "" : "s"}</b></header><div>${awards.map(({ event, details }) => `<a class="individual-award ${details.className} ${event.category === "major" ? "major-award" : ""}" href="#campeonato/${encodeURIComponent(event.id)}/overview"><i>${details.icon}</i><span><b>${escapeHtml(details.label)}${details.className === "mvp" && event.category === "major" ? " MAJOR" : ""}</b><small>${escapeHtml(event.name)} · ${event.year}</small></span></a>`).join("")}</div></section>` : ""}
       <section class="achievement-strip"><header><span>CONQUISTAS</span><b>${officialTitleCount(player)} título${officialTitleCount(player) === 1 ? "" : "s"} oficial${officialTitleCount(player) === 1 ? "" : "is"} · ${titleCount(player, "major")} Major${titleCount(player, "major") === 1 ? "" : "s"}</b></header><div>${wins.length ? wins.map((event) => `<article class="${event.category === "major" ? "major-win" : ""}"><i>${event.category === "major" ? "♛" : "★"}</i><span><b>${escapeHtml(event.name)}</b><small>${event.year} · ${categoryLabel(event.category)}</small></span></article>`).join("") : `<p>Nenhum título registrado até o momento.</p>`}</div></section>
       <div class="player-detail-grid"><section><div class="section-heading"><div><span>CARREIRA</span><h2>Histórico por campeonato</h2></div></div><div class="career-list">${history.map(({ event, team }) => `<article><time>${event.year}</time><div><b><a class="entity-link" href="#time/${encodeURIComponent(team)}">${escapeHtml(team)}</a></b><span><a class="entity-link" href="#campeonato/${encodeURIComponent(event.id)}/overview">${escapeHtml(event.name)}</a></span></div><em>${event.champion === team ? "CAMPEÃO" : event.status === "ongoing" ? "EM ANDAMENTO" : "PARTICIPANTE"}</em></article>`).join("")}</div></section><aside><div class="section-heading"><div><span>ORGANIZAÇÕES</span><h2>Equipes</h2></div></div><div class="profile-teams">${uniqueTeams.map((team) => `<a href="#time/${encodeURIComponent(team)}">${escapeHtml(team)}</a>`).join("")}</div></aside></div>`;
   }
@@ -449,7 +461,7 @@
     const teamA = match.teamA || match.teams?.[0] || match.slotA || "A decidir";
     const teamB = match.teamB || match.teams?.[1] || match.slotB || "A decidir";
     const stats = Array.isArray(match.statistics) ? match.statistics : [];
-    const teamLink = (team, confirmed) => confirmed && teams.has(team) ? `<a href="#time/${encodeURIComponent(team)}">${escapeHtml(team)}</a>` : `<span class="pending-team">${escapeHtml(team)}</span>`;
+    const teamLink = (team, confirmed) => confirmed && teams.has(team) ? `<a class="event-team-identity" href="#time/${encodeURIComponent(team)}"><span>${teamBadge(team)}</span><strong>${escapeHtml(team)}</strong></a>` : `<span class="pending-team">${escapeHtml(team)}</span>`;
     return `<article class="event-match-card clickable-match" data-open-match="${escapeHtml(match.id)}" role="link" tabindex="0"><div class="event-match"><span>${escapeHtml(match.name || match.phase || "Partida")}${match.bestOf ? `<i>MD${match.bestOf}</i>` : ""}</span><div>${teamLink(teamA, Boolean(match.teamA))}<b>${escapeHtml(match.score || "—")}</b>${teamLink(teamB, Boolean(match.teamB))}</div><small>${escapeHtml(match.subtitle || match.date || "Data a definir")}</small></div>${matchSourcesMarkup(match)}${match.demoInfo ? `<details class="demo-analysis"><summary><span>${stats.length ? "◉ Estatísticas disponíveis" : "◌ Extração da demo pendente"}</span><b>${escapeHtml(match.demoInfo.mapName || match.leetifyInfo?.mapName || "Mapa não identificado")} · ${match.demoInfo.rounds || match.leetifyInfo?.rounds || 0} rounds</b></summary>${stats.length ? `<div class="demo-stats"><div class="demo-stats-head"><span>Jogador</span><span>K</span><span>D</span><span>A</span><span>ADR</span><span>HS</span></div>${stats.map((player) => `<div>${playerHistory.has(player.name) ? `<a href="#jogador/${encodeURIComponent(player.name)}">${escapeHtml(player.name)}</a>` : `<strong>${escapeHtml(player.name)}</strong>`}<span>${player.kills}</span><span>${player.deaths}</span><span>${player.assists}</span><span>${player.adr ?? "—"}</span><span>${player.headshots}</span></div>`).join("")}</div>` : `<p>A data da demo foi reconhecida, mas o leitor do navegador não conseguiu extrair os números. Confira o Leetify ou o print do placar, quando disponíveis.</p>`}</details>` : ""}</article>`;
   }
 
