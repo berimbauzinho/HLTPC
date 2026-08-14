@@ -3,7 +3,7 @@ const { connectLambda, getStore } = require("@netlify/blobs");
 const { configuration, readSession, json } = require("./auth-utils");
 
 const STORE_NAME = "hltpc-content";
-const MEDIA_PREFIX = "media/";
+const MEDIA_PREFIX = "media-v2/";
 const MAX_OPTIMIZED_BYTES = 1_500_000;
 
 function authorized(event) {
@@ -23,11 +23,11 @@ exports.handler = async (event) => {
     connectLambda(event);
     const id = crypto.randomUUID();
     const key = `${MEDIA_PREFIX}${id}`;
-    const payload = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+    const payload = { version: 2, contentType, bytes: bytes.length, data: bytes.toString("base64"), uploadedAt: new Date().toISOString() };
     const store = getStore(STORE_NAME);
-    const written = await store.set(key, payload, { metadata: { contentType, uploadedAt: new Date().toISOString() }, onlyIfNew: true });
-    const verification = written.modified && await store.getMetadata(key, { consistency: "eventual" });
-    if (!verification) throw new Error("O Netlify não confirmou o armazenamento do arquivo.");
+    const written = await store.setJSON(key, payload, { onlyIfNew: true });
+    const verification = written.modified && await store.get(key, { type: "json", consistency: "eventual" });
+    if (!verification || verification.data !== payload.data || verification.contentType !== contentType) throw new Error("O Netlify não devolveu a imagem gravada corretamente.");
     return json(201, { ok: true, url: `/api/media/${id}` });
   } catch (reason) {
     console.error("HLTPC media upload error", reason);
