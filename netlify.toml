@@ -37,6 +37,16 @@
   to = "/.netlify/functions/admin-content"
   status = 200
 
+[[redirects]]
+  from = "/api/admin/media"
+  to = "/.netlify/functions/admin-media"
+  status = 200
+
+[[redirects]]
+  from = "/api/media/*"
+  to = "/.netlify/functions/media?id=:splat"
+  status = 200
+
 [[headers]]
   for = "/*"
   [headers.values]
