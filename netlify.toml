@@ -39,12 +39,12 @@
 
 [[redirects]]
   from = "/api/admin/media"
-  to = "/.netlify/functions/admin-media"
+  to = "/.netlify/functions/admin-media-v2"
   status = 200
 
 [[redirects]]
   from = "/api/media/*"
-  to = "/.netlify/functions/media?id=:splat"
+  to = "/.netlify/functions/media-v2?id=:splat"
   status = 200
 
 [[headers]]
