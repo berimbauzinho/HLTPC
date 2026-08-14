@@ -633,7 +633,7 @@
     matches.forEach((match) => statisticalSlices(match).forEach((slice) => slice.statistics.forEach((record) => {
       const name = canonicalPublicPlayer(record.name || record.demoName, record.steamid || record.steam64Id);
       const key = `${name}::${record.team || ""}`;
-      if (!players.has(key)) players.set(key, { name, team: record.team || "Sem equipe", matchIds: new Set(), kills: 0, deaths: 0, assists: 0, headshots: 0, damage: 0, rounds: 0, kastTotal: 0, kastRounds: 0, ratingTotal: 0, ratingRounds: 0 });
+      if (!players.has(key)) players.set(key, { name, team: record.team || "Sem equipe", matchIds: new Set(), kills: 0, deaths: 0, assists: 0, headshots: 0, damage: 0, hits: 0, headHits: 0, utilityDamage: 0, openingKills: 0, openingDeaths: 0, multiKill2: 0, multiKill3: 0, multiKill4: 0, multiKill5: 0, rounds: 0, kastTotal: 0, kastRounds: 0, ratingTotal: 0, ratingRounds: 0 });
       const row = players.get(key);
       const rounds = slice.rounds || numberOrZero(record.rounds);
       row.matchIds.add(match.id);
@@ -641,6 +641,15 @@
       row.deaths += numberOrZero(record.deaths);
       row.assists += numberOrZero(record.assists);
       row.headshots += numberOrZero(record.headshots);
+      row.hits += numberOrZero(record.hits);
+      row.headHits += numberOrZero(record.headHits);
+      row.utilityDamage += numberOrZero(record.utilityDamage);
+      row.openingKills += numberOrZero(record.openingKills);
+      row.openingDeaths += numberOrZero(record.openingDeaths);
+      row.multiKill2 += numberOrZero(record.multiKill2);
+      row.multiKill3 += numberOrZero(record.multiKill3);
+      row.multiKill4 += numberOrZero(record.multiKill4);
+      row.multiKill5 += numberOrZero(record.multiKill5);
       row.rounds += rounds;
       row.damage += numberOrZero(record.damage) || (numberOrZero(record.adr) * rounds);
       if (numberOrZero(record.kast) > 0 && rounds) { row.kastTotal += numberOrZero(record.kast) * rounds; row.kastRounds += rounds; }
@@ -654,6 +663,9 @@
       kd: row.deaths ? row.kills / row.deaths : row.kills,
       kpr: row.rounds ? row.kills / row.rounds : 0,
       dpr: row.rounds ? row.deaths / row.rounds : 0,
+      apr: row.rounds ? row.assists / row.rounds : 0,
+      headAccuracy: row.hits ? (row.headHits / row.hits) * 100 : null,
+      openingSuccess: row.openingKills + row.openingDeaths ? (row.openingKills / (row.openingKills + row.openingDeaths)) * 100 : null,
       kast: row.kastRounds ? row.kastTotal / row.kastRounds : null,
       rating: row.ratingRounds ? row.ratingTotal / row.ratingRounds : 0
     })).sort((a, b) => b.rating - a.rating || (b.kills - b.deaths) - (a.kills - a.deaths) || b.kills - a.kills);
@@ -700,7 +712,7 @@
   function playerComparisonMarkup(rows) {
     if (rows.length < 2) return `<div class="empty compact"><b>Comparação indisponível</b>São necessários dados de pelo menos dois jogadores neste recorte.</div>`;
     const options = rows.map((row, index) => `<option value="${index}">${escapeHtml(row.name)} · ${escapeHtml(row.team)}</option>`).join("");
-    return `<section class="player-comparison"><header><div><span>COMPARADOR</span><h3>Jogador contra jogador</h3></div><small>As barras usam escalas próprias por métrica — os valores reais aparecem ao lado.</small></header><div class="comparison-selectors"><label>Jogador A<select id="comparisonPlayerA">${options}</select></label><b>×</b><label>Jogador B<select id="comparisonPlayerB">${options}</select></label></div><div class="comparison-legend"><span class="player-a" id="comparisonNameA"></span><span class="player-b" id="comparisonNameB"></span></div><div class="comparison-chart" id="playerComparisonChart"></div></section>`;
+    return `<section class="player-comparison"><header><div><span>DASHBOARD HLTPC</span><h3>Jogador contra jogador</h3></div><small>Cada cartão coloca os dois jogadores lado a lado, na mesma escala daquela métrica.</small></header><div class="comparison-selectors"><label>Jogador A<select id="comparisonPlayerA">${options}</select></label><b>×</b><label>Jogador B<select id="comparisonPlayerB">${options}</select></label></div><div class="comparison-identities" id="comparisonIdentities"></div><div class="comparison-chart" id="playerComparisonChart"></div></section>`;
   }
 
   function playerHighlightsMarkup(rows) {
@@ -727,25 +739,30 @@
       { label: "Rating", key: "rating", max: 2, digits: 2 },
       { label: "ADR", key: "adr", max: 140, digits: 1 },
       { label: "K/D", key: "kd", max: 2.5, digits: 2 },
-      { label: "Kills/round", key: "kpr", max: 1.2, digits: 2 },
+      { label: "Kills / round", key: "kpr", max: 1.2, digits: 2 },
+      { label: "Assist. / round", key: "apr", max: .6, digits: 2 },
+      { label: "Mortes / round ↓", key: "dpr", max: 1.1, digits: 2 },
       { label: "KAST", key: "kast", max: 100, digits: 1, suffix: "%" },
       { label: "Headshots", key: "hs", max: 100, digits: 1, suffix: "%" }
     ];
+    if (rows.some((row) => row.headAccuracy !== null)) metrics.push({ label: "Precisão na cabeça", key: "headAccuracy", max: 100, digits: 1, suffix: "%", nullable: true });
+    if (rows.some((row) => row.openingSuccess !== null)) metrics.push({ label: "Opening duels", key: "openingSuccess", max: 100, digits: 1, suffix: "%", nullable: true });
     const render = () => {
       if (selectA.value === selectB.value) selectB.value = selectA.value === "0" ? "1" : "0";
       const first = rows[Number(selectA.value)] || rows[0];
       const second = rows[Number(selectB.value)] || rows[1];
-      const nameA = document.querySelector("#comparisonNameA");
-      const nameB = document.querySelector("#comparisonNameB");
-      if (nameA) nameA.textContent = first.name;
-      if (nameB) nameB.textContent = second.name;
+      const identities = document.querySelector("#comparisonIdentities");
+      if (identities) identities.innerHTML = [
+        { row: first, side: "a", label: "JOGADOR A" },
+        { row: second, side: "b", label: "JOGADOR B" }
+      ].map(({ row, side, label }) => { const meta = playerMeta.get(row.name) || {}; return `<article class="comparison-identity player-${side}"><span>${mediaImage(meta.photo, row.name, entityInitials(row.name))}</span><div><small>${label}</small><b>${escapeHtml(row.name)}</b><em>${escapeHtml(row.team)}</em></div></article>`; }).join("");
       chart.innerHTML = metrics.map((metric) => {
-        const valueA = metric.key === "kast" && first.kast === null ? null : numberOrZero(first[metric.key]);
-        const valueB = metric.key === "kast" && second.kast === null ? null : numberOrZero(second[metric.key]);
-        const widthA = valueA === null ? 0 : Math.min(100, (valueA / metric.max) * 100);
-        const widthB = valueB === null ? 0 : Math.min(100, (valueB / metric.max) * 100);
+        const valueA = (metric.key === "kast" && first.kast === null) || (metric.nullable && first[metric.key] === null) ? null : numberOrZero(first[metric.key]);
+        const valueB = (metric.key === "kast" && second.kast === null) || (metric.nullable && second[metric.key] === null) ? null : numberOrZero(second[metric.key]);
+        const heightA = valueA === null ? 0 : Math.max(3, Math.min(100, (valueA / metric.max) * 100));
+        const heightB = valueB === null ? 0 : Math.max(3, Math.min(100, (valueB / metric.max) * 100));
         const formatted = (value) => value === null ? "—" : `${value.toFixed(metric.digits)}${metric.suffix || ""}`;
-        return `<article><b>${metric.label}</b><div class="comparison-bar player-a"><i style="width:${widthA}%"></i><span>${formatted(valueA)}</span></div><div class="comparison-bar player-b"><i style="width:${widthB}%"></i><span>${formatted(valueB)}</span></div></article>`;
+        return `<article class="comparison-metric"><b>${metric.label}</b><div class="comparison-columns"><div class="comparison-column player-a"><strong>${formatted(valueA)}</strong><i style="height:${heightA}%"></i><small>A</small></div><div class="comparison-column player-b"><strong>${formatted(valueB)}</strong><i style="height:${heightB}%"></i><small>B</small></div></div></article>`;
       }).join("");
     };
     selectA.addEventListener("change", render);
