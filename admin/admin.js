@@ -690,17 +690,19 @@
 
     // A gravação só é considerada concluída quando a mesma URL usada pelo site
     // público consegue devolver uma imagem. Isso impede salvar referências 404.
-    const publicUrl = `${result.url}${result.url.includes("?") ? "&" : "?"}verify=${Date.now()}`;
-    const verification = await fetch(publicUrl, { cache: "no-store", credentials: "same-origin" });
-    const contentType = verification.headers.get("content-type") || "";
-    if (!verification.ok || !contentType.startsWith("image/")) {
-      throw new Error("A imagem foi enviada, mas não pôde ser carregada de volta. O cadastro anterior foi preservado.");
+    let lastStatus = 0;
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+      if (attempt) await new Promise((resolve) => setTimeout(resolve, 250 + attempt * 150));
+      const publicUrl = `${result.url}${result.url.includes("?") ? "&" : "?"}verify=${Date.now()}-${attempt}`;
+      const verification = await fetch(publicUrl, { cache: "no-store", credentials: "same-origin" });
+      lastStatus = verification.status;
+      const contentType = verification.headers.get("content-type") || "";
+      if (!verification.ok || !contentType.startsWith("image/")) continue;
+      const received = await verification.arrayBuffer();
+      if (received.byteLength !== blob.size) throw new Error("A imagem retornou incompleta. O cadastro anterior foi preservado.");
+      return result.url;
     }
-    const receivedBytes = Number(verification.headers.get("content-length") || 0);
-    if (receivedBytes && receivedBytes !== blob.size) {
-      throw new Error("A imagem retornou incompleta. O cadastro anterior foi preservado.");
-    }
-    return result.url;
+    throw new Error(`A imagem foi enviada, mas o armazenamento ainda não conseguiu devolvê-la${lastStatus ? ` (HTTP ${lastStatus})` : ""}. O cadastro anterior foi preservado.`);
   }
 
   async function loadDemoParser() {
