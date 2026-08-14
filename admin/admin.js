@@ -3,6 +3,7 @@
 
   const source = window.HLTPC_DATA;
   const MAX_LOCAL_DEMO_BYTES = 500 * 1024 * 1024;
+  const MAX_IMAGE_UPLOAD_BYTES = 12 * 1024 * 1024;
   const confirmedPlayerAliases = new Map([
     ["GJota", ["GJ"]],
     ["Downey", ["Mikasa es su kasa"]],
@@ -16,7 +17,7 @@
     teams: baselineTeams.map((team) => ({ ...team })),
     tournaments: source.tournaments.map((event) => ({ id: event.id, name: event.name, subtitle: String(event.year), status: "published", logo: "", format: event.format, formatType: event.entries.length === 2 ? "two_team_md3" : event.entries.length === 3 ? "three_team_series" : "four_team_groups", teams: event.entries.map((entry) => entry.team), updated: event.status === "ongoing" ? "Em andamento" : `Campeão: ${event.champion}` })),
     matches: [],
-    news: source.news.map((item) => ({ id: item.id, name: item.title, subtitle: item.summary, author: item.author, date: item.date, tournamentId: item.tournamentId, status: "published", updated: item.date }))
+    news: source.news.map((item) => ({ id: item.id, name: item.title, subtitle: item.summary, body: item.body || item.summary, author: item.author, date: item.date, tournamentId: item.tournamentId, status: "published", updated: item.date }))
   };
 
   const labels = { overview: "Visão geral", players: "Jogadores", teams: "Times", tournaments: "Campeonatos", matches: "Partidas", news: "Notícias", users: "Usuários e acessos" };
@@ -355,12 +356,12 @@
   }
 
   function formFields(item) {
-    if (section === "players") return `<div class="editor-tabs"><button type="button" class="active" data-editor-tab="profile">Dados do jogador</button><button type="button" data-editor-tab="teams">Equipes</button></div><div data-editor-panel="profile">${textField("name", "Nick principal", item.name, "Ex.: lanches", true)}<div class="field-row">${textField("alias", "Aliases conhecidos", item.alias, "Ex.: GJ, outro nick")}${selectField("status", item.status)}</div>${textField("steamId", "SteamID64", item.steamId, "Ex.: 76561198300371519")}${fileField("photo", "Foto do jogador", "image/*")}<div class="helper">Separe aliases por vírgula. O SteamID64 é a identidade principal e conecta automaticamente qualquer nick usado na demo ou no Leetify ao perfil correto.</div></div><div data-editor-panel="teams" hidden><span class="field-title">Equipes defendidas</span><div class="team-checklist">${state.teams.map((team) => `<label><input type="checkbox" name="teams" value="${escapeHtml(team.name)}" ${(item.teams || []).includes(team.name) ? "checked" : ""} /><span><b>${escapeHtml(team.name)}</b><small>${escapeHtml(team.acronym)}</small></span></label>`).join("")}</div><div class="helper">As equipes encontradas nas escalações históricas já aparecem marcadas. Use esta área para complementar ou corrigir o perfil.</div></div>`;
-    if (section === "teams") return `${textField("name", "Nome oficial do time", item.name, "Ex.: Deftones", true)}<div class="field-row">${textField("acronym", "Sigla", item.acronym, "Ex.: DFT")}${selectField("status", item.status)}</div>${fileField("logo", "Logo do time", "image/*")}<div class="helper">O elenco mais recente e as formações históricas serão derivados de cada participação.</div>`;
+    if (section === "players") return `<div class="editor-tabs"><button type="button" class="active" data-editor-tab="profile">Dados do jogador</button><button type="button" data-editor-tab="teams">Equipes</button></div><div data-editor-panel="profile">${textField("name", "Nick principal", item.name, "Ex.: lanches", true)}<div class="field-row">${textField("alias", "Aliases conhecidos", item.alias, "Ex.: GJ, outro nick")}${selectField("status", item.status)}</div>${textField("steamId", "SteamID64", item.steamId, "Ex.: 76561198300371519")}${imageFileField("photo", "Foto do jogador", item.photo, "photo")}<div class="helper">Separe aliases por vírgula. O SteamID64 é a identidade principal e conecta automaticamente qualquer nick usado na demo ou no Leetify ao perfil correto.</div></div><div data-editor-panel="teams" hidden><span class="field-title">Equipes defendidas</span><div class="team-checklist">${state.teams.map((team) => `<label><input type="checkbox" name="teams" value="${escapeHtml(team.name)}" ${(item.teams || []).includes(team.name) ? "checked" : ""} /><span><b>${escapeHtml(team.name)}</b><small>${escapeHtml(team.acronym)}</small></span></label>`).join("")}</div><div class="helper">As equipes encontradas nas escalações históricas já aparecem marcadas. Use esta área para complementar ou corrigir o perfil.</div></div>`;
+    if (section === "teams") return `${textField("name", "Nome oficial do time", item.name, "Ex.: Deftones", true)}<div class="field-row">${textField("acronym", "Sigla", item.acronym, "Ex.: DFT")}${selectField("status", item.status)}</div>${imageFileField("logo", "Logo do time em PNG transparente", item.logo, "logo")}<div class="helper">O painel aceita até 12 MB e otimiza a imagem antes de salvar. Para melhor resultado, use PNG transparente com boa resolução.</div>`;
     if (section === "tournaments") {
       const selectedFormat = item.formatType || "three_team_series";
       const selectedTeams = item.teams || [];
-      return `${textField("name", "Nome do campeonato", item.name, "Ex.: PGL Major Abadia", true)}<div class="field-row">${textField("subtitle", "Ano", item.subtitle, "2026", true)}${selectField("status", item.status)}</div><fieldset class="format-picker"><legend>Formato do campeonato</legend><div class="format-card-grid">${formatCards(selectedFormat)}</div></fieldset><input type="hidden" name="format" id="formatDescription" value="${escapeHtml(item.format || "")}" /><fieldset class="tournament-team-picker"><legend>Times participantes</legend><div class="participant-counter" id="participantCounter"></div><div class="team-checklist tournament-teams">${state.teams.map((team) => `<label><input type="checkbox" name="teams" value="${escapeHtml(team.name)}" ${selectedTeams.includes(team.name) ? "checked" : ""} /><span><b>${escapeHtml(team.name)}</b><small>${escapeHtml(team.acronym)}</small></span></label>`).join("")}</div></fieldset><div class="format-preview" id="formatPreview"></div>${fileField("logo", "Logo do campeonato", "image/*")}<div class="helper">Ao salvar, as partidas são geradas pelo formato escolhido. Partidas que já tenham placar ou demo nunca serão apagadas automaticamente.</div>`;
+      return `${textField("name", "Nome do campeonato", item.name, "Ex.: PGL Major Abadia", true)}<div class="field-row">${textField("subtitle", "Ano", item.subtitle, "2026", true)}${selectField("status", item.status)}</div><fieldset class="format-picker"><legend>Formato do campeonato</legend><div class="format-card-grid">${formatCards(selectedFormat)}</div></fieldset><input type="hidden" name="format" id="formatDescription" value="${escapeHtml(item.format || "")}" /><fieldset class="tournament-team-picker"><legend>Times participantes</legend><div class="participant-counter" id="participantCounter"></div><div class="team-checklist tournament-teams">${state.teams.map((team) => `<label><input type="checkbox" name="teams" value="${escapeHtml(team.name)}" ${selectedTeams.includes(team.name) ? "checked" : ""} /><span><b>${escapeHtml(team.name)}</b><small>${escapeHtml(team.acronym)}</small></span></label>`).join("")}</div></fieldset><div class="format-preview" id="formatPreview"></div>${imageFileField("logo", "Logo do campeonato em PNG transparente", item.logo, "logo")}<div class="helper">Ao salvar, as partidas são geradas pelo formato escolhido. Partidas que já tenham placar ou demo nunca serão apagadas automaticamente.</div>`;
     }
     if (section === "matches") {
       const generated = Boolean(item.slotA || item.slotB);
@@ -377,13 +378,15 @@
       const manualFields = manualResultFields(item, maps, manualResult);
       return `${tournamentField}${teamsField}${textField("name", "Fase", item.name, "Ex.: Semifinal", true)}${selectField("status", item.status)}${seriesMaps}${manualFields}<fieldset class="match-evidence"><legend>Fontes dos dados</legend><div class="evidence-order"><b>1</b><span><strong>Demo · fonte principal</strong><small>Até 500 MB, o painel tenta extrair data e estatísticas. Acima disso, ignora somente a leitura local e continua salvando as outras fontes.</small></span></div>${fileField("demo", "Selecionar arquivo .dem", ".dem")}${urlField("demoUrl", "Ou link da demo no Google Drive", item.demoUrl, "https://drive.google.com/file/d/...")}${item.demoInfo ? `<div class="demo-result ${demoHasStats ? "" : "partial"}"><b>${demoHasStats ? "✓ Demo processada" : item.demoInfo.extractionStatus === "skipped-large" ? "⚠ Demo grande registrada; leitura local ignorada" : item.demoUrl ? "✓ Demo vinculada pelo Drive" : "⚠ Demo anexada, sem estatísticas automáticas"}</b><span>${escapeHtml(item.demoInfo.fileName)} · ${escapeHtml(item.demoInfo.mapName || "mapa não identificado")} · ${item.demoInfo.rounds || 0} rounds</span><small>${escapeHtml(item.demoInfo.playedAtLabel || item.subtitle || "Data não identificada")} · ${(item.statistics || []).length} jogadores extraídos</small>${item.demoInfo.warnings?.length ? `<small>${escapeHtml(item.demoInfo.warnings.join(" · "))}</small>` : ""}</div>` : ""}<div class="evidence-order"><b>2</b><span><strong>Leetify · fonte secundária</strong><small>Use sozinho ou para complementar rating/KAST quando a demo estiver disponível.</small></span></div>${urlField("leetifyUrl", "Link da partida no Leetify", item.leetifyUrl, "https://leetify.com/app/match-details/...")}<div class="evidence-order"><b>3</b><span><strong>Print do placar · comprovação visual</strong><small>Envie a tela final quando a demo ou o Leetify não trouxerem tudo.</small></span></div>${fileField("scoreboardImage", item.scoreboardImage ? "Substituir print do placar" : "Enviar print do placar", "image/*")}${item.scoreboardImage ? `<div class="scoreboard-preview"><img src="${escapeHtml(item.scoreboardImage)}" alt="Print do placar salvo" /><span><b>Print salvo</b><small>Um novo arquivo substituirá esta imagem.</small><label><input type="checkbox" name="removeScoreboardImage" value="true" /> Remover print atual</label></span></div>` : ""}</fieldset>${sourceSummary}<div class="helper" id="matchHelper">${generated ? "A data será extraída do nome da demo quando ela puder ser lida. Cada fonte funciona de forma independente e fica ligada somente a este confronto." : "Escolha uma edição: os times serão limitados exclusivamente às escalações daquele campeonato."}</div>`;
     }
-    return `${textField("name", "Título", item.name, "Título da notícia", true)}<label>Texto / resumo<textarea name="subtitle" placeholder="Escreva a notícia...">${escapeHtml(item.subtitle)}</textarea></label><div class="field-row">${textField("author", "Autor", item.author, "HLTPC")}${textField("date", "Data", item.date, "2026-08-10", true)}</div>${selectField("status", item.status)}${fileField("image", "Imagem de destaque", "image/*")}`;
+    const relatedTournament = `<label>Campeonato relacionado<select name="tournamentId"><option value="">Nenhum</option>${state.tournaments.map((event) => `<option value="${escapeHtml(event.id)}" ${item.tournamentId === event.id ? "selected" : ""}>${escapeHtml(event.name)} ${escapeHtml(event.subtitle)}</option>`).join("")}</select></label>`;
+    return `${textField("name", "Título", item.name, "Título da notícia", true)}<label>Resumo para a capa<textarea name="subtitle" placeholder="Uma chamada curta para o banner e a lista de notícias...">${escapeHtml(item.subtitle)}</textarea></label><label>Texto completo da notícia<textarea class="article-body-field" name="body" placeholder="Escreva a matéria completa, separando os parágrafos com uma linha em branco...">${escapeHtml(item.body || item.subtitle)}</textarea></label>${relatedTournament}<div class="field-row">${textField("author", "Autor", item.author, "HLTPC")}${textField("date", "Data", item.date, "2026-08-10", true)}</div>${selectField("status", item.status)}${imageFileField("image", "Foto de destaque da notícia", item.image, "news")}`;
   }
 
   function textField(name, label, value = "", placeholder = "", required = false) { return `<label>${label}<input name="${name}" value="${escapeHtml(value)}" placeholder="${placeholder}" ${required ? "required" : ""} /></label>`; }
   function urlField(name, label, value = "", placeholder = "") { return `<label>${label}<input name="${name}" type="url" inputmode="url" value="${escapeHtml(value)}" placeholder="${placeholder}" /></label>`; }
   function selectField(name, value = "draft") { return `<label>Status<select name="${name}"><option value="draft" ${value === "draft" ? "selected" : ""}>Rascunho</option><option value="published" ${value === "published" ? "selected" : ""}>Publicado</option></select></label>`; }
   function fileField(name, label, accept) { return `<label>${label}<input class="file-field" name="${name}" type="file" accept="${accept}" /></label>`; }
+  function imageFileField(name, label, current = "", kind = "image") { return `<div class="image-upload" data-image-kind="${kind}"><label>${label}<input class="file-field" name="${name}" type="file" accept="image/png,image/jpeg,image/webp" /></label><div class="image-upload-preview ${current ? "has-image" : ""}" data-image-preview="${name}">${current ? `<img src="${escapeHtml(current)}" alt="Prévia atual" />` : `<span>PNG, JPG ou WebP · até 12 MB</span>`}</div></div>`; }
 
   function normalizedLeetifyUrl(value) {
     const raw = String(value || "").trim();
@@ -515,6 +518,17 @@
   }
 
   function bindEditorDynamics() {
+    document.querySelectorAll(".image-upload input[type=file]").forEach((input) => input.addEventListener("change", () => {
+      const preview = document.querySelector(`[data-image-preview="${input.name}"]`);
+      const file = input.files?.[0];
+      if (!preview || !file) return;
+      const previousUrl = preview.dataset.objectUrl;
+      if (previousUrl) URL.revokeObjectURL(previousUrl);
+      const objectUrl = URL.createObjectURL(file);
+      preview.dataset.objectUrl = objectUrl;
+      preview.classList.add("has-image");
+      preview.innerHTML = `<img src="${objectUrl}" alt="Prévia do arquivo selecionado" /><small>${escapeHtml(file.name)} · ${(file.size / 1024 / 1024).toFixed(1)} MB</small>`;
+    }));
     document.querySelectorAll("[data-editor-tab]").forEach((button) => button.addEventListener("click", () => {
       document.querySelectorAll("[data-editor-tab]").forEach((tab) => tab.classList.toggle("active", tab === button));
       document.querySelectorAll("[data-editor-panel]").forEach((panel) => { panel.hidden = panel.dataset.editorPanel !== button.dataset.editorTab; });
@@ -563,6 +577,34 @@
 
   function fileAsDataUrl(file) {
     return new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = reject; reader.readAsDataURL(file); });
+  }
+
+  async function optimizedImageDataUrl(file, kind = "image") {
+    if (!file?.type?.startsWith("image/")) throw new Error("Selecione uma imagem PNG, JPG ou WebP.");
+    if (file.size > MAX_IMAGE_UPLOAD_BYTES) throw new Error("A imagem ultrapassa 12 MB.");
+    const maxDimension = kind === "news" ? 2400 : kind === "photo" ? 1800 : 1600;
+    const image = new Image();
+    const objectUrl = URL.createObjectURL(file);
+    try {
+      await new Promise((resolve, reject) => { image.onload = resolve; image.onerror = () => reject(new Error("Não foi possível abrir esta imagem.")); image.src = objectUrl; });
+      const scale = Math.min(1, maxDimension / Math.max(image.naturalWidth, image.naturalHeight));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+      canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+      const context = canvas.getContext("2d", { alpha: true });
+      if (!context) return fileAsDataUrl(file);
+      context.clearRect(0, 0, canvas.width, canvas.height);
+      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+      let quality = .9;
+      let blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/webp", quality));
+      while (blob && blob.size > 3.5 * 1024 * 1024 && quality > .62) {
+        quality -= .08;
+        blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/webp", quality));
+      }
+      return fileAsDataUrl(blob || file);
+    } finally {
+      URL.revokeObjectURL(objectUrl);
+    }
   }
 
   async function loadDemoParser() {
@@ -951,11 +993,15 @@
     }
     const imageField = section === "players" ? "photo" : ["teams", "tournaments"].includes(section) ? "logo" : section === "news" ? "image" : null;
     const imageFile = imageField ? formData.get(imageField) : null;
-    if (imageFile?.size > 2 * 1024 * 1024) { showToast("Use uma imagem de até 2 MB"); return; }
-    if (imageField && imageFile?.size) values[imageField] = await fileAsDataUrl(imageFile);
+    if (imageField && imageFile?.size) {
+      try { values[imageField] = await optimizedImageDataUrl(imageFile, section === "news" ? "news" : section === "players" ? "photo" : "logo"); }
+      catch (reason) { showToast(reason.message || "Não foi possível otimizar a imagem"); return; }
+    }
     const scoreboardFile = section === "matches" ? formData.get("scoreboardImage") : null;
-    if (scoreboardFile?.size > 2 * 1024 * 1024) saveWarnings.push("O print passou de 2 MB e foi ignorado");
-    else if (scoreboardFile?.size) values.scoreboardImage = await fileAsDataUrl(scoreboardFile);
+    if (scoreboardFile?.size) {
+      try { values.scoreboardImage = await optimizedImageDataUrl(scoreboardFile, "news"); }
+      catch (reason) { saveWarnings.push(`O print foi ignorado: ${reason.message || reason}`); }
+    }
     if (section === "matches" && values.removeScoreboardImage === "true") values.scoreboardImage = "";
     delete values.removeScoreboardImage;
     const list = state[section];
