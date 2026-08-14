@@ -651,6 +651,9 @@
       matches: row.matchIds.size,
       adr: row.rounds ? row.damage / row.rounds : 0,
       hs: row.kills ? (row.headshots / row.kills) * 100 : 0,
+      kd: row.deaths ? row.kills / row.deaths : row.kills,
+      kpr: row.rounds ? row.kills / row.rounds : 0,
+      dpr: row.rounds ? row.deaths / row.rounds : 0,
       kast: row.kastRounds ? row.kastTotal / row.kastRounds : null,
       rating: row.ratingRounds ? row.ratingTotal / row.ratingRounds : 0
     })).sort((a, b) => b.rating - a.rating || (b.kills - b.deaths) - (a.kills - a.deaths) || b.kills - a.kills);
@@ -658,9 +661,9 @@
 
   function tournamentTeamStatistics(event, matches) {
     const participating = matches.length ? [...new Set(matches.flatMap((match) => [match.teamA, match.teamB]).filter(Boolean))] : event.entries.map((entry) => entry.team);
-    const rows = new Map(participating.map((team) => [team, { team, series: 0, wins: 0, losses: 0, mapsWon: 0, mapsLost: 0, roundsFor: 0, roundsAgainst: 0, kills: 0, deaths: 0 }]));
+    const rows = new Map(participating.map((team) => [team, { team, series: 0, wins: 0, losses: 0, mapsWon: 0, mapsLost: 0, roundsFor: 0, roundsAgainst: 0, kills: 0, deaths: 0, assists: 0, damage: 0, playerRounds: 0, ratingTotal: 0, ratingRounds: 0 }]));
     const ensure = (team) => {
-      if (!rows.has(team)) rows.set(team, { team, series: 0, wins: 0, losses: 0, mapsWon: 0, mapsLost: 0, roundsFor: 0, roundsAgainst: 0, kills: 0, deaths: 0 });
+      if (!rows.has(team)) rows.set(team, { team, series: 0, wins: 0, losses: 0, mapsWon: 0, mapsLost: 0, roundsFor: 0, roundsAgainst: 0, kills: 0, deaths: 0, assists: 0, damage: 0, playerRounds: 0, ratingTotal: 0, ratingRounds: 0 });
       return rows.get(team);
     };
     matches.forEach((match) => {
@@ -684,17 +687,78 @@
         const team = ensure(record.team || "Sem equipe");
         team.kills += numberOrZero(record.kills);
         team.deaths += numberOrZero(record.deaths);
+        team.assists += numberOrZero(record.assists);
+        const playerRounds = slice.rounds || numberOrZero(record.rounds);
+        team.playerRounds += playerRounds;
+        team.damage += numberOrZero(record.damage) || numberOrZero(record.adr) * playerRounds;
+        if (numberOrZero(record.rating) > 0) { const weight = playerRounds || 1; team.ratingTotal += numberOrZero(record.rating) * weight; team.ratingRounds += weight; }
       }));
     });
-    return [...rows.values()].map((row) => ({ ...row, roundDiff: row.roundsFor - row.roundsAgainst, kdDiff: row.kills - row.deaths })).sort((a, b) => b.wins - a.wins || b.roundDiff - a.roundDiff || b.mapsWon - a.mapsWon || a.team.localeCompare(b.team, "pt-BR"));
+    return [...rows.values()].map((row) => ({ ...row, roundDiff: row.roundsFor - row.roundsAgainst, kdDiff: row.kills - row.deaths, adr: row.playerRounds ? row.damage / row.playerRounds : 0, rating: row.ratingRounds ? row.ratingTotal / row.ratingRounds : 0 })).sort((a, b) => b.wins - a.wins || b.roundDiff - a.roundDiff || b.mapsWon - a.mapsWon || a.team.localeCompare(b.team, "pt-BR"));
+  }
+
+  function playerComparisonMarkup(rows) {
+    if (rows.length < 2) return `<div class="empty compact"><b>Comparação indisponível</b>São necessários dados de pelo menos dois jogadores neste recorte.</div>`;
+    const options = rows.map((row, index) => `<option value="${index}">${escapeHtml(row.name)} · ${escapeHtml(row.team)}</option>`).join("");
+    return `<section class="player-comparison"><header><div><span>COMPARADOR</span><h3>Jogador contra jogador</h3></div><small>As barras usam escalas próprias por métrica — os valores reais aparecem ao lado.</small></header><div class="comparison-selectors"><label>Jogador A<select id="comparisonPlayerA">${options}</select></label><b>×</b><label>Jogador B<select id="comparisonPlayerB">${options}</select></label></div><div class="comparison-legend"><span class="player-a" id="comparisonNameA"></span><span class="player-b" id="comparisonNameB"></span></div><div class="comparison-chart" id="playerComparisonChart"></div></section>`;
+  }
+
+  function playerHighlightsMarkup(rows) {
+    if (!rows.length) return "";
+    const byAdr = [...rows].sort((a, b) => b.adr - a.adr)[0];
+    const byDiff = [...rows].sort((a, b) => (b.kills - b.deaths) - (a.kills - a.deaths))[0];
+    const cards = [
+      { label: "MAIOR RATING", row: rows[0], value: rows[0].rating ? rows[0].rating.toFixed(2) : "—" },
+      { label: "MAIOR ADR", row: byAdr, value: byAdr.adr ? byAdr.adr.toFixed(1) : "—" },
+      { label: "MELHOR SALDO", row: byDiff, value: `${byDiff.kills - byDiff.deaths > 0 ? "+" : ""}${byDiff.kills - byDiff.deaths}` }
+    ];
+    return `<div class="statistics-highlights">${cards.map(({ label, row, value }) => `<article><span>${label}</span><b>${escapeHtml(value)}</b><a href="#jogador/${encodeURIComponent(row.name)}">${escapeHtml(row.name)}</a><small>${escapeHtml(row.team)}</small></article>`).join("")}</div>`;
+  }
+
+  function bindPlayerComparison(rows) {
+    const selectA = document.querySelector("#comparisonPlayerA");
+    const selectB = document.querySelector("#comparisonPlayerB");
+    const chart = document.querySelector("#playerComparisonChart");
+    if (!selectA || !selectB || !chart || rows.length < 2) return;
+    if (chart.dataset.bound === "true") return;
+    chart.dataset.bound = "true";
+    if (selectA.value === selectB.value) selectB.value = "1";
+    const metrics = [
+      { label: "Rating", key: "rating", max: 2, digits: 2 },
+      { label: "ADR", key: "adr", max: 140, digits: 1 },
+      { label: "K/D", key: "kd", max: 2.5, digits: 2 },
+      { label: "Kills/round", key: "kpr", max: 1.2, digits: 2 },
+      { label: "KAST", key: "kast", max: 100, digits: 1, suffix: "%" },
+      { label: "Headshots", key: "hs", max: 100, digits: 1, suffix: "%" }
+    ];
+    const render = () => {
+      if (selectA.value === selectB.value) selectB.value = selectA.value === "0" ? "1" : "0";
+      const first = rows[Number(selectA.value)] || rows[0];
+      const second = rows[Number(selectB.value)] || rows[1];
+      const nameA = document.querySelector("#comparisonNameA");
+      const nameB = document.querySelector("#comparisonNameB");
+      if (nameA) nameA.textContent = first.name;
+      if (nameB) nameB.textContent = second.name;
+      chart.innerHTML = metrics.map((metric) => {
+        const valueA = metric.key === "kast" && first.kast === null ? null : numberOrZero(first[metric.key]);
+        const valueB = metric.key === "kast" && second.kast === null ? null : numberOrZero(second[metric.key]);
+        const widthA = valueA === null ? 0 : Math.min(100, (valueA / metric.max) * 100);
+        const widthB = valueB === null ? 0 : Math.min(100, (valueB / metric.max) * 100);
+        const formatted = (value) => value === null ? "—" : `${value.toFixed(metric.digits)}${metric.suffix || ""}`;
+        return `<article><b>${metric.label}</b><div class="comparison-bar player-a"><i style="width:${widthA}%"></i><span>${formatted(valueA)}</span></div><div class="comparison-bar player-b"><i style="width:${widthB}%"></i><span>${formatted(valueB)}</span></div></article>`;
+      }).join("");
+    };
+    selectA.addEventListener("change", render);
+    selectB.addEventListener("change", render);
+    render();
   }
 
   function tournamentStatisticsContent(event, matches) {
     const playerRows = tournamentPlayerStatistics(matches);
     const teamRows = tournamentTeamStatistics(event, matches);
     const signed = (value) => `${value > 0 ? "+" : ""}${value}`;
-    const playerTable = playerRows.length ? `<div class="tournament-stats-scroll"><div class="tournament-stats-table player-stats-table"><header><span>Jogador</span><span>J</span><span>K–D</span><span>+/−</span><span>ADR</span><span>HS%</span><span>KAST</span><span>Rating</span></header>${playerRows.map((row, index) => `<div><span class="stats-player"><i>${String(index + 1).padStart(2, "0")}</i><b>${playerHistory.has(row.name) ? `<a href="#jogador/${encodeURIComponent(row.name)}">${escapeHtml(row.name)}</a>` : escapeHtml(row.name)}<small>${teams.has(row.team) ? `<a href="#time/${encodeURIComponent(row.team)}">${escapeHtml(row.team)}</a>` : escapeHtml(row.team)}</small></b></span><span>${row.matches}</span><strong>${row.kills}–${row.deaths}</strong><span class="${row.kills - row.deaths > 0 ? "positive" : row.kills - row.deaths < 0 ? "negative" : ""}">${signed(row.kills - row.deaths)}</span><span>${row.rounds ? row.adr.toFixed(1) : "—"}</span><span>${row.kills ? `${row.hs.toFixed(1)}%` : "—"}</span><span>${row.kast === null ? "—" : `${row.kast.toFixed(1)}%`}</span><strong class="rating ${ratingTone(row.rating)}">${row.rating ? row.rating.toFixed(2) : "—"}</strong></div>`).join("")}</div></div>` : `<div class="empty compact"><b>Sem estatísticas individuais neste recorte</b>O placar continua válido, mas nenhuma fonte anexada retornou dados de jogadores.</div>`;
-    const teamTable = `<div class="tournament-stats-scroll"><div class="tournament-stats-table team-stats-table"><header><span>Equipe</span><span>Séries</span><span>Campanha</span><span>Mapas</span><span>Rounds</span><span>SR</span><span>K–D</span></header>${teamRows.map((row, index) => `<div><span class="stats-team"><i>${String(index + 1).padStart(2, "0")}</i><span>${teamBadge(row.team)}</span><b><a href="#time/${encodeURIComponent(row.team)}">${escapeHtml(row.team)}</a></b></span><span>${row.series}</span><strong>${row.wins}–${row.losses}</strong><span>${row.mapsWon}–${row.mapsLost}</span><span>${row.roundsFor}–${row.roundsAgainst}</span><span class="${row.roundDiff > 0 ? "positive" : row.roundDiff < 0 ? "negative" : ""}">${signed(row.roundDiff)}</span><span>${row.kills || row.deaths ? `${row.kills}–${row.deaths}` : "—"}</span></div>`).join("")}</div></div>`;
+    const playerTable = playerRows.length ? `${playerHighlightsMarkup(playerRows)}${playerComparisonMarkup(playerRows)}<div class="section-heading compact-heading"><div><span>DETALHAMENTO</span><h3>Todos os jogadores</h3></div></div><div class="tournament-stats-scroll"><div class="tournament-stats-table player-stats-table"><header><span>Jogador</span><span>J</span><span>R</span><span>K–D</span><span>A</span><span>+/−</span><span>K/D</span><span>K/R</span><span>D/R</span><span>Dano</span><span>ADR</span><span>HS%</span><span>KAST</span><span>Rating</span></header>${playerRows.map((row, index) => `<div><span class="stats-player"><i>${String(index + 1).padStart(2, "0")}</i><b>${playerHistory.has(row.name) ? `<a href="#jogador/${encodeURIComponent(row.name)}">${escapeHtml(row.name)}</a>` : escapeHtml(row.name)}<small>${teams.has(row.team) ? `<a href="#time/${encodeURIComponent(row.team)}">${escapeHtml(row.team)}</a>` : escapeHtml(row.team)}</small></b></span><span>${row.matches}</span><span>${row.rounds || "—"}</span><strong>${row.kills}–${row.deaths}</strong><span>${row.assists}</span><span class="${row.kills - row.deaths > 0 ? "positive" : row.kills - row.deaths < 0 ? "negative" : ""}">${signed(row.kills - row.deaths)}</span><span>${row.kd.toFixed(2)}</span><span>${row.rounds ? row.kpr.toFixed(2) : "—"}</span><span>${row.rounds ? row.dpr.toFixed(2) : "—"}</span><span>${row.damage ? Math.round(row.damage).toLocaleString("pt-BR") : "—"}</span><span>${row.rounds ? row.adr.toFixed(1) : "—"}</span><span>${row.kills ? `${row.hs.toFixed(1)}%` : "—"}</span><span>${row.kast === null ? "—" : `${row.kast.toFixed(1)}%`}</span><strong class="rating ${ratingTone(row.rating)}">${row.rating ? row.rating.toFixed(2) : "—"}</strong></div>`).join("")}</div></div>` : `<div class="empty compact"><b>Sem estatísticas individuais neste recorte</b>O placar continua válido, mas nenhuma fonte anexada retornou dados de jogadores.</div>`;
+    const teamTable = `<div class="tournament-stats-scroll"><div class="tournament-stats-table team-stats-table"><header><span>Equipe</span><span>Séries</span><span>Campanha</span><span>Mapas</span><span>Rounds</span><span>SR</span><span>K–D–A</span><span>ADR</span><span>Rating</span></header>${teamRows.map((row, index) => `<div><span class="stats-team"><i>${String(index + 1).padStart(2, "0")}</i><span>${teamBadge(row.team)}</span><b><a href="#time/${encodeURIComponent(row.team)}">${escapeHtml(row.team)}</a></b></span><span>${row.series}</span><strong>${row.wins}–${row.losses}</strong><span>${row.mapsWon}–${row.mapsLost}</span><span>${row.roundsFor}–${row.roundsAgainst}</span><span class="${row.roundDiff > 0 ? "positive" : row.roundDiff < 0 ? "negative" : ""}">${signed(row.roundDiff)}</span><span>${row.kills || row.deaths ? `${row.kills}–${row.deaths}–${row.assists}` : "—"}</span><span>${row.adr ? row.adr.toFixed(1) : "—"}</span><strong class="rating ${ratingTone(row.rating)}">${row.rating ? row.rating.toFixed(2) : "—"}</strong></div>`).join("")}</div></div>`;
     return `<div class="tournament-stats-panels"><section data-statistics-panel="players">${playerTable}</section><section data-statistics-panel="teams" hidden>${teamTable}</section></div>`;
   }
 
@@ -711,6 +775,7 @@
     const applyView = () => {
       document.querySelectorAll("[data-statistics-view]").forEach((button) => button.classList.toggle("active", button.dataset.statisticsView === view));
       target?.querySelectorAll("[data-statistics-panel]").forEach((panel) => { panel.hidden = panel.dataset.statisticsPanel !== view; });
+      if (view === "players") bindPlayerComparison(tournamentPlayerStatistics(select?.value ? matches.filter((match) => match.id === select.value) : matches.filter((match) => match.score || statisticalSlices(match).length)));
     };
     const refresh = () => {
       const selected = select?.value ? matches.filter((match) => match.id === select.value) : matches.filter((match) => match.score || statisticalSlices(match).length);
