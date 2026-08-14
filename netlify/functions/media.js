@@ -8,9 +8,15 @@ exports.handler = async (event) => {
     connectLambda(event);
     const currentStore = getStore("hltpc-content");
     const legacyStore = getStore("hltpc-media");
-    const result = await currentStore.getWithMetadata(`media/${id}`, { type: "arrayBuffer", consistency: "eventual" })
-      || await legacyStore.getWithMetadata(id, { type: "arrayBuffer", consistency: "eventual" });
-    if (!result) return { statusCode: 404, body: "" };
+    const encoded = await currentStore.get(`media-v2/${id}`, { type: "json", consistency: "eventual" });
+    if (encoded?.data && encoded?.contentType) return {
+      statusCode: 200,
+      headers: { "Content-Type": encoded.contentType, "Content-Length": String(encoded.bytes || Buffer.byteLength(encoded.data, "base64")), "Cache-Control": "public, max-age=31536000, immutable", "X-Content-Type-Options": "nosniff" },
+      body: event.httpMethod === "HEAD" ? "" : encoded.data,
+      isBase64Encoded: event.httpMethod !== "HEAD"
+    };
+    const result = await currentStore.getWithMetadata(`media/${id}`, { type: "arrayBuffer", consistency: "eventual" }) || await legacyStore.getWithMetadata(id, { type: "arrayBuffer", consistency: "eventual" });
+    if (!result?.data) return { statusCode: 404, body: "" };
     return {
       statusCode: 200,
       headers: { "Content-Type": result.metadata?.contentType || "image/webp", "Cache-Control": "public, max-age=31536000, immutable", "X-Content-Type-Options": "nosniff" },
