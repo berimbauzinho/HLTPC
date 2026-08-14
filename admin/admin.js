@@ -3,7 +3,7 @@
 
   const source = window.HLTPC_DATA;
   const MAX_LOCAL_DEMO_BYTES = 500 * 1024 * 1024;
-  const MAX_IMAGE_UPLOAD_BYTES = 12 * 1024 * 1024;
+  const MAX_IMAGE_UPLOAD_BYTES = 30 * 1024 * 1024;
   const confirmedPlayerAliases = new Map([
     ["GJota", ["GJ"]],
     ["Downey", ["Mikasa es su kasa"]],
@@ -13,7 +13,7 @@
   const baselineTeams = baselineTeamNames.map((name, index) => ({ id: `team-${index}`, name, acronym: initials(name), aliases: [], status: "published", logo: "", updated: "Derivado das edições" }));
   const baselineTeamNameById = new Map(baselineTeams.map((team) => [team.id, team.name]));
   const state = {
-    players: source.players.map((name, index) => ({ id: `player-${index}`, name, alias: (confirmedPlayerAliases.get(name) || []).join(", "), status: "published", photo: "", teams: [...new Set(source.tournaments.flatMap((event) => event.entries.filter((entry) => entry.players.includes(name)).map((entry) => entry.team)))], updated: "Dados históricos" })),
+    players: source.players.map((name, index) => ({ id: `player-${index}`, name, alias: (confirmedPlayerAliases.get(name) || []).join(", "), status: "published", photo: "", awards: [], teams: [...new Set(source.tournaments.flatMap((event) => event.entries.filter((entry) => entry.players.includes(name)).map((entry) => entry.team)))], updated: "Dados históricos" })),
     teams: baselineTeams.map((team) => ({ ...team })),
     tournaments: source.tournaments.map((event) => ({ id: event.id, name: event.name, subtitle: String(event.year), status: "published", logo: "", format: event.format, formatType: event.entries.length === 2 ? "two_team_md3" : event.entries.length === 3 ? "three_team_series" : "four_team_groups", teams: event.entries.map((entry) => entry.team), updated: event.status === "ongoing" ? "Em andamento" : `Campeão: ${event.champion}` })),
     matches: [],
@@ -355,9 +355,24 @@
     return `<fieldset class="manual-result"><legend>Placar oficial por mapa</legend><label class="manual-result-toggle"><input type="checkbox" name="manualResult" value="true" ${manualResult ? "checked" : ""} /><span><b>Confirmar ou corrigir os rounds de cada mapa</b><small>O resultado da série (ex.: 2–0) será calculado automaticamente a partir dos mapas vencidos. As estatísticas da demo/Leetify permanecem separadas.</small></span></label><input type="hidden" name="manualMapCount" value="${maps.length}" /><div class="manual-map-score-fields" ${manualResult ? "" : "hidden"}>${rows}<div class="manual-series-live"><small>RESULTADO DA SÉRIE</small><b>Aguardando os placares dos mapas</b></div></div></fieldset>`;
   }
 
+  const awardCategories = [
+    ["mvp", "MVP", "Melhor jogador do campeonato"],
+    ["crowd", "Craque da galera", "Surpresa e destaque da torcida"],
+    ["bagre", "Troféu Bagre", "De quem se esperava mais"]
+  ];
+
+  function awardRowMarkup(award = {}) {
+    return `<article class="player-award-row" data-award-row><label>Categoria<select data-award-category>${awardCategories.map(([value, label]) => `<option value="${value}" ${award.type === value ? "selected" : ""}>${label}</option>`).join("")}</select></label><label>Edição do campeonato<select data-award-tournament><option value="">Selecione a edição</option>${[...state.tournaments].sort((a, b) => Number(b.subtitle) - Number(a.subtitle)).map((event) => `<option value="${escapeHtml(event.id)}" ${award.tournamentId === event.id ? "selected" : ""}>${escapeHtml(event.name)} ${escapeHtml(event.subtitle)}</option>`).join("")}</select></label><button type="button" data-remove-player-award aria-label="Remover premiação">×</button></article>`;
+  }
+
+  function awardsPanelMarkup(item) {
+    const awards = Array.isArray(item.awards) ? item.awards : [];
+    return `<div class="player-awards-editor"><div class="award-category-guide">${awardCategories.map(([value, label, description]) => `<span class="${value}"><b>${label}</b><small>${description}</small></span>`).join("")}</div><div id="playerAwardRows">${awards.map(awardRowMarkup).join("")}</div><div class="player-awards-empty" ${awards.length ? "hidden" : ""}>Nenhuma premiação individual cadastrada.</div><button class="secondary-add" type="button" data-add-player-award>＋ Adicionar premiação</button><div class="helper">A premiação fica ligada à edição selecionada e ganhará destaque no perfil público do jogador. Majors recebem tratamento visual especial.</div></div>`;
+  }
+
   function formFields(item) {
-    if (section === "players") return `<div class="editor-tabs"><button type="button" class="active" data-editor-tab="profile">Dados do jogador</button><button type="button" data-editor-tab="teams">Equipes</button></div><div data-editor-panel="profile">${textField("name", "Nick principal", item.name, "Ex.: lanches", true)}<div class="field-row">${textField("alias", "Aliases conhecidos", item.alias, "Ex.: GJ, outro nick")}${selectField("status", item.status)}</div>${textField("steamId", "SteamID64", item.steamId, "Ex.: 76561198300371519")}${imageFileField("photo", "Foto do jogador", item.photo, "photo")}<div class="helper">Separe aliases por vírgula. O SteamID64 é a identidade principal e conecta automaticamente qualquer nick usado na demo ou no Leetify ao perfil correto.</div></div><div data-editor-panel="teams" hidden><span class="field-title">Equipes defendidas</span><div class="team-checklist">${state.teams.map((team) => `<label><input type="checkbox" name="teams" value="${escapeHtml(team.name)}" ${(item.teams || []).includes(team.name) ? "checked" : ""} /><span><b>${escapeHtml(team.name)}</b><small>${escapeHtml(team.acronym)}</small></span></label>`).join("")}</div><div class="helper">As equipes encontradas nas escalações históricas já aparecem marcadas. Use esta área para complementar ou corrigir o perfil.</div></div>`;
-    if (section === "teams") return `${textField("name", "Nome oficial do time", item.name, "Ex.: Deftones", true)}<div class="field-row">${textField("acronym", "Sigla", item.acronym, "Ex.: DFT")}${selectField("status", item.status)}</div>${imageFileField("logo", "Logo do time em PNG transparente", item.logo, "logo")}<div class="helper">O painel aceita até 12 MB e otimiza a imagem antes de salvar. Para melhor resultado, use PNG transparente com boa resolução.</div>`;
+    if (section === "players") return `<div class="editor-tabs"><button type="button" class="active" data-editor-tab="profile">Dados do jogador</button><button type="button" data-editor-tab="teams">Equipes</button><button type="button" data-editor-tab="awards">Premiações</button></div><div data-editor-panel="profile">${textField("name", "Nick principal", item.name, "Ex.: lanches", true)}<div class="field-row">${textField("alias", "Aliases conhecidos", item.alias, "Ex.: GJ, outro nick")}${selectField("status", item.status)}</div>${textField("steamId", "SteamID64", item.steamId, "Ex.: 76561198300371519")}${imageFileField("photo", "Foto do jogador", item.photo, "photo")}<div class="helper">Separe aliases por vírgula. O SteamID64 é a identidade principal e conecta automaticamente qualquer nick usado na demo ou no Leetify ao perfil correto.</div></div><div data-editor-panel="teams" hidden><span class="field-title">Equipes defendidas</span><div class="team-checklist">${state.teams.map((team) => `<label><input type="checkbox" name="teams" value="${escapeHtml(team.name)}" ${(item.teams || []).includes(team.name) ? "checked" : ""} /><span><b>${escapeHtml(team.name)}</b><small>${escapeHtml(team.acronym)}</small></span></label>`).join("")}</div><div class="helper">As equipes encontradas nas escalações históricas já aparecem marcadas. Use esta área para complementar ou corrigir o perfil.</div></div><div data-editor-panel="awards" hidden>${awardsPanelMarkup(item)}</div>`;
+    if (section === "teams") return `${textField("name", "Nome oficial do time", item.name, "Ex.: Deftones", true)}<div class="field-row">${textField("acronym", "Sigla", item.acronym, "Ex.: DFT")}${selectField("status", item.status)}</div>${imageFileField("logo", "Logo do time em PNG transparente", item.logo, "logo")}<div class="helper">O painel adapta a resolução e o peso automaticamente. Para melhor resultado, use PNG transparente quadrado.</div>`;
     if (section === "tournaments") {
       const selectedFormat = item.formatType || "three_team_series";
       const selectedTeams = item.teams || [];
@@ -386,7 +401,10 @@
   function urlField(name, label, value = "", placeholder = "") { return `<label>${label}<input name="${name}" type="url" inputmode="url" value="${escapeHtml(value)}" placeholder="${placeholder}" /></label>`; }
   function selectField(name, value = "draft") { return `<label>Status<select name="${name}"><option value="draft" ${value === "draft" ? "selected" : ""}>Rascunho</option><option value="published" ${value === "published" ? "selected" : ""}>Publicado</option></select></label>`; }
   function fileField(name, label, accept) { return `<label>${label}<input class="file-field" name="${name}" type="file" accept="${accept}" /></label>`; }
-  function imageFileField(name, label, current = "", kind = "image") { return `<div class="image-upload" data-image-kind="${kind}"><label>${label}<input class="file-field" name="${name}" type="file" accept="image/png,image/jpeg,image/webp" /></label><div class="image-upload-preview ${current ? "has-image" : ""}" data-image-preview="${name}">${current ? `<img src="${escapeHtml(current)}" alt="Prévia atual" />` : `<span>PNG, JPG ou WebP · até 12 MB</span>`}</div></div>`; }
+  function imageFileField(name, label, current = "", kind = "image") {
+    const reference = kind === "logo" ? "Referência: 1200 × 1200 px, PNG transparente" : kind === "photo" ? "Referência: 1200 × 1600 px, PNG transparente" : "Referência: 1920 × 1080 px";
+    return `<div class="image-upload" data-image-kind="${kind}"><label>${label}<input class="file-field" name="${name}" type="file" accept="image/png,image/jpeg,image/webp" /><small class="image-guidance">${reference} · até 30 MB. O painel adapta automaticamente.</small></label><div class="image-upload-preview ${current ? "has-image" : ""}" data-image-preview="${name}">${current ? `<img src="${escapeHtml(current)}" alt="Prévia atual" />` : `<span>PNG, JPG ou WebP<br>${reference}</span>`}</div></div>`;
+  }
 
   function normalizedLeetifyUrl(value) {
     const raw = String(value || "").trim();
@@ -533,6 +551,20 @@
       document.querySelectorAll("[data-editor-tab]").forEach((tab) => tab.classList.toggle("active", tab === button));
       document.querySelectorAll("[data-editor-panel]").forEach((panel) => { panel.hidden = panel.dataset.editorPanel !== button.dataset.editorTab; });
     }));
+    const refreshAwardsEmpty = () => {
+      const empty = document.querySelector(".player-awards-empty");
+      if (empty) empty.hidden = Boolean(document.querySelector("[data-award-row]"));
+    };
+    document.querySelector("[data-add-player-award]")?.addEventListener("click", () => {
+      document.querySelector("#playerAwardRows")?.insertAdjacentHTML("beforeend", awardRowMarkup());
+      refreshAwardsEmpty();
+    });
+    document.querySelector("#playerAwardRows")?.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-remove-player-award]");
+      if (!button) return;
+      button.closest("[data-award-row]")?.remove();
+      refreshAwardsEmpty();
+    });
     if (section === "tournaments") {
       document.querySelectorAll('input[name="formatType"], .tournament-teams input[name="teams"]').forEach((input) => input.addEventListener("change", renderFormatPreview));
       renderFormatPreview();
@@ -579,32 +611,43 @@
     return new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = reject; reader.readAsDataURL(file); });
   }
 
-  async function optimizedImageDataUrl(file, kind = "image") {
+  async function optimizedImageBlob(file, kind = "image") {
     if (!file?.type?.startsWith("image/")) throw new Error("Selecione uma imagem PNG, JPG ou WebP.");
-    if (file.size > MAX_IMAGE_UPLOAD_BYTES) throw new Error("A imagem ultrapassa 12 MB.");
-    const maxDimension = kind === "news" ? 2400 : kind === "photo" ? 1800 : 1600;
+    if (file.size > MAX_IMAGE_UPLOAD_BYTES) throw new Error("A imagem ultrapassa 30 MB.");
+    const settings = kind === "news" ? { dimension: 1920, target: 700 * 1024 } : kind === "photo" ? { dimension: 1600, target: 500 * 1024 } : { dimension: 1200, target: 320 * 1024 };
     const image = new Image();
     const objectUrl = URL.createObjectURL(file);
     try {
       await new Promise((resolve, reject) => { image.onload = resolve; image.onerror = () => reject(new Error("Não foi possível abrir esta imagem.")); image.src = objectUrl; });
-      const scale = Math.min(1, maxDimension / Math.max(image.naturalWidth, image.naturalHeight));
+      let scale = Math.min(1, settings.dimension / Math.max(image.naturalWidth, image.naturalHeight));
       const canvas = document.createElement("canvas");
-      canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
-      canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
-      const context = canvas.getContext("2d", { alpha: true });
-      if (!context) return fileAsDataUrl(file);
-      context.clearRect(0, 0, canvas.width, canvas.height);
-      context.drawImage(image, 0, 0, canvas.width, canvas.height);
       let quality = .9;
-      let blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/webp", quality));
-      while (blob && blob.size > 3.5 * 1024 * 1024 && quality > .62) {
-        quality -= .08;
+      let blob = null;
+      for (let attempt = 0; attempt < 10; attempt += 1) {
+        canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+        canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+        const context = canvas.getContext("2d", { alpha: true });
+        if (!context) throw new Error("O navegador não conseguiu preparar a imagem.");
+        context.clearRect(0, 0, canvas.width, canvas.height);
+        context.drawImage(image, 0, 0, canvas.width, canvas.height);
         blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/webp", quality));
+        if (blob && blob.size <= settings.target) break;
+        if (quality > .66) quality -= .08;
+        else { quality = .8; scale *= .82; }
       }
-      return fileAsDataUrl(blob || file);
+      if (!blob) throw new Error("Não foi possível converter a imagem.");
+      return blob;
     } finally {
       URL.revokeObjectURL(objectUrl);
     }
+  }
+
+  async function uploadOptimizedImage(file, kind) {
+    const blob = await optimizedImageBlob(file, kind);
+    const response = await fetch("/api/admin/media", { method: "POST", credentials: "same-origin", headers: { "Content-Type": blob.type || "image/webp" }, body: blob });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok || !result.url) throw new Error(result.error || "Não foi possível enviar a imagem.");
+    return result.url;
   }
 
   async function loadDemoParser() {
@@ -979,7 +1022,10 @@
     const values = {};
     const saveWarnings = [];
     for (const [key, value] of formData.entries()) if (!(typeof File !== "undefined" && value instanceof File)) values[key] = value;
-    if (section === "players") values.teams = formData.getAll("teams");
+    if (section === "players") {
+      values.teams = formData.getAll("teams");
+      values.awards = [...document.querySelectorAll("[data-award-row]")].map((row) => ({ type: row.querySelector("[data-award-category]")?.value || "mvp", tournamentId: row.querySelector("[data-award-tournament]")?.value || "" })).filter((award) => award.tournamentId);
+    }
     if (section === "tournaments") {
       values.teams = formData.getAll("teams");
       const definition = formatDefinition(values.formatType);
@@ -994,12 +1040,12 @@
     const imageField = section === "players" ? "photo" : ["teams", "tournaments"].includes(section) ? "logo" : section === "news" ? "image" : null;
     const imageFile = imageField ? formData.get(imageField) : null;
     if (imageField && imageFile?.size) {
-      try { values[imageField] = await optimizedImageDataUrl(imageFile, section === "news" ? "news" : section === "players" ? "photo" : "logo"); }
+      try { values[imageField] = await uploadOptimizedImage(imageFile, section === "news" ? "news" : section === "players" ? "photo" : "logo"); }
       catch (reason) { showToast(reason.message || "Não foi possível otimizar a imagem"); return; }
     }
     const scoreboardFile = section === "matches" ? formData.get("scoreboardImage") : null;
     if (scoreboardFile?.size) {
-      try { values.scoreboardImage = await optimizedImageDataUrl(scoreboardFile, "news"); }
+      try { values.scoreboardImage = await uploadOptimizedImage(scoreboardFile, "news"); }
       catch (reason) { saveWarnings.push(`O print foi ignorado: ${reason.message || reason}`); }
     }
     if (section === "matches" && values.removeScoreboardImage === "true") values.scoreboardImage = "";
