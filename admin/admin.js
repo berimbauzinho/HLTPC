@@ -687,6 +687,19 @@
     const response = await fetch("/api/admin/media", { method: "POST", credentials: "same-origin", headers: { "Content-Type": blob.type || "image/webp" }, body: blob });
     const result = await response.json().catch(() => ({}));
     if (!response.ok || !result.url) throw new Error(result.error || "Não foi possível enviar a imagem.");
+
+    // A gravação só é considerada concluída quando a mesma URL usada pelo site
+    // público consegue devolver uma imagem. Isso impede salvar referências 404.
+    const publicUrl = `${result.url}${result.url.includes("?") ? "&" : "?"}verify=${Date.now()}`;
+    const verification = await fetch(publicUrl, { cache: "no-store", credentials: "same-origin" });
+    const contentType = verification.headers.get("content-type") || "";
+    if (!verification.ok || !contentType.startsWith("image/")) {
+      throw new Error("A imagem foi enviada, mas não pôde ser carregada de volta. O cadastro anterior foi preservado.");
+    }
+    const receivedBytes = Number(verification.headers.get("content-length") || 0);
+    if (receivedBytes && receivedBytes !== blob.size) {
+      throw new Error("A imagem retornou incompleta. O cadastro anterior foi preservado.");
+    }
     return result.url;
   }
 
