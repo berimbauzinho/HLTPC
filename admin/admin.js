@@ -182,15 +182,17 @@
       const referencesChanged = normalizeTeamReferences();
       const structureChanged = normalizeTournamentStructures();
       const leetifyImported = await syncPendingLeetifyMatches();
-      if (historicalImported || identitiesChanged || referencesChanged || structureChanged || leetifyImported) await persistContent();
+      const compactedImages = await compactStoredImages();
+      if (historicalImported || identitiesChanged || referencesChanged || structureChanged || leetifyImported || compactedImages) await persistContent();
       go(section);
-      showToast(historicalImported ? `Histórico de 2025 importado: ${historicalImported} registros atualizados` : leetifyImported ? `${leetifyImported} partida sincronizada com o Leetify` : "Conteúdo compartilhado carregado");
+      showToast(historicalImported ? `Histórico de 2025 importado: ${historicalImported} registros atualizados` : leetifyImported ? `${leetifyImported} partida sincronizada com o Leetify` : compactedImages ? `${compactedImages} imagens antigas foram compactadas` : "Conteúdo compartilhado carregado");
     } catch (reason) {
       showToast(reason.message);
     }
   }
 
   async function persistContent() {
+    await compactStoredImages();
     return contentRequest({ method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ players: state.players, teams: state.teams, tournaments: state.tournaments, matches: state.matches, news: state.news }) });
   }
 
@@ -651,10 +653,16 @@
     return new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = reject; reader.readAsDataURL(file); });
   }
 
+  function imageSettings(kind = "image") {
+    if (kind === "news") return { dimension: 1600, target: 300 * 1024 };
+    if (kind === "photo") return { dimension: 1200, target: 180 * 1024 };
+    return { dimension: 900, target: 110 * 1024 };
+  }
+
   async function optimizedImageBlob(file, kind = "image") {
     if (!file?.type?.startsWith("image/")) throw new Error("Selecione uma imagem PNG, JPG ou WebP.");
     if (file.size > MAX_IMAGE_UPLOAD_BYTES) throw new Error("A imagem ultrapassa 30 MB.");
-    const settings = kind === "news" ? { dimension: 1920, target: 700 * 1024 } : kind === "photo" ? { dimension: 1600, target: 500 * 1024 } : { dimension: 1200, target: 320 * 1024 };
+    const settings = imageSettings(kind);
     const image = new Image();
     const objectUrl = URL.createObjectURL(file);
     try {
@@ -684,25 +692,37 @@
 
   async function uploadOptimizedImage(file, kind) {
     const blob = await optimizedImageBlob(file, kind);
-    const response = await fetch("/api/admin/media", { method: "POST", credentials: "same-origin", headers: { "Content-Type": blob.type || "image/webp" }, body: blob });
-    const result = await response.json().catch(() => ({}));
-    if (!response.ok || !result.url) throw new Error(result.error || "Não foi possível enviar a imagem.");
+    return fileAsDataUrl(blob);
+  }
 
-    // A gravação só é considerada concluída quando a mesma URL usada pelo site
-    // público consegue devolver uma imagem. Isso impede salvar referências 404.
-    let lastStatus = 0;
-    for (let attempt = 0; attempt < 8; attempt += 1) {
-      if (attempt) await new Promise((resolve) => setTimeout(resolve, 250 + attempt * 150));
-      const publicUrl = `${result.url}${result.url.includes("?") ? "&" : "?"}verify=${Date.now()}-${attempt}`;
-      const verification = await fetch(publicUrl, { cache: "no-store", credentials: "same-origin" });
-      lastStatus = verification.status;
-      const contentType = verification.headers.get("content-type") || "";
-      if (!verification.ok || !contentType.startsWith("image/")) continue;
-      const received = await verification.arrayBuffer();
-      if (received.byteLength !== blob.size) throw new Error("A imagem retornou incompleta. O cadastro anterior foi preservado.");
-      return result.url;
+  function dataUrlAsBlob(value) {
+    const match = String(value || "").match(/^data:([^;,]+);base64,(.+)$/s);
+    if (!match) return null;
+    const binary = atob(match[2]);
+    const bytes = new Uint8Array(binary.length);
+    for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+    return new Blob([bytes], { type: match[1] });
+  }
+
+  async function compactStoredImages() {
+    const references = [
+      ...state.teams.map((record) => ({ record, field: "logo", kind: "logo" })),
+      ...state.tournaments.map((record) => ({ record, field: "logo", kind: "logo" })),
+      ...state.players.map((record) => ({ record, field: "photo", kind: "photo" })),
+      ...state.news.map((record) => ({ record, field: "image", kind: "news" })),
+      ...state.matches.map((record) => ({ record, field: "scoreboardImage", kind: "news" }))
+    ];
+    let changed = 0;
+    for (const reference of references) {
+      const source = String(reference.record[reference.field] || "");
+      const settings = imageSettings(reference.kind);
+      if (!source.startsWith("data:image/") || source.length <= Math.ceil(settings.target * 1.42)) continue;
+      const blob = dataUrlAsBlob(source);
+      if (!blob) continue;
+      reference.record[reference.field] = await fileAsDataUrl(await optimizedImageBlob(blob, reference.kind));
+      changed += 1;
     }
-    throw new Error(`A imagem foi enviada, mas o armazenamento ainda não conseguiu devolvê-la${lastStatus ? ` (HTTP ${lastStatus})` : ""}. O cadastro anterior foi preservado.`);
+    return changed;
   }
 
   async function loadDemoParser() {
@@ -1004,12 +1024,15 @@
     const stats = new Map();
     const getPlayer = (steamid, name, team) => {
       const id = String(steamid || name || "desconhecido");
-      if (!stats.has(id)) stats.set(id, { steamid: String(steamid || ""), name: canonicalPlayerName(name, steamid, true), demoName: String(name || ""), team: String(team || ""), kills: 0, deaths: 0, assists: 0, headshots: 0, damage: 0 });
+      if (!stats.has(id)) stats.set(id, { steamid: String(steamid || ""), name: canonicalPlayerName(name, steamid, true), demoName: String(name || ""), team: String(team || ""), kills: 0, deaths: 0, assists: 0, headshots: 0, damage: 0, hits: 0, headHits: 0, utilityDamage: 0, openingKills: 0, openingDeaths: 0, multiKill2: 0, multiKill3: 0, multiKill4: 0, multiKill5: 0 });
       const player = stats.get(id);
       if (!player.team && team) player.team = String(team);
       return player;
     };
-    deaths.forEach((event) => {
+    const validDeaths = [...deaths].sort((a, b) => numberValue(a.tick) - numberValue(b.tick));
+    const firstKillByRound = new Set();
+    const killsByPlayerRound = new Map();
+    validDeaths.forEach((event) => {
       const samePlayer = String(event.attacker_steamid || "") === String(event.user_steamid || "");
       const teamKill = event.attacker_team_name && event.user_team_name && event.attacker_team_name === event.user_team_name;
       const victim = getPlayer(event.user_steamid, event.user_name, event.user_team_name);
@@ -1017,13 +1040,34 @@
         victim.deaths += 1;
         const attacker = getPlayer(event.attacker_steamid, event.attacker_name, event.attacker_team_name);
         attacker.kills += 1;
+        const round = numberValue(event.total_rounds_played);
+        if (!firstKillByRound.has(round)) {
+          firstKillByRound.add(round);
+          attacker.openingKills += 1;
+          victim.openingDeaths += 1;
+        }
+        const multiKey = `${round}:${attacker.steamid || attacker.name}`;
+        killsByPlayerRound.set(multiKey, { player: attacker, kills: (killsByPlayerRound.get(multiKey)?.kills || 0) + 1 });
         if (booleanValue(event.headshot)) attacker.headshots += 1;
         if (event.assister_name && String(event.assister_steamid || "") !== "0") getPlayer(event.assister_steamid, event.assister_name, event.assister_team_name).assists += 1;
       }
     });
+    killsByPlayerRound.forEach(({ player, kills }) => {
+      if (kills >= 5) player.multiKill5 += 1;
+      else if (kills === 4) player.multiKill4 += 1;
+      else if (kills === 3) player.multiKill3 += 1;
+      else if (kills === 2) player.multiKill2 += 1;
+    });
     hurts.forEach((event) => {
       const teamKill = event.attacker_team_name && event.user_team_name && event.attacker_team_name === event.user_team_name;
-      if (!teamKill && event.attacker_name && String(event.attacker_steamid || "") !== String(event.user_steamid || "")) getPlayer(event.attacker_steamid, event.attacker_name, event.attacker_team_name).damage += numberValue(event.dmg_health ?? event.health_damage);
+      if (!teamKill && event.attacker_name && String(event.attacker_steamid || "") !== String(event.user_steamid || "")) {
+        const attacker = getPlayer(event.attacker_steamid, event.attacker_name, event.attacker_team_name);
+        const damage = numberValue(event.dmg_health ?? event.health_damage);
+        attacker.damage += damage;
+        attacker.hits += 1;
+        if (["head", "1"].includes(String(event.hitgroup || event.hit_group || "").toLowerCase())) attacker.headHits += 1;
+        if (/hegrenade|inferno|molotov|incgrenade/i.test(String(event.weapon || event.weapon_name || ""))) attacker.utilityDamage += damage;
+      }
     });
     const observedRounds = [...deaths, ...hurts].map((event) => numberValue(event.total_rounds_played)).filter((round) => round >= 0);
     const rounds = roundEnds.length || (observedRounds.length ? Math.max(...observedRounds) + 1 : 0);
@@ -1033,7 +1077,7 @@
     if (lastRoundTick) {
       try {
         const scoreboard = demoRows(parser.parseTicks(bytes, ["kills_total", "deaths_total", "assists_total", "headshot_kills_total", "damage_total", "team_name"], new Int32Array([lastRoundTick]))).filter((player) => player.steamid && String(player.steamid) !== "0");
-        if (scoreboard.length) statistics = scoreboard.map((player) => ({ steamid: String(player.steamid), name: canonicalPlayerName(player.name, player.steamid, true), demoName: String(player.name || ""), team: String(player.team_name || ""), kills: numberValue(player.kills_total), deaths: numberValue(player.deaths_total), assists: numberValue(player.assists_total), headshots: numberValue(player.headshot_kills_total), damage: numberValue(player.damage_total), adr: rounds ? Number((numberValue(player.damage_total) / rounds).toFixed(1)) : null, kd: numberValue(player.deaths_total) ? Number((numberValue(player.kills_total) / numberValue(player.deaths_total)).toFixed(2)) : numberValue(player.kills_total) })).sort((a, b) => b.kills - a.kills || b.damage - a.damage);
+        if (scoreboard.length) statistics = scoreboard.map((player) => ({ ...(stats.get(String(player.steamid)) || {}), steamid: String(player.steamid), name: canonicalPlayerName(player.name, player.steamid, true), demoName: String(player.name || ""), team: String(player.team_name || ""), kills: numberValue(player.kills_total), deaths: numberValue(player.deaths_total), assists: numberValue(player.assists_total), headshots: numberValue(player.headshot_kills_total), damage: numberValue(player.damage_total), adr: rounds ? Number((numberValue(player.damage_total) / rounds).toFixed(1)) : null, kd: numberValue(player.deaths_total) ? Number((numberValue(player.kills_total) / numberValue(player.deaths_total)).toFixed(2)) : numberValue(player.kills_total) })).sort((a, b) => b.kills - a.kills || b.damage - a.damage);
       } catch (reason) { warnings.push(`placar final: ${reason.message || reason}`); }
       try {
         const teamRows = demoRows(parser.parseTicks(bytes, ["team_name", "team_score"], new Int32Array([lastRoundTick, lastRoundTick + 1]))).filter((row) => row.team_name);
