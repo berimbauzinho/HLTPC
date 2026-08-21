@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>HLTPC Admin — Demonstração</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&family=Oswald:wght@500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="admin.css?v=inline-media-1" />
+    <link rel="stylesheet" href="media-fallback.css?v=inline-media-1" />
+  </head>
+  <body>
+    <section class="login-screen" id="loginScreen">
+      <div class="login-brand">HLT<span>PC</span><small>ADMIN</small></div>
+      <form class="login-card" id="loginForm">
+        <span>ACESSO RESTRITO</span>
+        <h1>Entrar no painel</h1>
+        <p>Use o usuário e a senha cadastrados pelo owner.</p>
+        <label>Usuário<input name="username" autocomplete="username" required autofocus /></label>
+        <label>Senha<input name="password" type="password" autocomplete="current-password" required /></label>
+        <button class="primary" type="submit">Entrar</button>
+        <div class="login-error" id="loginError" role="alert"></div>
+        <a href="../">← Voltar ao site público</a>
+      </form>
+      <form class="login-card" id="changePasswordForm" hidden>
+        <span>PRIMEIRO ACESSO</span>
+        <h1>Crie sua senha</h1>
+        <p>A senha temporária funcionou. Agora escolha uma senha só sua.</p>
+        <label>Nova senha<input name="password" type="password" minlength="8" autocomplete="new-password" required /></label>
+        <label>Confirmar nova senha<input name="confirmation" type="password" minlength="8" autocomplete="new-password" required /></label>
+        <button class="primary" type="submit">Salvar nova senha</button>
+        <div class="login-error" id="changePasswordError" role="alert"></div>
+      </form>
+    </section>
+
+    <div class="admin-app" id="adminApp">
+    <aside class="sidebar">
+      <a class="brand" href="../">HLT<span>PC</span><small>ADMIN</small></a>
+      <nav id="adminNav">
+        <button class="active" data-section="overview"><i>⌂</i>Visão geral</button>
+        <button data-section="players"><i>♟</i>Jogadores</button>
+        <button data-section="teams"><i>◆</i>Times</button>
+        <button data-section="tournaments"><i>★</i>Campeonatos</button>
+        <button data-section="news"><i>▤</i>Notícias</button>
+        <button data-section="users" data-owner-only><i>♙</i>Usuários e acessos</button>
+      </nav>
+      <div class="sidebar-footer"><a href="../">↗ Ver site público</a><button id="logoutButton">⇥ Sair</button></div>
+    </aside>
+
+    <main class="workspace">
+      <header class="topbar">
+        <button class="mobile-menu" id="mobileMenu">☰</button>
+        <div><span>HLTPC /</span><b id="breadcrumb">Visão geral</b></div>
+        <div class="admin-user"><span class="status-dot"></span><span id="currentUser">Owner</span><b id="currentInitials">OW</b></div>
+      </header>
+
+      <div class="demo-banner"><b>Deploy Preview</b><span>Alterações salvas aqui são compartilhadas e aparecem no site de teste. Imagens devem ter até 2 MB. Demos acima de 500 MB são registradas sem leitura local; Leetify, print e resultado manual continuam funcionando normalmente.</span></div>
+
+      <section class="content" id="content"></section>
+    </main>
+
+    <dialog id="editorDialog">
+      <form method="dialog" id="editorForm">
+        <header><div><span id="dialogEyebrow">NOVO REGISTRO</span><h2 id="dialogTitle">Adicionar</h2></div><button type="button" id="closeDialog" aria-label="Fechar">×</button></header>
+        <div class="form-body" id="formFields"></div>
+        <footer><button type="button" class="danger" id="deleteButton">Excluir</button><div><button type="button" class="ghost" id="cancelButton">Cancelar</button><button class="primary" value="save" type="submit">Salvar</button></div></footer>
+      </form>
+    </dialog>
+
+    <div class="toast" id="toast"><i>✓</i><span>Alteração salva na demonstração</span></div>
+    </div>
+
+    <script src="../data.js"></script>
+    <script src="../data-2025.js?v=2025-import-2"></script>
+    <script src="auth.js"></script>
+    <script src="admin.js?v=dashboard-2"></script>
+  </body>
+</html>

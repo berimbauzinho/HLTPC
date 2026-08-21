@@ -1,0 +1,9 @@
+{
+  "name": "hltpc",
+  "private": true,
+  "version": "1.0.0",
+  "dependencies": {
+    "@laihoe/demoparser2": "^0.42.0",
+    "@netlify/blobs": "^10.0.10"
+  }
+}

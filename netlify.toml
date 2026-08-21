@@ -1,0 +1,63 @@
+[build]
+  publish = "."
+  functions = "netlify/functions"
+
+[functions]
+  external_node_modules = ["@laihoe/demoparser2"]
+
+[[redirects]]
+  from = "/api/admin/login"
+  to = "/.netlify/functions/admin-login"
+  status = 200
+
+[[redirects]]
+  from = "/api/admin/session"
+  to = "/.netlify/functions/admin-session"
+  status = 200
+
+[[redirects]]
+  from = "/api/admin/logout"
+  to = "/.netlify/functions/admin-logout"
+  status = 200
+
+[[redirects]]
+  from = "/api/admin/change-password"
+  to = "/.netlify/functions/admin-change-password"
+  status = 200
+
+[[redirects]]
+  from = "/api/admin/users"
+  to = "/.netlify/functions/admin-users"
+  status = 200
+
+[[redirects]]
+  from = "/api/content"
+  to = "/.netlify/functions/content"
+  status = 200
+
+[[redirects]]
+  from = "/api/admin/content"
+  to = "/.netlify/functions/admin-content"
+  status = 200
+
+[[redirects]]
+  from = "/api/admin/media"
+  to = "/.netlify/functions/admin-media-v2"
+  status = 200
+
+[[redirects]]
+  from = "/api/admin/process-demo"
+  to = "/.netlify/functions/admin-process-demo-background"
+  status = 200
+
+[[redirects]]
+  from = "/api/media/*"
+  to = "/.netlify/functions/media-v2?id=:splat"
+  status = 200
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    X-Frame-Options = "SAMEORIGIN"
+    Referrer-Policy = "strict-origin-when-cross-origin"

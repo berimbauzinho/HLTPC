@@ -1,0 +1,37 @@
+.media-image-fallback {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  padding: 3px;
+  overflow: hidden;
+  color: #526071;
+  background: #e6eaf0;
+  font: 700 8px/1.15 "JetBrains Mono", monospace;
+  text-align: center;
+}
+
+.media-image-fallback[hidden],
+.image-upload-preview > img[hidden],
+.avatar > img[hidden],
+.championship-logo > img[hidden] {
+  display: none !important;
+}
+
+.avatar > .media-image-fallback,
+.championship-logo > .media-image-fallback {
+  border-radius: 7px;
+}
+
+.championship-logo > img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.image-upload-preview > .media-image-fallback {
+  min-height: 112px;
+  background: #fff4e2;
+  color: #895d1d;
+  font-size: 9px;
+}
