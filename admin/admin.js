@@ -175,6 +175,51 @@
     return result;
   }
 
+  async function processDemoOnServer(matchId) {
+    const previous = state.matches.find((item) => item.id === matchId)?.demoProcessing?.processedAt || "";
+    const response = await fetch("/api/admin/process-demo", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ matchId })
+    });
+    if (!response.ok) {
+      const result = await response.json().catch(() => ({}));
+      throw new Error(result.error || "O servidor não conseguiu iniciar o processamento da demo.");
+    }
+    for (let attempt = 0; attempt < 180; attempt += 1) {
+      await new Promise((resolve) => window.setTimeout(resolve, 5000));
+      const saved = await contentRequest();
+      ["players", "teams", "tournaments", "matches", "news"].forEach((key) => { if (Array.isArray(saved[key])) state[key] = saved[key]; });
+      const match = state.matches.find((item) => item.id === matchId);
+      if (match?.demoProcessing?.status === "error") throw new Error(match.demoProcessing.error || "A demo não pôde ser processada.");
+      if (match?.demoProcessing?.status === "complete" && match.demoProcessing.processedAt !== previous) {
+        return {
+          mapName: match.demoInfo?.mapName || "",
+          rounds: match.demoInfo?.rounds || 0,
+          players: match.statistics?.length || 0,
+          score: match.score || "",
+          winner: match.winner || ""
+        };
+      }
+    }
+    throw new Error("O processamento continua em segundo plano. Atualize o painel em alguns minutos para conferir.");
+  }
+
+  async function syncPendingServerDemos() {
+    const pending = state.matches.filter((match) => match.demoUrl && match.statisticsSource !== "demo" && match.demoProcessing?.status !== "error" && (
+      !(match.statistics || []).length ||
+      ["failed", "pending", "skipped-large"].includes(match.demoInfo?.extractionStatus)
+    ));
+    let processed = 0;
+    for (const match of pending) {
+      showToast(`${match.name}: processando a demo do Drive no servidor…`);
+      await processDemoOnServer(match.id);
+      processed += 1;
+    }
+    return processed;
+  }
+
   async function loadPersistedContent() {
     try {
       const saved = await contentRequest();
@@ -183,11 +228,14 @@
       const identitiesChanged = enforceConfirmedPlayerIdentities();
       const referencesChanged = normalizeTeamReferences();
       const structureChanged = normalizeTournamentStructures();
+      const compactedBeforeProcessing = await compactStoredImages();
+      if (historicalImported || identitiesChanged || referencesChanged || structureChanged || compactedBeforeProcessing) await persistContent();
+      const serverImported = await syncPendingServerDemos();
       const leetifyImported = await syncPendingLeetifyMatches();
       const compactedImages = await compactStoredImages();
-      if (historicalImported || identitiesChanged || referencesChanged || structureChanged || leetifyImported || compactedImages) await persistContent();
+      if (leetifyImported || compactedImages) await persistContent();
       go(section);
-      showToast(historicalImported ? `Histórico de 2025 importado: ${historicalImported} registros atualizados` : leetifyImported ? `${leetifyImported} partida sincronizada com o Leetify` : compactedImages ? `${compactedImages} imagens antigas foram compactadas` : "Conteúdo compartilhado carregado");
+      showToast(serverImported ? `${serverImported} demo processada no servidor HLTPC` : historicalImported ? `Histórico de 2025 importado: ${historicalImported} registros atualizados` : leetifyImported ? `${leetifyImported} partida sincronizada com o Leetify` : compactedImages || compactedBeforeProcessing ? `${compactedImages + compactedBeforeProcessing} imagens antigas foram compactadas` : "Conteúdo compartilhado carregado");
     } catch (reason) {
       showToast(reason.message);
     }
@@ -434,8 +482,9 @@
       const manualResult = item.manualResult === true || item.manualResult === "true" || ["manual", "manual-maps"].includes(item.resultSource) || maps.some((map) => map.scoreSource === "manual" || map.resultSource === "manual");
       const seriesMaps = seriesMapsMarkup(item, maps);
       const sourceSummary = item.demoInfo || item.leetifyUrl || item.scoreboardImage || manualResult ? `<div class="match-source-summary"><span class="${demoHasStats ? "verified" : item.demoInfo ? "partial" : "muted"}"><b>${demoHasStats ? "1 · Demo confirmada" : item.demoInfo?.extractionStatus === "skipped-large" ? "1 · Demo grande" : item.demoInfo ? "1 · Demo anexada" : "1 · Sem demo"}</b><small>${item.demoInfo ? `${escapeHtml(item.demoInfo.fileName)}${demoHasStats ? ` · ${(item.statistics || []).length} jogadores` : item.demoInfo.extractionStatus === "skipped-large" ? " · leitura local ignorada" : " · extração pendente"}` : "Fonte primária opcional"}</small></span><span class="${leetifyHasStats ? "verified" : item.leetifyUrl ? "partial" : "muted"}"><b>2 · Leetify</b><small>${leetifyHasStats ? `${(item.statistics || []).length} jogadores · ${escapeHtml(item.leetifyInfo.mapName || "mapa identificado")}` : item.leetifySyncError ? escapeHtml(item.leetifySyncError) : item.leetifyUrl ? "Link salvo · aguarda importação" : "Fonte secundária opcional"}</small></span><span class="${item.scoreboardImage ? "verified" : "muted"}"><b>3 · Print</b><small>${item.scoreboardImage ? "Imagem salva como comprovação" : "Evidência visual opcional"}</small></span><span class="${manualResult ? "verified" : "muted"}"><b>4 · Manual</b><small>${manualResult ? `Resultado confirmado: ${escapeHtml(item.score || "—")}` : "Disponível mesmo sem arquivos"}</small></span></div>` : "";
+      const serverStatus = item.demoProcessing?.status === "processing" ? `<div class="helper"><b>Processando no servidor…</b> A demo pode continuar sendo lida mesmo que você saia desta tela.</div>` : item.demoProcessing?.status === "error" ? `<div class="helper storage-warning"><b>Falha no processamento:</b> ${escapeHtml(item.demoProcessing.error || "verifique o link do Drive")}</div>` : item.demoProcessing?.status === "complete" ? `<div class="helper"><b>✓ Processamento concluído.</b> O arquivo bruto foi apagado; somente os dados extraídos permanecem.</div>` : "";
       const manualFields = manualResultFields(item, maps, manualResult);
-      return `${tournamentField}${teamsField}${textField("name", "Fase", item.name, "Ex.: Semifinal", true)}${selectField("status", item.status)}${seriesMaps}${manualFields}<fieldset class="match-evidence"><legend>Fontes dos dados</legend><div class="evidence-order"><b>1</b><span><strong>Demo · fonte principal</strong><small>Até 500 MB, o painel tenta extrair data e estatísticas. Acima disso, ignora somente a leitura local e continua salvando as outras fontes.</small></span></div>${fileField("demo", "Selecionar arquivo .dem", ".dem")}${urlField("demoUrl", "Ou link da demo no Google Drive", item.demoUrl, "https://drive.google.com/file/d/...")}${item.demoInfo ? `<div class="demo-result ${demoHasStats ? "" : "partial"}"><b>${demoHasStats ? "✓ Demo processada" : item.demoInfo.extractionStatus === "skipped-large" ? "⚠ Demo grande registrada; leitura local ignorada" : item.demoUrl ? "✓ Demo vinculada pelo Drive" : "⚠ Demo anexada, sem estatísticas automáticas"}</b><span>${escapeHtml(item.demoInfo.fileName)} · ${escapeHtml(item.demoInfo.mapName || "mapa não identificado")} · ${item.demoInfo.rounds || 0} rounds</span><small>${escapeHtml(item.demoInfo.playedAtLabel || item.subtitle || "Data não identificada")} · ${(item.statistics || []).length} jogadores extraídos</small>${item.demoInfo.warnings?.length ? `<small>${escapeHtml(item.demoInfo.warnings.join(" · "))}</small>` : ""}</div>` : ""}<div class="evidence-order"><b>2</b><span><strong>Leetify · fonte secundária</strong><small>Use sozinho ou para complementar rating/KAST quando a demo estiver disponível.</small></span></div>${urlField("leetifyUrl", "Link da partida no Leetify", item.leetifyUrl, "https://leetify.com/app/match-details/...")}<div class="evidence-order"><b>3</b><span><strong>Print do placar · comprovação visual</strong><small>Envie a tela final quando a demo ou o Leetify não trouxerem tudo.</small></span></div>${fileField("scoreboardImage", item.scoreboardImage ? "Substituir print do placar" : "Enviar print do placar", "image/*")}${item.scoreboardImage ? `<div class="scoreboard-preview"><img src="${escapeHtml(item.scoreboardImage)}" alt="Print do placar salvo" /><span><b>Print salvo</b><small>Um novo arquivo substituirá esta imagem.</small><label><input type="checkbox" name="removeScoreboardImage" value="true" /> Remover print atual</label></span></div>` : ""}</fieldset>${sourceSummary}<div class="helper" id="matchHelper">${generated ? "A data será extraída do nome da demo quando ela puder ser lida. Cada fonte funciona de forma independente e fica ligada somente a este confronto." : "Escolha uma edição: os times serão limitados exclusivamente às escalações daquele campeonato."}</div>`;
+      return `${tournamentField}${teamsField}${textField("name", "Fase", item.name, "Ex.: Semifinal", true)}${selectField("status", item.status)}${seriesMaps}${manualFields}<fieldset class="match-evidence"><legend>Fontes dos dados</legend><div class="evidence-order"><b>1</b><span><strong>Demo · fonte principal</strong><small>Para arquivos grandes, envie ao Drive, compartilhe como “qualquer pessoa com o link” e cole o endereço abaixo. O servidor processa em segundo plano e não guarda a demo bruta.</small></span></div>${fileField("demo", "Selecionar arquivo .dem (leitura rápida no navegador)", ".dem")}${urlField("demoUrl", "Link da demo no Google Drive", item.demoUrl, "https://drive.google.com/file/d/...")}${item.demoUrl ? `<button class="secondary-add" type="button" data-process-server-demo>Reprocessar demo no servidor</button>` : ""}${serverStatus}${item.demoInfo ? `<div class="demo-result ${demoHasStats ? "" : "partial"}"><b>${demoHasStats ? "✓ Demo processada" : item.demoInfo.extractionStatus === "skipped-large" ? "⚠ Demo grande registrada; leitura local ignorada" : item.demoUrl ? "✓ Demo vinculada pelo Drive" : "⚠ Demo anexada, sem estatísticas automáticas"}</b><span>${escapeHtml(item.demoInfo.fileName)} · ${escapeHtml(item.demoInfo.mapName || "mapa não identificado")} · ${item.demoInfo.rounds || 0} rounds</span><small>${escapeHtml(item.demoInfo.playedAtLabel || item.subtitle || "Data não identificada")} · ${(item.statistics || []).length} jogadores extraídos</small>${item.demoInfo.warnings?.length ? `<small>${escapeHtml(item.demoInfo.warnings.join(" · "))}</small>` : ""}</div>` : ""}<div class="evidence-order"><b>2</b><span><strong>Leetify · fonte secundária</strong><small>Use sozinho ou para complementar rating/KAST quando a demo estiver disponível.</small></span></div>${urlField("leetifyUrl", "Link da partida no Leetify", item.leetifyUrl, "https://leetify.com/app/match-details/...")}<div class="evidence-order"><b>3</b><span><strong>Print do placar · comprovação visual</strong><small>Envie a tela final quando a demo ou o Leetify não trouxerem tudo.</small></span></div>${fileField("scoreboardImage", item.scoreboardImage ? "Substituir print do placar" : "Enviar print do placar", "image/*")}${item.scoreboardImage ? `<div class="scoreboard-preview"><img src="${escapeHtml(item.scoreboardImage)}" alt="Print do placar salvo" /><span><b>Print salvo</b><small>Um novo arquivo substituirá esta imagem.</small><label><input type="checkbox" name="removeScoreboardImage" value="true" /> Remover print atual</label></span></div>` : ""}</fieldset>${sourceSummary}<div class="helper" id="matchHelper">${generated ? "A data será extraída do nome da demo quando ela puder ser lida. Cada fonte funciona de forma independente e fica ligada somente a este confronto." : "Escolha uma edição: os times serão limitados exclusivamente às escalações daquele campeonato."}</div>`;
     }
     const relatedTournament = `<label>Campeonato relacionado<select name="tournamentId"><option value="">Nenhum</option>${state.tournaments.map((event) => `<option value="${escapeHtml(event.id)}" ${item.tournamentId === event.id ? "selected" : ""}>${escapeHtml(event.name)} ${escapeHtml(event.subtitle)}</option>`).join("")}</select></label>`;
     return `${textField("name", "Título", item.name, "Título da notícia", true)}<label>Resumo para a capa<textarea name="subtitle" placeholder="Uma chamada curta para o banner e a lista de notícias...">${escapeHtml(item.subtitle)}</textarea></label><label>Texto completo da notícia<textarea class="article-body-field" name="body" placeholder="Escreva a matéria completa, separando os parágrafos com uma linha em branco...">${escapeHtml(item.body || item.subtitle)}</textarea></label>${relatedTournament}<div class="field-row">${textField("author", "Autor", item.author, "HLTPC")}${textField("date", "Data", item.date, "2026-08-10", true)}</div>${selectField("status", item.status)}${imageFileField("image", "Foto de destaque da notícia", item.image, "news")}`;
@@ -647,6 +696,24 @@
         document.querySelector(`[name="manualMapScoreA_${button.dataset.editMap}"]`)?.focus();
         refreshSeriesResult();
       }));
+      document.querySelector("[data-process-server-demo]")?.addEventListener("click", async (event) => {
+        const button = event.currentTarget;
+        if (!editingId || button.disabled) return;
+        button.disabled = true;
+        button.textContent = "Processando a demo…";
+        showToast("Baixando e processando a demo no servidor HLTPC…");
+        try {
+          const result = await processDemoOnServer(editingId);
+          dialog.close();
+          showToast(`${result.mapName || "Demo"}: ${result.rounds} rounds, ${result.players} jogadores e placar ${result.score || "extraído"}`);
+          if (returnSection) { section = returnSection; returnSection = null; }
+          go(section === "matches" ? "tournaments" : section);
+        } catch (reason) {
+          button.disabled = false;
+          button.textContent = "Processar demo no servidor";
+          showToast(reason.message, true);
+        }
+      });
       refreshSeriesResult();
     }
   }
@@ -1292,8 +1359,19 @@
     if (section === "tournaments") ensureTournamentFixtures(index >= 0 ? list[index] : record);
     normalizeTeamReferences();
     await persistContent();
+    let serverDemoResult = null;
+    const shouldProcessOnServer = section === "matches" && record.demoUrl && record.statisticsSource !== "demo" && (
+      Boolean(demoFile?.size) ||
+      !(record.statistics || []).length ||
+      ["failed", "pending", "skipped-large"].includes(record.demoInfo?.extractionStatus)
+    );
+    if (shouldProcessOnServer) {
+      showToast("A demo foi salva. Processando o arquivo do Drive no servidor HLTPC…");
+      try { serverDemoResult = await processDemoOnServer(record.id); }
+      catch (reason) { saveWarnings.push(`Processamento no servidor pendente: ${reason.message || reason}`); }
+    }
     dialog.close();
-    const successMessage = leetifyImported ? `${record.name}: ${(record.statistics || []).length} jogadores e resultado conferidos` : demoFile?.size ? (record.demoInfo?.extractionStatus === "skipped-large" ? `${record.name}: demo grande registrada; outras fontes foram salvas` : record.statistics?.length ? `${record.name}: demo lida e ${record.statistics.length} jogadores extraídos` : `${record.name}: demo registrada sem estatísticas`) : `${record.name} foi salvo`;
+    const successMessage = serverDemoResult ? `${record.name}: demo processada no servidor, ${serverDemoResult.players} jogadores e placar ${serverDemoResult.score}` : leetifyImported ? `${record.name}: ${(record.statistics || []).length} jogadores e resultado conferidos` : demoFile?.size ? (record.demoInfo?.extractionStatus === "skipped-large" ? `${record.name}: demo grande registrada; outras fontes foram salvas` : record.statistics?.length ? `${record.name}: demo lida e ${record.statistics.length} jogadores extraídos` : `${record.name}: demo registrada sem estatísticas`) : `${record.name} foi salvo`;
     showToast(saveWarnings.length ? `${successMessage}. Aviso: ${saveWarnings.join(" · ")}` : successMessage);
     if (returnSection) { const destination = returnSection; returnSection = null; go(destination); }
     else if (section === "tournaments") tournamentsView();
