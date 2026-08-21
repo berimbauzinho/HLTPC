@@ -2,9 +2,6 @@
   publish = "."
   functions = "netlify/functions"
 
-[functions]
-  external_node_modules = ["@laihoe/demoparser2"]
-
 [[redirects]]
   from = "/api/admin/login"
   to = "/.netlify/functions/admin-login"
@@ -43,11 +40,6 @@
 [[redirects]]
   from = "/api/admin/media"
   to = "/.netlify/functions/admin-media-v2"
-  status = 200
-
-[[redirects]]
-  from = "/api/admin/process-demo"
-  to = "/.netlify/functions/admin-process-demo"
   status = 200
 
 [[redirects]]
