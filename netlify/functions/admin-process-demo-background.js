@@ -57,6 +57,15 @@ exports.handler = async (event) => {
     await pipeline(Readable.fromWeb(response.body), fs.createWriteStream(demoPath));
     const fileSize = (await fs.promises.stat(demoPath)).size;
     if (fileSize > 700 * 1024 * 1024) throw new Error("A demo ultrapassa o limite de 700 MB do processador.");
+    if (fileSize < 1024 * 1024) throw new Error("O Drive não devolveu uma demo válida; confirme o compartilhamento como ‘qualquer pessoa com o link’.");
+    const signature = (await fs.promises.open(demoPath, "r")).createReadStream({ start: 0, end: 7 });
+    const signatureChunks = [];
+    for await (const chunk of signature) signatureChunks.push(chunk);
+    if (!Buffer.concat(signatureChunks).toString("utf8").startsWith("PBDEMS2")) throw new Error("O link do Drive devolveu uma página ou um arquivo que não é uma demo CS2.");
+    const expectedSize = Number(match.demoInfo?.fileSize || 0);
+    if (expectedSize && fileSize + 1024 * 1024 < expectedSize) {
+      throw new Error(`O download ficou incompleto (${Math.round(fileSize / 1048576)} de ${Math.round(expectedSize / 1048576)} MB). Tente reprocessar a demo.`);
+    }
 
     const fileName = match.demoInfo?.fileName || `demo-${match.id}.dem`;
     const processed = processDemoPath(demoPath, match, content, { fileName, fileSize });
@@ -97,4 +106,3 @@ exports.handler = async (event) => {
     if (directory) await fs.promises.rm(directory, { recursive: true, force: true }).catch(() => {});
   }
 };
-
