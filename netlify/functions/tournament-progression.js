@@ -44,19 +44,29 @@ function applyTournamentProgression(content) {
   if (!content || !Array.isArray(content.matches) || !Array.isArray(content.tournaments)) return content || {};
   content.tournaments.filter((tournament) => tournament.formatType === "three_team_series").forEach((tournament) => {
     const table = standingsForTournament(content, tournament);
-    if (!table.complete || table.teams.length !== 3) return;
+    if (table.teams.length !== 3) return;
     const semifinal = content.matches.find((match) => match.tournamentId === tournament.id && match.round === "semifinal");
     const final = content.matches.find((match) => match.tournamentId === tournament.id && match.round === "final");
-    assignTeam(semifinal, "A", table.teams[1]);
-    assignTeam(semifinal, "B", table.teams[2]);
-    if (semifinal) {
+
+    if (table.complete && semifinal?.status !== "finished") {
+      assignTeam(semifinal, "A", table.teams[1]);
+      assignTeam(semifinal, "B", table.teams[2]);
+    }
+    if (semifinal?.teamA && semifinal?.teamB) {
       semifinal.slotA = semifinal.teamA;
       semifinal.slotB = semifinal.teamB;
       semifinal.status = semifinal.status === "draft" ? "published" : semifinal.status;
       semifinal.qualification = { source: "group", seedA: 2, seedB: 3, resolvedAt: semifinal.qualification?.resolvedAt || content.updatedAt || "" };
     }
-    assignTeam(final, "A", table.teams[0]);
-    if (final) {
+
+    const semifinalIds = new Set([semifinal?.teamAId, semifinal?.teamBId].filter(Boolean));
+    const semifinalNames = new Set([semifinal?.teamA, semifinal?.teamB].filter(Boolean));
+    const directFinalist = table.complete
+      ? table.teams[0]
+      : table.teams.find((team) => !semifinalIds.has(team.id) && !semifinalNames.has(team.name));
+
+    if (final && directFinalist) {
+      assignTeam(final, "A", directFinalist);
       final.slotA = final.teamA;
       if (semifinal?.winner) {
         assignTeam(final, "B", { name: semifinal.winner, id: semifinal.winnerId || "" });
@@ -69,7 +79,7 @@ function applyTournamentProgression(content) {
       final.status = final.status === "draft" ? "published" : final.status;
       final.qualification = { source: "group", seedA: 1, resolvedAt: final.qualification?.resolvedAt || content.updatedAt || "" };
     }
-    tournament.groupStandings = table.teams.map((team, index) => ({ ...team, position: index + 1 }));
+    if (table.complete) tournament.groupStandings = table.teams.map((team, index) => ({ ...team, position: index + 1 }));
   });
   return content;
 }
