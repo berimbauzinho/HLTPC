@@ -47,7 +47,7 @@
 
 [[redirects]]
   from = "/api/admin/process-demo"
-  to = "/.netlify/functions/admin-process-demo-background"
+  to = "/.netlify/functions/admin-process-demo-v2-background"
   status = 200
 
 [[redirects]]
