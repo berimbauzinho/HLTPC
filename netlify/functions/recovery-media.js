@@ -65,8 +65,8 @@ function recoverNews(content) {
     content.news.unshift({
       id: "boca-final-pgl-2026",
       name: "BOCA DE FUMO garante vaga direta na final",
-      subtitle: "Líder da fase de grupos, a BOCA aguarda o vencedor de RED PILL Gaming × Deftones.",
-      body: "A BOCA DE FUMO Gaming terminou a fase de grupos na primeira colocação e avançou diretamente à final do PGL Major Abadia 2026. RED PILL Gaming e Deftones disputam a semifinal.",
+      subtitle: "Líder da fase de grupos, a BOCA enfrentará a RED PILL Gaming na decisão.",
+      body: "A BOCA DE FUMO Gaming terminou a fase de grupos na primeira colocação e avançou diretamente à final do PGL Major Abadia 2026. Após vencer a semifinal contra a Deftones por 2–0, a RED PILL Gaming será a adversária na decisão.",
       author: "HLTPC",
       date: "2026-08-31",
       tournamentId: "pgl-abadia-2026",
@@ -75,6 +75,16 @@ function recoverNews(content) {
       image: `${ASSET_ROOT}/noticia-boca-classificada.webp`
     });
   }
+}
+
+function recoverFinalGroupMatch(content) {
+  const match = (content.matches || []).find((item) => item.id === "pgl-abadia-2026-group-6");
+  if (!match || match.resultSource === "manual" || match.scoreSource === "manual") return;
+  match.score = "10 - 13";
+  match.winner = "RED PILL Gaming";
+  match.winnerId = "team-8";
+  match.status = "finished";
+  match.updated = "Placar recuperado da demo processada";
 }
 
 function applyRecoveryMedia(content) {
@@ -87,6 +97,7 @@ function applyRecoveryMedia(content) {
   recoverTeams(content);
   recoverTournaments(content);
   recoverNews(content);
+  recoverFinalGroupMatch(content);
   return content;
 }
 
