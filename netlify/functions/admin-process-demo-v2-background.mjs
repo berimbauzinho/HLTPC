@@ -44,22 +44,28 @@ export default async (request) => {
 
   let directory = "";
   let matchId = "";
+  let mapIndex = null;
   let startedAt = "";
   try {
-    ({ matchId } = await request.json());
+    ({ matchId, mapIndex } = await request.json());
+    mapIndex = Number.isInteger(mapIndex) && mapIndex >= 0 ? mapIndex : null;
     const initial = await getContent();
     const initialMatch = (initial.matches || []).find((item) => item.id === matchId);
     if (!initialMatch) throw new Error("Partida não encontrada.");
-    if (!initialMatch.demoUrl) throw new Error("Informe o link da demo no Google Drive antes de processar no servidor.");
+    const initialTarget = mapIndex === null ? initialMatch : initialMatch.maps?.[mapIndex];
+    if (!initialTarget) throw new Error("Mapa não encontrado nesta série.");
+    if (!initialTarget.demoUrl) throw new Error("Informe o link da demo no Google Drive antes de processar no servidor.");
 
     startedAt = new Date().toISOString();
     await saveMatchUpdate(matchId, (match) => {
-      match.demoProcessing = { status: "processing", startedAt, error: "" };
+      const target = mapIndex === null ? match : match.maps?.[mapIndex];
+      if (!target) throw new Error("Mapa não encontrado durante a atualização.");
+      target.demoProcessing = { status: "processing", startedAt, error: "" };
     });
 
     directory = await fs.promises.mkdtemp(path.join(os.tmpdir(), "hltpc-demo-"));
     const demoPath = path.join(directory, "match.dem");
-    const response = await fetch(downloadUrl(initialMatch.demoUrl), { redirect: "follow" });
+    const response = await fetch(downloadUrl(initialTarget.demoUrl), { redirect: "follow" });
     if (!response.ok || !response.body) {
       throw new Error(`O Google Drive respondeu HTTP ${response.status}. Confirme que o link está compartilhado para leitura.`);
     }
@@ -77,7 +83,7 @@ export default async (request) => {
     await handle.close();
     if (!signature.toString("utf8").startsWith("PBDEMS2")) throw new Error("O link do Drive devolveu uma página ou um arquivo que não é uma demo CS2.");
 
-    const expectedSize = Number(initialMatch.demoInfo?.fileSize || 0);
+    const expectedSize = Number(initialTarget.demoInfo?.fileSize || 0);
     if (expectedSize && fileSize + 1024 * 1024 < expectedSize) {
       throw new Error(`O download ficou incompleto (${Math.round(fileSize / 1048576)} de ${Math.round(expectedSize / 1048576)} MB). Tente reprocessar a demo.`);
     }
@@ -85,9 +91,11 @@ export default async (request) => {
     const latest = await getContent();
     const latestMatch = (latest.matches || []).find((item) => item.id === matchId);
     if (!latestMatch) throw new Error("Partida não encontrada após o download.");
-    const fileName = latestMatch.demoInfo?.fileName || `demo-${latestMatch.id}.dem`;
+    const latestTarget = mapIndex === null ? latestMatch : latestMatch.maps?.[mapIndex];
+    if (!latestTarget) throw new Error("Mapa não encontrado após o download.");
+    const fileName = latestTarget.demoInfo?.fileName || `demo-${latestMatch.id}${mapIndex === null ? "" : `-map-${mapIndex + 1}`}.dem`;
     const processed = processDemoPath(demoPath, latestMatch, latest, { fileName, fileSize });
-    const manualResult = latestMatch.manualResult === true || ["manual", "manual-maps"].includes(latestMatch.resultSource);
+    const manualResult = mapIndex === null && (latestMatch.manualResult === true || ["manual", "manual-maps"].includes(latestMatch.resultSource));
     if (manualResult) {
       delete processed.score;
       delete processed.winner;
@@ -98,6 +106,20 @@ export default async (request) => {
     }
 
     await saveMatchUpdate(matchId, (match) => {
+      const target = mapIndex === null ? match : match.maps?.[mapIndex];
+      if (!target) throw new Error("Mapa não encontrado ao concluir o processamento.");
+      if (mapIndex !== null) {
+        const manualMap = target.resultSource === "manual" || target.scoreSource === "manual";
+        const { score, winner, winnerId, resultSource, status, evidenceNote, ...mapStats } = processed;
+        Object.assign(target, mapStats, {
+          name: processed.demoInfo?.mapName || target.name,
+          demoProcessing: { status: "complete", startedAt, processedAt: new Date().toISOString(), error: "" },
+          updated: "Demo do mapa processada no servidor HLTPC · fonte principal"
+        });
+        if (!manualMap) Object.assign(target, { score, winner, winnerId, resultSource, status, evidenceNote, scoreSource: "demo" });
+        match.updated = `Demo do mapa ${mapIndex + 1} processada no servidor HLTPC`;
+        return;
+      }
       Object.assign(match, processed, {
         demoProcessing: {
           status: "complete",
@@ -113,13 +135,15 @@ export default async (request) => {
     console.error("HLTPC demo processing v2 error", reason);
     if (matchId) {
       await saveMatchUpdate(matchId, (match) => {
-        match.demoProcessing = {
+        const target = mapIndex === null ? match : match.maps?.[mapIndex];
+        if (!target) return;
+        target.demoProcessing = {
           status: "error",
-          startedAt: startedAt || match.demoProcessing?.startedAt || new Date().toISOString(),
+          startedAt: startedAt || target.demoProcessing?.startedAt || new Date().toISOString(),
           failedAt: new Date().toISOString(),
           error: String(reason?.message || "Não foi possível processar a demo.").slice(0, 300)
         };
-        match.updated = "Falha ao processar demo no servidor";
+        match.updated = mapIndex === null ? "Falha ao processar demo no servidor" : `Falha ao processar a demo do mapa ${mapIndex + 1}`;
       }).catch((storageError) => console.error("HLTPC demo error persistence", storageError));
     }
     return new Response(null, { status: 500 });
