@@ -4,7 +4,7 @@ const { connectLambda, getStore } = require("@netlify/blobs");
 
 function store(event) {
   connectLambda(event);
-  return getStore({ name: STORE_NAME, consistency: "strong" });
+  return getStore(STORE_NAME);
 }
 
 async function listUsers(event) {
