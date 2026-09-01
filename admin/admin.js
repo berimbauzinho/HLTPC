@@ -36,6 +36,9 @@
   const expandedTournaments = new Set();
   let search = "";
   let demoParserPromise = null;
+  let contentRevision = null;
+  let sharedContentLoaded = false;
+  const CONTENT_KEYS = ["players", "teams", "tournaments", "matches", "news"];
   const DEMO_PARSER_MODULE = new URL("./vendor/demoparser2.js", window.location.href).href;
   const DEMO_PARSER_WASM_PARTS = [1, 2, 3].map((part) => new URL(`./vendor/demoparser2_bg.wasm.part${part}`, window.location.href).href);
 
@@ -168,6 +171,23 @@
     return changed;
   }
 
+  function validSharedContent(saved) {
+    return Boolean(
+      saved &&
+      CONTENT_KEYS.every((key) => Array.isArray(saved[key])) &&
+      saved.players.length &&
+      saved.teams.length &&
+      saved.tournaments.length
+    );
+  }
+
+  function acceptSharedContent(saved) {
+    if (!validSharedContent(saved)) throw new Error("O armazenamento não devolveu uma base válida. O painel está em modo seguro e não gravará nada.");
+    CONTENT_KEYS.forEach((key) => { state[key] = saved[key]; });
+    contentRevision = Number(saved._revision || 0);
+    sharedContentLoaded = true;
+  }
+
   async function contentRequest(options = {}) {
     const response = await fetch("/api/admin/content", { credentials: "same-origin", ...options });
     const result = await response.json().catch(() => ({}));
@@ -190,7 +210,7 @@
     for (let attempt = 0; attempt < 180; attempt += 1) {
       await new Promise((resolve) => window.setTimeout(resolve, 5000));
       const saved = await contentRequest();
-      ["players", "teams", "tournaments", "matches", "news"].forEach((key) => { if (Array.isArray(saved[key])) state[key] = saved[key]; });
+      acceptSharedContent(saved);
       const match = state.matches.find((item) => item.id === matchId);
       if (match?.demoProcessing?.status === "error") throw new Error(match.demoProcessing.error || "A demo não pôde ser processada.");
       if (match?.demoProcessing?.status === "complete" && match.demoProcessing.processedAt !== previous) {
@@ -223,27 +243,43 @@
   async function loadPersistedContent() {
     try {
       const saved = await contentRequest();
-      ["players", "teams", "tournaments", "matches", "news"].forEach((key) => { if (Array.isArray(saved[key])) state[key] = saved[key]; });
-      const historicalImported = applyHistoricalImport2025();
-      const identitiesChanged = enforceConfirmedPlayerIdentities();
-      const referencesChanged = normalizeTeamReferences();
-      const structureChanged = normalizeTournamentStructures();
-      const compactedBeforeProcessing = await compactStoredImages();
-      if (historicalImported || identitiesChanged || referencesChanged || structureChanged || compactedBeforeProcessing) await persistContent();
-      const serverImported = await syncPendingServerDemos();
-      const leetifyImported = await syncPendingLeetifyMatches();
-      const compactedImages = await compactStoredImages();
-      if (leetifyImported || compactedImages) await persistContent();
+      acceptSharedContent(saved);
+      const pendingAdjustments = [
+        applyHistoricalImport2025(),
+        enforceConfirmedPlayerIdentities(),
+        normalizeTeamReferences(),
+        normalizeTournamentStructures()
+      ].filter(Boolean).length;
       go(section);
-      showToast(serverImported ? `${serverImported} demo processada no servidor HLTPC` : historicalImported ? `Histórico de 2025 importado: ${historicalImported} registros atualizados` : leetifyImported ? `${leetifyImported} partida sincronizada com o Leetify` : compactedImages || compactedBeforeProcessing ? `${compactedImages + compactedBeforeProcessing} imagens antigas foram compactadas` : "Conteúdo compartilhado carregado");
+      showToast(pendingAdjustments
+        ? "Conteúdo carregado com segurança. Ajustes internos só serão gravados na próxima alteração explícita."
+        : "Conteúdo compartilhado carregado");
     } catch (reason) {
+      sharedContentLoaded = false;
+      contentRevision = null;
       showToast(reason.message);
     }
   }
 
   async function persistContent() {
+    if (!sharedContentLoaded || contentRevision === null) {
+      throw new Error("Gravação bloqueada: recarregue o painel para sincronizar a base oficial antes de editar.");
+    }
     await compactStoredImages();
-    return contentRequest({ method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ players: state.players, teams: state.teams, tournaments: state.tournaments, matches: state.matches, news: state.news }) });
+    const saved = await contentRequest({
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        _revision: contentRevision,
+        players: state.players,
+        teams: state.teams,
+        tournaments: state.tournaments,
+        matches: state.matches,
+        news: state.news
+      })
+    });
+    contentRevision = Number(saved._revision);
+    return saved;
   }
 
   function pageTitle(title, description, action = true) {
