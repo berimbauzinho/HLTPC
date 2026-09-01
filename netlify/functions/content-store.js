@@ -1,4 +1,4 @@
-const { getStore } = require("@netlify/blobs");
+const { connectLambda, getStore } = require("@netlify/blobs");
 const { applyPgl2026Imports } = require("./pgl-2026-imports");
 const { applyStatisticsImports } = require("./statistics-imports");
 const { applyRecoveryMedia } = require("./recovery-media");
@@ -10,7 +10,8 @@ const CONTENT_KEY = "current";
 const CONTENT_KEYS = ["players", "teams", "tournaments", "matches", "news"];
 const BACKUP_SLOTS = 12;
 
-function store() {
+function store(event) {
+  connectLambda(event);
   return getStore({ name: STORE_NAME, consistency: "strong" });
 }
 
@@ -34,12 +35,12 @@ function runtimeContent(content) {
   );
 }
 
-async function getRawContent() {
-  return await store().get(CONTENT_KEY, { type: "json" }) || null;
+async function getRawContent(event) {
+  return await store(event).get(CONTENT_KEY, { type: "json" }) || null;
 }
 
-async function getContent() {
-  const raw = await getRawContent();
+async function getContent(event) {
+  const raw = await getRawContent(event);
   if (!isValidContent(raw)) {
     const error = new Error("O armazenamento compartilhado não devolveu uma base válida. Nenhuma gravação foi feita.");
     error.name = "ContentUnavailableError";
@@ -57,7 +58,7 @@ async function saveContent(event, content, options = {}) {
     throw error;
   }
 
-  const current = await getRawContent();
+  const current = await getRawContent(event);
   const currentRevision = Number(current?._revision || 0);
   const expectedRevision = options.expectedRevision;
   if (expectedRevision !== undefined && expectedRevision !== null && Number(expectedRevision) !== currentRevision) {
@@ -69,7 +70,7 @@ async function saveContent(event, content, options = {}) {
 
   if (isValidContent(current)) {
     const backupKey = `backup-${currentRevision % BACKUP_SLOTS}`;
-    await store().setJSON(backupKey, {
+    await store(event).setJSON(backupKey, {
       backedUpAt: new Date().toISOString(),
       revision: currentRevision,
       content: current
@@ -81,7 +82,7 @@ async function saveContent(event, content, options = {}) {
     _revision: currentRevision + 1,
     updatedAt: content.updatedAt || new Date().toISOString()
   });
-  await store().setJSON(CONTENT_KEY, next);
+  await store(event).setJSON(CONTENT_KEY, next);
   return next;
 }
 
