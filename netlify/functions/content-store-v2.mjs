@@ -31,10 +31,10 @@ function isValidContent(content) {
 }
 
 function runtimeContent(content) {
-  return applyRecoveryMedia(
-    applyTournamentProgression(
-      normalizeContentTeamReferences(
-        applyStatisticsImports(applyPgl2026Imports(content))
+  return applyTournamentProgression(
+    normalizeContentTeamReferences(
+      applyStatisticsImports(
+        applyPgl2026Imports(applyRecoveryMedia(content))
       )
     )
   );
