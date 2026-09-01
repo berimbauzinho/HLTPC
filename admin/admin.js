@@ -263,7 +263,6 @@
     if (!sharedContentLoaded || contentRevision === null) {
       throw new Error("Gravação bloqueada: recarregue o painel para sincronizar a base oficial antes de editar.");
     }
-    await compactStoredImages();
     const changes = [];
     CONTENT_KEYS.forEach((collection) => {
       const before = new Map((persistedSnapshot?.[collection] || []).map((record) => [record.id, record]));
