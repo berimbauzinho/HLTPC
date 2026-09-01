@@ -11,7 +11,7 @@ exports.handler = async (event) => {
   if (!authorized(event)) return json(403, { error: "Acesso administrativo necessário." });
   try {
     if (event.httpMethod === "GET") {
-      const content = await getContent();
+      const content = await getContent(event);
       if (!isValidContent(content)) {
         const error = new Error("A base compartilhada está indisponível. O painel foi mantido em modo seguro.");
         error.statusCode = 503;
