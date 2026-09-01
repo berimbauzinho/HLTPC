@@ -28,19 +28,40 @@ export default async (request) => {
       }
       return json(200, content);
     }
-    if (request.method !== "PUT") return json(405, { error: "Método não permitido." });
+    // Reject the legacy whole-document save. A stale Admin tab must never be
+    // able to replace the shared site with its local copy again.
+    if (request.method === "PUT") return json(410, { error: "Esta versão do painel está desatualizada e foi bloqueada para proteger o conteúdo. Recarregue a página antes de editar." });
+    if (request.method !== "PATCH") return json(405, { error: "Método não permitido." });
 
     const raw = await request.text();
-    if (raw.length > 5_500_000) return json(413, { error: "O conteúdo ficou grande demais. Reduza o tamanho das imagens." });
+    if (raw.length > 1_500_000) return json(413, { error: "A alteração ficou grande demais. Reduza o tamanho das imagens." });
     const body = JSON.parse(raw || "{}");
-    if (!CONTENT_KEYS.every((key) => Array.isArray(body[key]))) {
-      return json(422, { error: "Gravação bloqueada: a base enviada está incompleta." });
+    const changes = Array.isArray(body.changes) ? body.changes : [];
+    if (!changes.length || changes.length > 60) {
+      return json(422, { error: "Gravação bloqueada: envie somente os registros alterados." });
     }
 
-    const content = Object.fromEntries(CONTENT_KEYS.map((key) => [key, body[key]]));
+    const current = await getContent();
+    const content = Object.fromEntries(CONTENT_KEYS.map((key) => [key, [...current[key]]]));
+    for (const change of changes) {
+      const collection = String(change?.collection || "");
+      const id = String(change?.id || "");
+      if (!CONTENT_KEYS.includes(collection) || !id) throw Object.assign(new Error("Registro inválido na alteração."), { statusCode: 422 });
+      const index = content[collection].findIndex((record) => record.id === id);
+      if (change.operation === "delete") {
+        if (index < 0) throw Object.assign(new Error("O registro que seria removido não existe mais."), { statusCode: 409 });
+        content[collection].splice(index, 1);
+        continue;
+      }
+      if (!change.record || typeof change.record !== "object" || Array.isArray(change.record) || String(change.record.id || "") !== id) {
+        throw Object.assign(new Error("A alteração contém um registro inválido."), { statusCode: 422 });
+      }
+      if (index >= 0) content[collection][index] = change.record;
+      else content[collection].unshift(change.record);
+    }
     content.updatedAt = new Date().toISOString();
     const saved = await saveContent(content, { expectedRevision: body._revision });
-    return json(200, { ok: true, updatedAt: saved.updatedAt, _revision: saved._revision });
+    return json(200, { ok: true, updatedAt: saved.updatedAt, _revision: saved._revision, content: saved });
   } catch (reason) {
     console.error("HLTPC admin content v2 error", reason);
     return json(Number(reason?.statusCode || 500), {

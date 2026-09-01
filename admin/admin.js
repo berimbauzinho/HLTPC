@@ -38,6 +38,7 @@
   let demoParserPromise = null;
   let contentRevision = null;
   let sharedContentLoaded = false;
+  let persistedSnapshot = null;
   const CONTENT_KEYS = ["players", "teams", "tournaments", "matches", "news"];
   const DEMO_PARSER_MODULE = new URL("./vendor/demoparser2.js", window.location.href).href;
   const DEMO_PARSER_WASM_PARTS = [1, 2, 3].map((part) => new URL(`./vendor/demoparser2_bg.wasm.part${part}`, window.location.href).href);
@@ -186,6 +187,7 @@
     CONTENT_KEYS.forEach((key) => { state[key] = saved[key]; });
     contentRevision = Number(saved._revision || 0);
     sharedContentLoaded = true;
+    persistedSnapshot = JSON.parse(JSON.stringify(Object.fromEntries(CONTENT_KEYS.map((key) => [key, state[key]]))));
   }
 
   async function contentRequest(options = {}) {
@@ -195,13 +197,17 @@
     return result;
   }
 
-  async function processDemoOnServer(matchId) {
-    const previous = state.matches.find((item) => item.id === matchId)?.demoProcessing?.processedAt || "";
+  async function processDemoOnServer(matchId, mapIndex = null) {
+    const target = () => {
+      const match = state.matches.find((item) => item.id === matchId);
+      return Number.isInteger(mapIndex) ? match?.maps?.[mapIndex] : match;
+    };
+    const previous = target()?.demoProcessing?.processedAt || "";
     const response = await fetch("/api/admin/process-demo", {
       method: "POST",
       credentials: "same-origin",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ matchId })
+      body: JSON.stringify({ matchId, mapIndex })
     });
     if (!response.ok) {
       const result = await response.json().catch(() => ({}));
@@ -211,15 +217,15 @@
       await new Promise((resolve) => window.setTimeout(resolve, 5000));
       const saved = await contentRequest();
       acceptSharedContent(saved);
-      const match = state.matches.find((item) => item.id === matchId);
-      if (match?.demoProcessing?.status === "error") throw new Error(match.demoProcessing.error || "A demo não pôde ser processada.");
-      if (match?.demoProcessing?.status === "complete" && match.demoProcessing.processedAt !== previous) {
+      const processedTarget = target();
+      if (processedTarget?.demoProcessing?.status === "error") throw new Error(processedTarget.demoProcessing.error || "A demo não pôde ser processada.");
+      if (processedTarget?.demoProcessing?.status === "complete" && processedTarget.demoProcessing.processedAt !== previous) {
         return {
-          mapName: match.demoInfo?.mapName || "",
-          rounds: match.demoInfo?.rounds || 0,
-          players: match.statistics?.length || 0,
-          score: match.score || "",
-          winner: match.winner || ""
+          mapName: processedTarget.demoInfo?.mapName || "",
+          rounds: processedTarget.demoInfo?.rounds || 0,
+          players: processedTarget.statistics?.length || 0,
+          score: processedTarget.score || "",
+          winner: processedTarget.winner || ""
         };
       }
     }
@@ -244,16 +250,8 @@
     try {
       const saved = await contentRequest();
       acceptSharedContent(saved);
-      const pendingAdjustments = [
-        applyHistoricalImport2025(),
-        enforceConfirmedPlayerIdentities(),
-        normalizeTeamReferences(),
-        normalizeTournamentStructures()
-      ].filter(Boolean).length;
       go(section);
-      showToast(pendingAdjustments
-        ? "Conteúdo carregado com segurança. Ajustes internos só serão gravados na próxima alteração explícita."
-        : "Conteúdo compartilhado carregado");
+      showToast("Conteúdo compartilhado carregado em modo seguro");
     } catch (reason) {
       sharedContentLoaded = false;
       contentRevision = null;
@@ -265,20 +263,27 @@
     if (!sharedContentLoaded || contentRevision === null) {
       throw new Error("Gravação bloqueada: recarregue o painel para sincronizar a base oficial antes de editar.");
     }
-    await compactStoredImages();
+    const changes = [];
+    CONTENT_KEYS.forEach((collection) => {
+      const before = new Map((persistedSnapshot?.[collection] || []).map((record) => [record.id, record]));
+      const after = new Map((state[collection] || []).map((record) => [record.id, record]));
+      after.forEach((record, id) => {
+        if (JSON.stringify(before.get(id)) !== JSON.stringify(record)) changes.push({ collection, id, operation: "upsert", record });
+      });
+      before.forEach((record, id) => {
+        if (!after.has(id)) changes.push({ collection, id, operation: "delete" });
+      });
+    });
+    if (!changes.length) return;
     const saved = await contentRequest({
-      method: "PUT",
+      method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         _revision: contentRevision,
-        players: state.players,
-        teams: state.teams,
-        tournaments: state.tournaments,
-        matches: state.matches,
-        news: state.news
+        changes
       })
     });
-    contentRevision = Number(saved._revision);
+    acceptSharedContent(saved.content);
     return saved;
   }
 
@@ -457,10 +462,19 @@
   }
 
   function editableSeriesMaps(item) {
-    if (Array.isArray(item.maps) && item.maps.length) return item.maps;
     const bestOf = Number(item.bestOf || 1);
     if (bestOf <= 1) return [];
-    return Array.from({ length: bestOf }, (_, index) => ({ id: `${item.id || "match"}-map-${index + 1}`, name: `Mapa ${index + 1}`, order: index + 1, score: "", statistics: [] }));
+    const savedMaps = Array.isArray(item.maps) ? item.maps : [];
+    // A MD3 always exposes its three possible maps, even after a 2-0. This
+    // keeps the third slot available for a decider or for correcting a series.
+    return Array.from({ length: bestOf }, (_, index) => ({
+      id: `${item.id || "match"}-map-${index + 1}`,
+      name: `Mapa ${index + 1}`,
+      order: index + 1,
+      score: "",
+      statistics: [],
+      ...(savedMaps[index] || {})
+    }));
   }
 
   function seriesMapsMarkup(item, maps) {
@@ -469,6 +483,14 @@
       const source = map.scoreSource === "manual" || map.resultSource === "manual" ? "Placar oficial manual" : map.statisticsSource === "missing" ? "Dados faltantes · preenchimento manual" : map.statisticsSource === "leetify" ? "Estatísticas: Leetify + demo" : map.statisticsSource === "demo" ? "Estatísticas: demo" : "Aguardando dados";
       return `<article class="${map.statisticsSource === "missing" && !map.score ? "missing" : ""}"><span><b>${escapeHtml(map.name || map.mapName || `Mapa ${index + 1}`)}</b><small>${escapeHtml(source)}</small></span><button type="button" data-edit-map="${index}">${escapeHtml(map.score || "Preencher placar")}</button></article>`;
     }).join("")}</section>`;
+  }
+
+  function seriesMapDemosMarkup(maps) {
+    if (!maps.length) return "";
+    return `<fieldset class="series-map-demos"><legend>Demos por mapa</legend><p>Uma MD3 pode ter até ${maps.length} mapas. Cole o link do Drive em cada mapa jogado; cada demo será processada separadamente e depois somada nas estatísticas da série.</p>${maps.map((map, index) => {
+      const status = map.demoProcessing?.status === "processing" ? "Processando…" : map.demoProcessing?.status === "error" ? `Falha: ${map.demoProcessing.error || "verifique o link"}` : map.statisticsSource === "demo" ? `✓ Demo processada · ${map.demoInfo?.mapName || map.name}` : map.demoUrl ? "Demo vinculada · aguardando processamento" : "Sem demo neste mapa";
+      return `<article class="series-map-demo" data-series-map-demo="${index}"><label>Mapa ${index + 1}<input name="seriesMapName_${index}" value="${escapeHtml(map.name || map.mapName || `Mapa ${index + 1}`)}" placeholder="Ex.: Dust II" /></label><label>Link da demo no Google Drive<input name="mapDemoUrl_${index}" type="url" inputmode="url" value="${escapeHtml(map.demoUrl || "")}" placeholder="https://drive.google.com/file/d/..." /></label>${fileField(`mapDemo_${index}`, "Ou selecionar .dem", ".dem")}<div><small>${escapeHtml(status)}</small>${map.demoUrl ? `<button class="secondary-add" type="button" data-process-map-demo="${index}">Processar este mapa</button>` : ""}</div></article>`;
+    }).join("")}</fieldset>`;
   }
 
   function manualResultFields(item, maps, manualResult) {
@@ -517,10 +539,11 @@
       const maps = editableSeriesMaps(item);
       const manualResult = item.manualResult === true || item.manualResult === "true" || ["manual", "manual-maps"].includes(item.resultSource) || maps.some((map) => map.scoreSource === "manual" || map.resultSource === "manual");
       const seriesMaps = seriesMapsMarkup(item, maps);
+      const seriesMapDemos = seriesMapDemosMarkup(maps);
       const sourceSummary = item.demoInfo || item.leetifyUrl || item.scoreboardImage || manualResult ? `<div class="match-source-summary"><span class="${demoHasStats ? "verified" : item.demoInfo ? "partial" : "muted"}"><b>${demoHasStats ? "1 · Demo confirmada" : item.demoInfo?.extractionStatus === "skipped-large" ? "1 · Demo grande" : item.demoInfo ? "1 · Demo anexada" : "1 · Sem demo"}</b><small>${item.demoInfo ? `${escapeHtml(item.demoInfo.fileName)}${demoHasStats ? ` · ${(item.statistics || []).length} jogadores` : item.demoInfo.extractionStatus === "skipped-large" ? " · leitura local ignorada" : " · extração pendente"}` : "Fonte primária opcional"}</small></span><span class="${leetifyHasStats ? "verified" : item.leetifyUrl ? "partial" : "muted"}"><b>2 · Leetify</b><small>${leetifyHasStats ? `${(item.statistics || []).length} jogadores · ${escapeHtml(item.leetifyInfo.mapName || "mapa identificado")}` : item.leetifySyncError ? escapeHtml(item.leetifySyncError) : item.leetifyUrl ? "Link salvo · aguarda importação" : "Fonte secundária opcional"}</small></span><span class="${item.scoreboardImage ? "verified" : "muted"}"><b>3 · Print</b><small>${item.scoreboardImage ? "Imagem salva como comprovação" : "Evidência visual opcional"}</small></span><span class="${manualResult ? "verified" : "muted"}"><b>4 · Manual</b><small>${manualResult ? `Resultado confirmado: ${escapeHtml(item.score || "—")}` : "Disponível mesmo sem arquivos"}</small></span></div>` : "";
       const serverStatus = item.demoProcessing?.status === "processing" ? `<div class="helper"><b>Processando no servidor…</b> A demo pode continuar sendo lida mesmo que você saia desta tela.</div>` : item.demoProcessing?.status === "error" ? `<div class="helper storage-warning"><b>Falha no processamento:</b> ${escapeHtml(item.demoProcessing.error || "verifique o link do Drive")}</div>` : item.demoProcessing?.status === "complete" ? `<div class="helper"><b>✓ Processamento concluído.</b> O arquivo bruto foi apagado; somente os dados extraídos permanecem.</div>` : "";
       const manualFields = manualResultFields(item, maps, manualResult);
-      return `${tournamentField}${teamsField}${textField("name", "Fase", item.name, "Ex.: Semifinal", true)}${selectField("status", item.status)}${seriesMaps}${manualFields}<fieldset class="match-evidence"><legend>Fontes dos dados</legend><div class="evidence-order"><b>1</b><span><strong>Demo · fonte principal</strong><small>Para arquivos grandes, envie ao Drive, compartilhe como “qualquer pessoa com o link” e cole o endereço abaixo. O servidor processa em segundo plano e não guarda a demo bruta.</small></span></div>${fileField("demo", "Selecionar arquivo .dem (leitura rápida no navegador)", ".dem")}${urlField("demoUrl", "Link da demo no Google Drive", item.demoUrl, "https://drive.google.com/file/d/...")}${item.demoUrl ? `<button class="secondary-add" type="button" data-process-server-demo>Reprocessar demo no servidor</button>` : ""}${serverStatus}${item.demoInfo ? `<div class="demo-result ${demoHasStats ? "" : "partial"}"><b>${demoHasStats ? "✓ Demo processada" : item.demoInfo.extractionStatus === "skipped-large" ? "⚠ Demo grande registrada; leitura local ignorada" : item.demoUrl ? "✓ Demo vinculada pelo Drive" : "⚠ Demo anexada, sem estatísticas automáticas"}</b><span>${escapeHtml(item.demoInfo.fileName)} · ${escapeHtml(item.demoInfo.mapName || "mapa não identificado")} · ${item.demoInfo.rounds || 0} rounds</span><small>${escapeHtml(item.demoInfo.playedAtLabel || item.subtitle || "Data não identificada")} · ${(item.statistics || []).length} jogadores extraídos</small>${item.demoInfo.warnings?.length ? `<small>${escapeHtml(item.demoInfo.warnings.join(" · "))}</small>` : ""}</div>` : ""}<div class="evidence-order"><b>2</b><span><strong>Leetify · fonte secundária</strong><small>Use sozinho ou para complementar rating/KAST quando a demo estiver disponível.</small></span></div>${urlField("leetifyUrl", "Link da partida no Leetify", item.leetifyUrl, "https://leetify.com/app/match-details/...")}<div class="evidence-order"><b>3</b><span><strong>Print do placar · comprovação visual</strong><small>Envie a tela final quando a demo ou o Leetify não trouxerem tudo.</small></span></div>${fileField("scoreboardImage", item.scoreboardImage ? "Substituir print do placar" : "Enviar print do placar", "image/*")}${item.scoreboardImage ? `<div class="scoreboard-preview"><img src="${escapeHtml(item.scoreboardImage)}" alt="Print do placar salvo" /><span><b>Print salvo</b><small>Um novo arquivo substituirá esta imagem.</small><label><input type="checkbox" name="removeScoreboardImage" value="true" /> Remover print atual</label></span></div>` : ""}</fieldset>${sourceSummary}<div class="helper" id="matchHelper">${generated ? "A data será extraída do nome da demo quando ela puder ser lida. Cada fonte funciona de forma independente e fica ligada somente a este confronto." : "Escolha uma edição: os times serão limitados exclusivamente às escalações daquele campeonato."}</div>`;
+      return `${tournamentField}${teamsField}${textField("name", "Fase", item.name, "Ex.: Semifinal", true)}${selectField("status", item.status)}${seriesMaps}${seriesMapDemos}${manualFields}<fieldset class="match-evidence"><legend>Fonte complementar da série</legend><div class="evidence-order"><b>1</b><span><strong>Demo única (somente MD1)</strong><small>Para MD3, use os campos acima — um link para cada mapa. O servidor não guarda os arquivos brutos.</small></span></div>${maps.length ? "" : `${fileField("demo", "Selecionar arquivo .dem (leitura rápida no navegador)", ".dem")}${urlField("demoUrl", "Link da demo no Google Drive", item.demoUrl, "https://drive.google.com/file/d/...")}${item.demoUrl ? `<button class="secondary-add" type="button" data-process-server-demo>Reprocessar demo no servidor</button>` : ""}${serverStatus}`}${!maps.length && item.demoInfo ? `<div class="demo-result ${demoHasStats ? "" : "partial"}"><b>${demoHasStats ? "✓ Demo processada" : "Demo vinculada"}</b><span>${escapeHtml(item.demoInfo.fileName)} · ${escapeHtml(item.demoInfo.mapName || "mapa não identificado")} · ${item.demoInfo.rounds || 0} rounds</span></div>` : ""}<div class="evidence-order"><b>2</b><span><strong>Leetify · fonte secundária</strong><small>Use sozinho ou para complementar rating/KAST quando a demo estiver disponível.</small></span></div>${urlField("leetifyUrl", "Link da série no Leetify", item.leetifyUrl, "https://leetify.com/app/match-details/...")}<div class="evidence-order"><b>3</b><span><strong>Print do placar · comprovação visual</strong><small>Envie a tela final quando a demo ou o Leetify não trouxerem tudo.</small></span></div>${fileField("scoreboardImage", item.scoreboardImage ? "Substituir print do placar" : "Enviar print do placar", "image/*")}${item.scoreboardImage ? `<div class="scoreboard-preview"><img src="${escapeHtml(item.scoreboardImage)}" alt="Print do placar salvo" /><span><b>Print salvo</b><small>Um novo arquivo substituirá esta imagem.</small><label><input type="checkbox" name="removeScoreboardImage" value="true" /> Remover print atual</label></span></div>` : ""}</fieldset>${sourceSummary}<div class="helper" id="matchHelper">${generated ? "Cada demo fica vinculada apenas ao seu mapa; as estatísticas da série são consolidadas automaticamente." : "Escolha uma edição: os times serão limitados exclusivamente às escalações daquele campeonato."}</div>`;
     }
     const relatedTournament = `<label>Campeonato relacionado<select name="tournamentId"><option value="">Nenhum</option>${state.tournaments.map((event) => `<option value="${escapeHtml(event.id)}" ${item.tournamentId === event.id ? "selected" : ""}>${escapeHtml(event.name)} ${escapeHtml(event.subtitle)}</option>`).join("")}</select></label>`;
     return `${textField("name", "Título", item.name, "Título da notícia", true)}<label>Resumo para a capa<textarea name="subtitle" placeholder="Uma chamada curta para o banner e a lista de notícias...">${escapeHtml(item.subtitle)}</textarea></label><label>Texto completo da notícia<textarea class="article-body-field" name="body" placeholder="Escreva a matéria completa, separando os parágrafos com uma linha em branco...">${escapeHtml(item.body || item.subtitle)}</textarea></label>${relatedTournament}<div class="field-row">${textField("author", "Autor", item.author, "HLTPC")}${textField("date", "Data", item.date, "2026-08-10", true)}</div>${selectField("status", item.status)}${imageFileField("image", "Foto de destaque da notícia", item.image, "news")}`;
@@ -750,6 +773,22 @@
           showToast(reason.message, true);
         }
       });
+      document.querySelectorAll("[data-process-map-demo]").forEach((button) => button.addEventListener("click", async (event) => {
+        const mapIndex = Number(event.currentTarget.dataset.processMapDemo);
+        if (!editingId || !Number.isInteger(mapIndex) || event.currentTarget.disabled) return;
+        event.currentTarget.disabled = true;
+        event.currentTarget.textContent = "Processando…";
+        try {
+          const result = await processDemoOnServer(editingId, mapIndex);
+          dialog.close();
+          showToast(`${result.mapName || `Mapa ${mapIndex + 1}`}: ${result.players} jogadores e placar ${result.score || "extraído"}`);
+          go(section === "matches" ? "tournaments" : section);
+        } catch (reason) {
+          event.currentTarget.disabled = false;
+          event.currentTarget.textContent = "Processar este mapa";
+          showToast(reason.message);
+        }
+      }));
       refreshSeriesResult();
     }
   }
@@ -1284,8 +1323,15 @@
       const manualResult = values.manualResult === "true";
       record.manualResult = manualResult;
       const manualMapCount = Number(values.manualMapCount || 0);
+      const configuredSeriesMaps = editableSeriesMaps(previousRecord).map((map, mapIndex) => ({
+        ...map,
+        id: map.id || `${record.id}-map-${mapIndex + 1}`,
+        order: map.order || mapIndex + 1,
+        name: String(values[`seriesMapName_${mapIndex}`] || map.name || `Mapa ${mapIndex + 1}`).trim(),
+        demoUrl: String(values[`mapDemoUrl_${mapIndex}`] || "").trim()
+      }));
       if (manualResult && manualMapCount > 0) {
-        const originalMaps = editableSeriesMaps(previousRecord);
+        const originalMaps = configuredSeriesMaps;
         const maps = [];
         let winsA = 0;
         let winsB = 0;
@@ -1294,10 +1340,7 @@
           const rawA = String(values[`manualMapScoreA_${mapIndex}`] || "").trim();
           const rawB = String(values[`manualMapScoreB_${mapIndex}`] || "").trim();
           const mapName = String(values[`manualMapName_${mapIndex}`] || original.name || `Mapa ${mapIndex + 1}`).trim();
-          if (!rawA && !rawB) {
-            if (original.demoUrl || original.leetifyUrl || (original.statistics || []).length) maps.push({ ...original, name: mapName });
-            continue;
-          }
+          if (!rawA && !rawB) { maps.push({ ...original, name: mapName }); continue; }
           if (!rawA || !rawB) {
             showToast(`Preencha os dois lados do placar no ${mapName}`);
             return;
@@ -1338,6 +1381,10 @@
         record.resultSource = "manual-maps";
         record.evidenceNote = seriesFinished ? `Resultado oficial calculado pelos mapas: ${record.teamA} ${winsA}–${winsB} ${record.teamB}.` : `Série em andamento: ${winsA}–${winsB} em mapas com placar confirmado.`;
         if (seriesFinished) record.status = "finished";
+      } else if (configuredSeriesMaps.length) {
+        // Keep independent source fields for each possible map even before a
+        // score is entered. This is what makes a 2-1 decider uploadable.
+        record.maps = configuredSeriesMaps;
       } else if (manualResult) {
         const scoreA = Number(values.manualScoreA);
         const scoreB = Number(values.manualScoreB);
@@ -1361,6 +1408,7 @@
       delete record.manualScoreB;
       delete record.manualMapCount;
       Object.keys(record).filter((key) => /^manualMap(Name|ScoreA|ScoreB)_\d+$/.test(key)).forEach((key) => delete record[key]);
+      Object.keys(record).filter((key) => /^(seriesMapName|mapDemoUrl)_\d+$/.test(key)).forEach((key) => delete record[key]);
     }
     if (demoFile?.size) {
       try {
@@ -1371,6 +1419,22 @@
         const playedAt = demoPlayedAt(demoFile);
         record.demoInfo = { fileName: demoFile.name, fileSize: demoFile.size, playedAt: playedAt.iso, playedAtLabel: playedAt.label, processedAt: new Date().toISOString(), rawFileStored: false, extractionStatus: "failed", warnings: [String(reason.message || reason)] };
         saveWarnings.push(`A demo não pôde ser lida: ${reason.message || reason}`);
+      }
+    }
+    if (section === "matches" && Array.isArray(record.maps)) {
+      for (let mapIndex = 0; mapIndex < record.maps.length; mapIndex += 1) {
+        const mapFile = formData.get(`mapDemo_${mapIndex}`);
+        if (!mapFile?.size) continue;
+        try {
+          const processed = await parseDemoFile(mapFile, record);
+          const target = record.maps[mapIndex];
+          const manualMap = target.resultSource === "manual" || target.scoreSource === "manual";
+          const { score, winner, winnerId, resultSource, status, evidenceNote, ...mapStats } = processed;
+          Object.assign(target, mapStats, { name: processed.demoInfo?.mapName || target.name, updated: "Demo do mapa processada pelo painel" });
+          if (!manualMap) Object.assign(target, { score, winner, winnerId, resultSource, status, evidenceNote, scoreSource: "demo" });
+        } catch (reason) {
+          saveWarnings.push(`A demo do mapa ${mapIndex + 1} não pôde ser lida: ${reason.message || reason}`);
+        }
       }
     }
     if (section === "matches" && record.leetifyUrl) {
@@ -1391,9 +1455,7 @@
       }
     }
     if (index >= 0) list[index] = record; else list.unshift(record);
-    if (section === "teams" && previousTeam) migrateTeamRename(record.id, previousTeam.name, record.name);
     if (section === "tournaments") ensureTournamentFixtures(index >= 0 ? list[index] : record);
-    normalizeTeamReferences();
     await persistContent();
     let serverDemoResult = null;
     const shouldProcessOnServer = section === "matches" && record.demoUrl && record.statisticsSource !== "demo" && (
