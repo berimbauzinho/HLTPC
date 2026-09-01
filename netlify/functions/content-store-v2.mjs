@@ -1,17 +1,22 @@
-const { connectLambda, getStore } = require("@netlify/blobs");
-const { applyPgl2026Imports } = require("./pgl-2026-imports");
-const { applyStatisticsImports } = require("./statistics-imports");
-const { applyRecoveryMedia } = require("./recovery-media");
-const { normalizeContentTeamReferences } = require("./team-relations");
-const { applyTournamentProgression } = require("./tournament-progression");
+import { getStore } from "@netlify/blobs";
+import pglImports from "./pgl-2026-imports.js";
+import statisticsImports from "./statistics-imports.js";
+import recoveryMedia from "./recovery-media.js";
+import teamRelations from "./team-relations.js";
+import tournamentProgression from "./tournament-progression.js";
+
+const { applyPgl2026Imports } = pglImports;
+const { applyStatisticsImports } = statisticsImports;
+const { applyRecoveryMedia } = recoveryMedia;
+const { normalizeContentTeamReferences } = teamRelations;
+const { applyTournamentProgression } = tournamentProgression;
 
 const STORE_NAME = "hltpc-content";
 const CONTENT_KEY = "current";
 const CONTENT_KEYS = ["players", "teams", "tournaments", "matches", "news"];
 const BACKUP_SLOTS = 12;
 
-function store(event) {
-  connectLambda(event);
+function store() {
   return getStore({ name: STORE_NAME, consistency: "strong" });
 }
 
@@ -35,12 +40,12 @@ function runtimeContent(content) {
   );
 }
 
-async function getRawContent(event) {
-  return await store(event).get(CONTENT_KEY, { type: "json" }) || null;
+async function getRawContent() {
+  return await store().get(CONTENT_KEY, { type: "json" }) || null;
 }
 
-async function getContent(event) {
-  const raw = await getRawContent(event);
+async function getContent() {
+  const raw = await getRawContent();
   if (!isValidContent(raw)) {
     const error = new Error("O armazenamento compartilhado não devolveu uma base válida. Nenhuma gravação foi feita.");
     error.name = "ContentUnavailableError";
@@ -50,7 +55,7 @@ async function getContent(event) {
   return runtimeContent(raw);
 }
 
-async function saveContent(event, content, options = {}) {
+async function saveContent(content, options = {}) {
   if (!isValidContent(content)) {
     const error = new Error("A gravação foi bloqueada porque a base enviada está incompleta.");
     error.name = "InvalidContentError";
@@ -58,7 +63,7 @@ async function saveContent(event, content, options = {}) {
     throw error;
   }
 
-  const current = await getRawContent(event);
+  const current = await getRawContent();
   const currentRevision = Number(current?._revision || 0);
   const expectedRevision = options.expectedRevision;
   if (expectedRevision !== undefined && expectedRevision !== null && Number(expectedRevision) !== currentRevision) {
@@ -70,7 +75,7 @@ async function saveContent(event, content, options = {}) {
 
   if (isValidContent(current)) {
     const backupKey = `backup-${currentRevision % BACKUP_SLOTS}`;
-    await store(event).setJSON(backupKey, {
+    await store().setJSON(backupKey, {
       backedUpAt: new Date().toISOString(),
       revision: currentRevision,
       content: current
@@ -82,8 +87,8 @@ async function saveContent(event, content, options = {}) {
     _revision: currentRevision + 1,
     updatedAt: content.updatedAt || new Date().toISOString()
   });
-  await store(event).setJSON(CONTENT_KEY, next);
+  await store().setJSON(CONTENT_KEY, next);
   return next;
 }
 
-module.exports = { CONTENT_KEYS, getContent, getRawContent, isValidContent, saveContent };
+export { CONTENT_KEYS, getContent, getRawContent, isValidContent, saveContent };

@@ -32,12 +32,12 @@
 
 [[redirects]]
   from = "/api/content"
-  to = "/.netlify/functions/content"
+  to = "/.netlify/functions/content-v2"
   status = 200
 
 [[redirects]]
   from = "/api/admin/content"
-  to = "/.netlify/functions/admin-content"
+  to = "/.netlify/functions/admin-content-v2"
   status = 200
 
 [[redirects]]
@@ -47,7 +47,7 @@
 
 [[redirects]]
   from = "/api/admin/process-demo"
-  to = "/.netlify/functions/admin-process-demo-background"
+  to = "/.netlify/functions/admin-process-demo-v2-background"
   status = 200
 
 [[redirects]]

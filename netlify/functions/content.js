@@ -7,6 +7,8 @@ exports.handler = async (event) => {
     return json(200, await getContent(event));
   } catch (reason) {
     console.error("HLTPC public content error", reason);
-    return json(200, {});
+    return json(Number(reason?.statusCode || 503), {
+      error: "O conteúdo compartilhado está temporariamente indisponível."
+    });
   }
 };
