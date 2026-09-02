@@ -233,14 +233,20 @@
   }
 
   async function syncPendingServerDemos() {
-    const pending = state.matches.filter((match) => match.demoUrl && match.statisticsSource !== "demo" && match.demoProcessing?.status !== "error" && (
-      !(match.statistics || []).length ||
-      ["failed", "pending", "skipped-large"].includes(match.demoInfo?.extractionStatus)
-    ));
+    const needsProcessing = (record) => record?.demoUrl && record.statisticsSource !== "demo" && record.demoProcessing?.status !== "error" && record.demoProcessing?.status !== "processing" && (
+      !(record.statistics || []).length || ["failed", "pending", "skipped-large", "external"].includes(record.demoInfo?.extractionStatus)
+    );
+    const pending = state.matches.flatMap((match) => {
+      const entries = needsProcessing(match) ? [{ matchId: match.id, mapIndex: null, label: match.name }] : [];
+      (match.maps || []).forEach((map, mapIndex) => {
+        if (needsProcessing(map)) entries.push({ matchId: match.id, mapIndex, label: `${match.name} · ${map.name || `Mapa ${mapIndex + 1}`}` });
+      });
+      return entries;
+    });
     let processed = 0;
-    for (const match of pending) {
-      showToast(`${match.name}: processando a demo do Drive no servidor…`);
-      await processDemoOnServer(match.id);
+    for (const entry of pending) {
+      showToast(`${entry.label}: processando a demo do Drive no servidor…`);
+      await processDemoOnServer(entry.matchId, entry.mapIndex);
       processed += 1;
     }
     return processed;
@@ -252,6 +258,11 @@
       acceptSharedContent(saved);
       go(section);
       showToast("Conteúdo compartilhado carregado em modo seguro");
+      // Existing Drive links from before the MD3 screen are upgraded as soon
+      // as an authenticated Admin opens the panel; no second upload is needed.
+      syncPendingServerDemos().then((processed) => {
+        if (processed) showToast(`${processed} demo${processed > 1 ? "s" : ""} pendente${processed > 1 ? "s" : ""} processada${processed > 1 ? "s" : ""} no servidor`);
+      }).catch((reason) => showToast(`Processamento pendente: ${reason.message}`));
     } catch (reason) {
       sharedContentLoaded = false;
       contentRevision = null;
@@ -1467,6 +1478,15 @@
       showToast("A demo foi salva. Processando o arquivo do Drive no servidor HLTPC…");
       try { serverDemoResult = await processDemoOnServer(record.id); }
       catch (reason) { saveWarnings.push(`Processamento no servidor pendente: ${reason.message || reason}`); }
+    }
+    if (section === "matches") {
+      const savedMatch = state.matches.find((item) => item.id === record.id);
+      const pendingMaps = (savedMatch?.maps || []).map((map, mapIndex) => ({ map, mapIndex })).filter(({ map }) => map.demoUrl && map.statisticsSource !== "demo" && map.demoProcessing?.status !== "processing" && map.demoProcessing?.status !== "error" && !(map.statistics || []).length);
+      for (const { mapIndex } of pendingMaps) {
+        showToast(`${record.name}: processando a demo do mapa ${mapIndex + 1} no servidor…`);
+        try { serverDemoResult = await processDemoOnServer(record.id, mapIndex); }
+        catch (reason) { saveWarnings.push(`Mapa ${mapIndex + 1} pendente: ${reason.message || reason}`); }
+      }
     }
     dialog.close();
     const successMessage = serverDemoResult ? `${record.name}: demo processada no servidor, ${serverDemoResult.players} jogadores e placar ${serverDemoResult.score}` : leetifyImported ? `${record.name}: ${(record.statistics || []).length} jogadores e resultado conferidos` : demoFile?.size ? (record.demoInfo?.extractionStatus === "skipped-large" ? `${record.name}: demo grande registrada; outras fontes foram salvas` : record.statistics?.length ? `${record.name}: demo lida e ${record.statistics.length} jogadores extraídos` : `${record.name}: demo registrada sem estatísticas`) : `${record.name} foi salvo`;
