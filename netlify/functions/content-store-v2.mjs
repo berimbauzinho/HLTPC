@@ -4,12 +4,14 @@ import statisticsImports from "./statistics-imports.js";
 import recoveryMedia from "./recovery-media.js";
 import teamRelations from "./team-relations.js";
 import tournamentProgression from "./tournament-progression.js";
+import playerIdentities from "./player-identities.js";
 
 const { applyPgl2026Imports } = pglImports;
 const { applyStatisticsImports } = statisticsImports;
 const { applyRecoveryMedia } = recoveryMedia;
 const { normalizeContentTeamReferences } = teamRelations;
-const { applyTournamentProgression } = tournamentProgression;
+const { applyTournamentProgression, ensureAllTournamentFixtures } = tournamentProgression;
+const { applyPlayerIdentities } = playerIdentities;
 
 const STORE_NAME = "hltpc-content";
 const CONTENT_KEY = "current";
@@ -34,7 +36,13 @@ function runtimeContent(content) {
   return applyTournamentProgression(
     normalizeContentTeamReferences(
       applyStatisticsImports(
-        applyPgl2026Imports(applyRecoveryMedia(content))
+        applyPgl2026Imports(
+          applyRecoveryMedia(
+            applyPlayerIdentities(
+              ensureAllTournamentFixtures(content)
+            )
+          )
+        )
       )
     )
   );

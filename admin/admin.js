@@ -233,9 +233,15 @@
   }
 
   async function syncPendingServerDemos() {
-    const needsProcessing = (record) => record?.demoUrl && record.statisticsSource !== "demo" && record.demoProcessing?.status !== "error" && record.demoProcessing?.status !== "processing" && (
-      !(record.statistics || []).length || ["failed", "pending", "skipped-large", "external"].includes(record.demoInfo?.extractionStatus)
-    );
+    const needsProcessing = (record) => {
+      if (!record?.demoUrl || record.statisticsSource === "demo") return false;
+      const isProcessingStuck = record.demoProcessing?.status === "processing" && (
+        !record.demoProcessing.startedAt || (Date.now() - new Date(record.demoProcessing.startedAt).getTime() > 5 * 60 * 1000)
+      );
+      if (record.demoProcessing?.status === "processing" && !isProcessingStuck) return false;
+      const extraction = record.demoInfo?.extractionStatus || "pending";
+      return !(record.statistics || []).length || ["failed", "pending", "skipped-large", "external", "linked"].includes(extraction);
+    };
     const pending = state.matches.flatMap((match) => {
       const entries = needsProcessing(match) ? [{ matchId: match.id, mapIndex: null, label: match.name }] : [];
       (match.maps || []).forEach((map, mapIndex) => {
@@ -245,9 +251,14 @@
     });
     let processed = 0;
     for (const entry of pending) {
-      showToast(`${entry.label}: processando a demo do Drive no servidor…`);
-      await processDemoOnServer(entry.matchId, entry.mapIndex);
-      processed += 1;
+      try {
+        showToast(`${entry.label}: processando a demo do Drive no servidor…`);
+        await processDemoOnServer(entry.matchId, entry.mapIndex);
+        processed += 1;
+      } catch (err) {
+        console.warn(`HLTPC: falha ao sincronizar demo ${entry.label}:`, err);
+        showToast(`${entry.label}: ${err.message || "falha ao processar demo"}`);
+      }
     }
     return processed;
   }

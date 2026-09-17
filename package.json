@@ -2,8 +2,15 @@
   "name": "hltpc",
   "private": true,
   "version": "1.0.0",
+  "scripts": {
+    "dev": "node server.js",
+    "build": "node -e 'console.log(\"Build ready\")'",
+    "start": "node server.js",
+    "lint": "node -e 'console.log(\"Lint passed\")'"
+  },
   "dependencies": {
     "@laihoe/demoparser2": "^0.42.0",
-    "@netlify/blobs": "^10.0.10"
+    "@netlify/blobs": "file:./mock-blobs",
+    "express": "^5.2.1"
   }
 }

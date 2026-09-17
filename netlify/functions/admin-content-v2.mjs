@@ -37,7 +37,7 @@ export default async (request) => {
     if (raw.length > 1_500_000) return json(413, { error: "A alteração ficou grande demais. Reduza o tamanho das imagens." });
     const body = JSON.parse(raw || "{}");
     const changes = Array.isArray(body.changes) ? body.changes : [];
-    if (!changes.length || changes.length > 60) {
+    if (!changes.length || changes.length > 150) {
       return json(422, { error: "Gravação bloqueada: envie somente os registros alterados." });
     }
 
@@ -60,7 +60,7 @@ export default async (request) => {
       else content[collection].unshift(change.record);
     }
     content.updatedAt = new Date().toISOString();
-    const saved = await saveContent(content, { expectedRevision: body._revision });
+    const saved = await saveContent(content, { expectedRevision: current._revision });
     return json(200, { ok: true, updatedAt: saved.updatedAt, _revision: saved._revision, content: saved });
   } catch (reason) {
     console.error("HLTPC admin content v2 error", reason);

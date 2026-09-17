@@ -18,8 +18,16 @@
       const merged = new Map((currentItems || []).map((item) => [item.id, item]));
       (importedItems || []).forEach((imported) => {
         const current = merged.get(imported.id);
-        const currentVersion = Number(current?.[versionKey] || current?.importVersion || 0);
-        if (!current || currentVersion < Number(historicalImport2025.version || 1)) merged.set(imported.id, { ...(current || {}), ...imported });
+        if (!current) {
+          merged.set(imported.id, imported);
+        } else if (current.updated?.includes("painel") || current.resultSource === "manual" || current.manualResult) {
+          merged.set(imported.id, current);
+        } else {
+          const currentVersion = Number(current?.[versionKey] || current?.importVersion || 0);
+          if (currentVersion < Number(historicalImport2025.version || 1)) {
+            merged.set(imported.id, { ...imported, ...current });
+          }
+        }
       });
       return [...merged.values()];
     };
@@ -78,6 +86,12 @@
     if (saved.name) event.name = saved.name;
     if (saved.subtitle && Number(saved.subtitle)) event.year = Number(saved.subtitle);
     if (saved.format && saved.format !== "A definir") event.format = saved.format;
+    if (saved.champion) event.champion = canonicalTeamName(saved.champion, saved.championId);
+    if (saved.category) event.category = saved.category;
+    if (saved.status) event.status = saved.status;
+    if (saved.eventStatus) event.status = saved.eventStatus;
+    if (saved.banner) event.banner = saved.banner;
+    if (saved.logo) event.logo = saved.logo;
     if (Array.isArray(saved.teams) && saved.teams.length) {
       const historicEntries = new Map(event.entries.map((entry) => [entry.teamId || entry.team, entry]));
       event.entries = saved.teams.map((team, index) => {

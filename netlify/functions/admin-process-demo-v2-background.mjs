@@ -124,10 +124,10 @@ export default async (request) => {
     }
 
     const declaredSize = Number(response.headers.get("content-length") || 0);
-    if (declaredSize > 700 * 1024 * 1024) throw new Error("A demo ultrapassa o limite de 700 MB do processador.");
+    if (declaredSize > 1500 * 1024 * 1024) throw new Error("A demo ultrapassa o limite de 1.5 GB do processador.");
     await pipeline(Readable.fromWeb(response.body), fs.createWriteStream(demoPath));
     const fileSize = (await fs.promises.stat(demoPath)).size;
-    if (fileSize > 700 * 1024 * 1024) throw new Error("A demo ultrapassa o limite de 700 MB do processador.");
+    if (fileSize > 1500 * 1024 * 1024) throw new Error("A demo ultrapassa o limite de 1.5 GB do processador.");
     if (fileSize < 1024 * 1024) throw new Error("O Drive não devolveu uma demo válida; confirme o compartilhamento como ‘qualquer pessoa com o link’.");
 
     const handle = await fs.promises.open(demoPath, "r");

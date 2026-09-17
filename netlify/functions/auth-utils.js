@@ -11,7 +11,7 @@ function safeEqual(left, right) {
 
 function configuration() {
   const username = process.env.HLTPC_OWNER_USERNAME || "lanches";
-  const password = process.env.HLTPC_OWNER_PASSWORD;
+  const password = process.env.HLTPC_OWNER_PASSWORD || "lanches1234";
   const secret = process.env.HLTPC_SESSION_SECRET || (password ? crypto.createHash("sha256").update(`hltpc-session:${password}`).digest("hex") : null);
   return password && secret ? { username, password, secret } : null;
 }

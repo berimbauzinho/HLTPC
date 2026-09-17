@@ -1,0 +1,14 @@
+{
+  "name": "@netlify/blobs",
+  "version": "1.0.0",
+  "description": "In-memory mock for @netlify/blobs",
+  "main": "./index.js",
+  "type": "commonjs",
+  "exports": {
+    ".": {
+      "require": "./index.js",
+      "import": "./index.js",
+      "default": "./index.js"
+    }
+  }
+}

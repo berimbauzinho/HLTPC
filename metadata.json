@@ -1,0 +1,8 @@
+{
+  "name": "HLTPC",
+  "description": "HLTPC — A Plataforma Oficial do TAMPICOUNTERS. Portal histórico dos campeonatos de Counter-Strike.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

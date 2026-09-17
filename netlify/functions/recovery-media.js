@@ -42,26 +42,28 @@ function recoverTeams(content) {
     const recovered = TEAM_RECOVERY[team.id];
     if (!recovered) return;
     const previousName = team.name;
-    team.name = recovered.name;
-    team.acronym = recovered.acronym;
-    team.logo = recovered.logo;
-    team.aliases = Array.from(new Set([...(team.aliases || []), previousName].filter(Boolean)));
+    if (!team.logo) team.logo = recovered.logo;
+    if (!team.acronym) team.acronym = recovered.acronym;
+    if (!team.name || team.name.startsWith("team-")) team.name = recovered.name;
+    team.aliases = Array.from(new Set([...(team.aliases || []), previousName, recovered.name].filter(Boolean)));
   });
 }
 
 function recoverTournaments(content) {
   (content.tournaments || []).forEach((tournament) => {
     const recovered = TOURNAMENT_RECOVERY[tournament.id];
-    if (recovered) Object.assign(tournament, recovered);
+    if (!recovered) return;
+    if (!tournament.logo) tournament.logo = recovered.logo;
+    if (!tournament.banner) tournament.banner = recovered.banner;
   });
 }
 
 function recoverNews(content) {
   (content.news || []).forEach((item) => {
-    if (NEWS_RECOVERY[item.id]) item.image = NEWS_RECOVERY[item.id];
+    if (NEWS_RECOVERY[item.id] && !item.image) item.image = NEWS_RECOVERY[item.id];
   });
 
-  if (!(content.news || []).some((item) => item.id === "boca-final-pgl-2026")) {
+  if (!Number(content._revision || 0) && !(content.news || []).some((item) => item.id === "boca-final-pgl-2026")) {
     content.news.unshift({
       id: "boca-final-pgl-2026",
       name: "BOCA DE FUMO garante vaga direta na final",
@@ -80,19 +82,17 @@ function recoverNews(content) {
 function recoverFinalGroupMatch(content) {
   const match = (content.matches || []).find((item) => item.id === "pgl-abadia-2026-group-6");
   if (!match || match.resultSource === "manual" || match.scoreSource === "manual") return;
-  match.score = "10 - 13";
-  match.winner = "RED PILL Gaming";
-  match.winnerId = "team-8";
-  match.status = "finished";
-  match.updated = "Placar recuperado da demo processada";
+  if (!match.score) {
+    match.score = "10 - 13";
+    match.winner = "RED PILL Gaming";
+    match.winnerId = "team-8";
+    match.status = "finished";
+    match.updated = "Placar recuperado da demo processada";
+  }
 }
 
 function applyRecoveryMedia(content) {
   if (!content || typeof content !== "object") return content || {};
-
-  // A base sobrescrita não tinha revisão. Depois do primeiro salvamento seguro,
-  // as escolhas feitas no Admin passam a prevalecer e não são reimpostas aqui.
-  if (Number(content._revision || 0) > 0) return content;
 
   recoverTeams(content);
   recoverTournaments(content);

@@ -2,6 +2,9 @@ const IMPORTS = {
   "pgl-abadia-2026-group-1": {
     demoUrl: "https://drive.google.com/file/d/1ijMqtTU2WuE7_hkCBy1SDbzInsDw0I82/view?usp=drivesdk",
     leetifyUrl: "https://leetify.com/app/match-details/feb1d954-0319-4c11-a24f-cfb2b2f96ba9/overview",
+    score: "13 - 9",
+    winner: "BOCA DE FUMO Gaming",
+    status: "finished",
     demoInfo: {
       fileName: "Fase_de_grupos_BOCADEFUMO_vs_redpillados_INFERNO.dem",
       fileSize: 360315374,
