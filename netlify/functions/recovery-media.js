@@ -23,8 +23,8 @@ const TOURNAMENT_RECOVERY = {
     banner: `${ASSET_ROOT}/blast-resenha-series-2025.webp`
   },
   "esl-gramadao-2025": {
-    logo: `${ASSET_ROOT}/esl-major-gramadao-2025.webp`,
-    banner: `${ASSET_ROOT}/esl-major-gramadao-2025.webp`
+    logo: `${ASSET_ROOT}/esl-major-gramadao-2025.webp?v=transparent`,
+    banner: `${ASSET_ROOT}/esl-major-gramadao-2025.webp?v=transparent`
   },
   "pgl-abadia-2026": {
     logo: `${ASSET_ROOT}/pgl-major-abadia-2026.webp`,

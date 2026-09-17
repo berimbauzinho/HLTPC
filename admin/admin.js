@@ -820,9 +820,10 @@
   }
 
   function imageSettings(kind = "image") {
-    if (kind === "news") return { dimension: 1600, target: 300 * 1024 };
-    if (kind === "photo") return { dimension: 1200, target: 180 * 1024 };
-    return { dimension: 900, target: 110 * 1024 };
+    if (kind === "news") return { dimension: 1600, target: 400 * 1024 };
+    if (kind === "photo") return { dimension: 1200, target: 250 * 1024 };
+    if (kind === "logo") return { dimension: 800, target: 350 * 1024 };
+    return { dimension: 900, target: 150 * 1024 };
   }
 
   async function optimizedImageBlob(file, kind = "image") {
@@ -835,8 +836,9 @@
       await new Promise((resolve, reject) => { image.onload = resolve; image.onerror = () => reject(new Error("Não foi possível abrir esta imagem.")); image.src = objectUrl; });
       let scale = Math.min(1, settings.dimension / Math.max(image.naturalWidth, image.naturalHeight));
       const canvas = document.createElement("canvas");
-      let quality = .9;
+      let quality = .92;
       let blob = null;
+      const mimeType = file.type === "image/png" && kind === "logo" ? "image/png" : "image/webp";
       for (let attempt = 0; attempt < 10; attempt += 1) {
         canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
         canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
@@ -844,10 +846,14 @@
         if (!context) throw new Error("O navegador não conseguiu preparar a imagem.");
         context.clearRect(0, 0, canvas.width, canvas.height);
         context.drawImage(image, 0, 0, canvas.width, canvas.height);
-        blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/webp", quality));
+        blob = await new Promise((resolve) => canvas.toBlob(resolve, mimeType, quality));
         if (blob && blob.size <= settings.target) break;
-        if (quality > .66) quality -= .08;
-        else { quality = .8; scale *= .82; }
+        if (mimeType === "image/png") {
+          scale *= .85;
+        } else {
+          if (quality > .66) quality -= .08;
+          else { quality = .8; scale *= .82; }
+        }
       }
       if (!blob) throw new Error("Não foi possível converter a imagem.");
       return blob;
@@ -858,11 +864,12 @@
 
   async function uploadOptimizedImage(file, kind) {
     const blob = await optimizedImageBlob(file, kind);
+    const contentType = blob.type || (file.type === "image/png" && kind === "logo" ? "image/png" : "image/webp");
     try {
       const response = await fetch("/api/admin/media", {
         method: "POST",
         credentials: "same-origin",
-        headers: { "Content-Type": blob.type || "image/webp" },
+        headers: { "Content-Type": contentType },
         body: blob
       });
       if (response.ok) {
@@ -870,11 +877,17 @@
         if (result?.url) return result.url;
       }
       const errorJson = await response.json().catch(() => ({}));
+      if (response.status === 403) {
+        throw new Error("Sessão expirada. Faça login novamente no painel.");
+      }
       if (errorJson?.error) {
-        console.warn("Upload de mídia no servidor retornou erro:", errorJson.error);
+        throw new Error(`Erro no servidor ao salvar mídia: ${errorJson.error}`);
       }
     } catch (error) {
-      console.warn("Falha de rede no upload de mídia via Netlify Blobs, usando base64 comprimido:", error);
+      if (error.message?.includes("Sessão expirada") || error.message?.includes("Erro no servidor")) {
+        throw error;
+      }
+      console.warn("Upload de mídia via endpoint falhou, usando data URL:", error);
     }
     return fileAsDataUrl(blob);
   }
