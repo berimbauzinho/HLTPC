@@ -858,6 +858,20 @@
 
   async function uploadOptimizedImage(file, kind) {
     const blob = await optimizedImageBlob(file, kind);
+    try {
+      const response = await fetch("/api/admin/media", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": blob.type || "image/webp" },
+        body: blob
+      });
+      if (response.ok) {
+        const result = await response.json();
+        if (result?.url) return result.url;
+      }
+    } catch (error) {
+      console.warn("Falha no upload de mídia via Netlify Blobs, usando base64 comprimido:", error);
+    }
     return fileAsDataUrl(blob);
   }
 

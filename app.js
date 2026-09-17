@@ -9,7 +9,7 @@
   }
   let shared = {};
   try {
-    const response = await fetch("/api/content", { cache: "no-store" });
+    const response = await fetch(`/api/content?_t=${Date.now()}`, { cache: "no-store" });
     if (response.ok) shared = await response.json();
   } catch (_) {}
   const historicalImport2025 = window.HLTPC_IMPORT_2025;
@@ -77,8 +77,14 @@
     if (event.champion) event.champion = canonicalTeamName(event.champion, event.championId);
   });
   const playerMeta = new Map((shared.players || []).map((item) => [item.name, item]));
-  const teamMeta = new Map((shared.teams || []).map((item) => [item.name, item]));
+  const teamMeta = new Map();
+  (shared.teams || []).forEach((team) => {
+    if (team.name) teamMeta.set(team.name, team);
+    if (team.id) teamMeta.set(team.id, team);
+    (team.aliases || []).forEach((alias) => { if (alias && !teamMeta.has(alias)) teamMeta.set(alias, team); });
+  });
   const tournamentMeta = new Map((shared.tournaments || []).map((item) => [item.id, item]));
+  (shared.tournaments || []).forEach((event) => { if (event.name) tournamentMeta.set(event.name, event); });
   (shared.players || []).forEach((item) => { if (item.name && !data.players.includes(item.name)) data.players.push(item.name); });
   data.tournaments.forEach((event) => {
     const saved = tournamentMeta.get(event.id);
@@ -153,7 +159,11 @@
     bagre: { label: "Troféu Bagre", icon: "♟", className: "bagre" }
   };
   const demoLabel = (demos) => ({ unavailable: "Sem demo", partial: "Demos parciais", future: "Aguardando campeonato" }[demos] || "Não informado");
-  const teamBadge = (team) => { const meta = teamMeta.get(team) || {}; const fallback = (meta.acronym || entityInitials(team)).toUpperCase(); return mediaImage(meta.logo, `Logo de ${team}`, fallback); };
+  const teamBadge = (team) => {
+    const meta = teamMeta.get(team) || teamMeta.get(canonicalTeamName(team)) || teamMeta.get(sharedTeamById.get(team)?.name) || {};
+    const fallback = (meta.acronym || entityInitials(team)).toUpperCase();
+    return mediaImage(meta.logo, `Logo de ${team}`, fallback);
+  };
   const safeLeetifyUrl = (value) => {
     try { const url = new URL(String(value || "")); return url.protocol === "https:" && /(^|\.)leetify\.com$/i.test(url.hostname) ? url.href : ""; }
     catch (_) { return ""; }
