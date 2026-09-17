@@ -869,8 +869,12 @@
         const result = await response.json();
         if (result?.url) return result.url;
       }
+      const errorJson = await response.json().catch(() => ({}));
+      if (errorJson?.error) {
+        console.warn("Upload de mídia no servidor retornou erro:", errorJson.error);
+      }
     } catch (error) {
-      console.warn("Falha no upload de mídia via Netlify Blobs, usando base64 comprimido:", error);
+      console.warn("Falha de rede no upload de mídia via Netlify Blobs, usando base64 comprimido:", error);
     }
     return fileAsDataUrl(blob);
   }
@@ -1304,6 +1308,19 @@
   }
 
   async function saveEditor() {
+    const saveButton = form.querySelector('button[type="submit"]');
+    const originalSaveText = saveButton ? saveButton.textContent : "Salvar";
+    if (saveButton) {
+      saveButton.disabled = true;
+      saveButton.textContent = "Salvando…";
+    }
+    const restoreSaveButton = () => {
+      if (saveButton) {
+        saveButton.disabled = false;
+        saveButton.textContent = originalSaveText;
+      }
+    };
+
     const formData = new FormData(form);
     const values = {};
     const saveWarnings = [];
@@ -1315,19 +1332,26 @@
     if (section === "tournaments") {
       values.teams = formData.getAll("teams");
       const definition = formatDefinition(values.formatType);
-      if (!definition || values.teams.length !== definition.teamCount) { showToast(`Selecione exatamente ${definition?.teamCount || "os"} times exigidos pelo formato`); return; }
+      if (!definition || values.teams.length !== definition.teamCount) { restoreSaveButton(); showToast(`Selecione exatamente ${definition?.teamCount || "os"} times exigidos pelo formato`); return; }
       values.format = definition.description;
     }
     if (section === "news" && !values.date) values.date = new Date().toISOString().slice(0, 10);
     if (section === "matches") {
       try { values.leetifyUrl = normalizedLeetifyUrl(values.leetifyUrl); }
-      catch (reason) { showToast(reason.message); return; }
+      catch (reason) { restoreSaveButton(); showToast(reason.message); return; }
     }
     const imageField = section === "players" ? "photo" : ["teams", "tournaments"].includes(section) ? "logo" : section === "news" ? "image" : null;
     const imageFile = imageField ? formData.get(imageField) : null;
     if (imageField && imageFile?.size) {
-      try { values[imageField] = await uploadOptimizedImage(imageFile, section === "news" ? "news" : section === "players" ? "photo" : "logo"); }
-      catch (reason) { showToast(reason.message || "Não foi possível otimizar a imagem"); return; }
+      try {
+        if (saveButton) saveButton.textContent = "Processando imagem…";
+        values[imageField] = await uploadOptimizedImage(imageFile, section === "news" ? "news" : section === "players" ? "photo" : "logo");
+        if (saveButton) saveButton.textContent = "Salvando…";
+      } catch (reason) {
+        restoreSaveButton();
+        showToast(reason.message || "Não foi possível otimizar a imagem");
+        return;
+      }
     }
     const scoreboardFile = section === "matches" ? formData.get("scoreboardImage") : null;
     if (scoreboardFile?.size) {
@@ -1513,6 +1537,7 @@
         catch (reason) { saveWarnings.push(`Mapa ${mapIndex + 1} pendente: ${reason.message || reason}`); }
       }
     }
+    restoreSaveButton();
     dialog.close();
     const successMessage = serverDemoResult ? `${record.name}: demo processada no servidor, ${serverDemoResult.players} jogadores e placar ${serverDemoResult.score}` : leetifyImported ? `${record.name}: ${(record.statistics || []).length} jogadores e resultado conferidos` : demoFile?.size ? (record.demoInfo?.extractionStatus === "skipped-large" ? `${record.name}: demo grande registrada; outras fontes foram salvas` : record.statistics?.length ? `${record.name}: demo lida e ${record.statistics.length} jogadores extraídos` : `${record.name}: demo registrada sem estatísticas`) : `${record.name} foi salvo`;
     showToast(saveWarnings.length ? `${successMessage}. Aviso: ${saveWarnings.join(" · ")}` : successMessage);
@@ -1567,7 +1592,21 @@
   document.querySelector("#closeDialog").addEventListener("click", closeEditor);
   document.querySelector("#cancelButton").addEventListener("click", closeEditor);
   deleteButton.addEventListener("click", async () => { try { await deleteEditor(); } catch (reason) { showToast(reason.message); } });
-  form.addEventListener("submit", async (event) => { event.preventDefault(); if (!form.reportValidity()) return; try { await saveEditor(); } catch (reason) { showToast(reason.message); } });
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (!form.reportValidity()) return;
+    try {
+      await saveEditor();
+    } catch (reason) {
+      console.error("Erro ao salvar:", reason);
+      const saveButton = form.querySelector('button[type="submit"]');
+      if (saveButton) {
+        saveButton.disabled = false;
+        saveButton.textContent = "Salvar";
+      }
+      showToast(reason?.message || "Ocorreu um erro ao salvar as alterações");
+    }
+  });
 
   overview();
   window.addEventListener("hltpc:authenticated", loadPersistedContent);
