@@ -7,3 +7,4 @@ recovery/
 artifacts/
 dist/
 *.log
+.netlify/

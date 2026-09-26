@@ -6,6 +6,9 @@
 [functions]
   external_node_modules = ["@laihoe/demoparser2"]
 
+[functions."admin-process-demo-v2-background"]
+  included_files = ["node_modules/@laihoe/demoparser2/**", "node_modules/@laihoe/demoparser2-linux-x64-gnu/**"]
+
 [[redirects]]
   from = "/api/admin/login"
   to = "/.netlify/functions/admin-login"

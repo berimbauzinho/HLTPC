@@ -63,6 +63,9 @@ test('image bytes round-trip, unsupported format and unauthenticated upload are 
   const read = await mediaRead(new Request(`https://hltpc.test/media?id=${url.split('/').at(-1)}`));
   assert.equal(read.status, 200);
   assert.deepEqual(Buffer.from(await read.arrayBuffer()), png);
+  const rewrittenRead = await mediaRead(new Request(`https://hltpc.test${url}`));
+  assert.equal(rewrittenRead.status, 200);
+  assert.deepEqual(Buffer.from(await rewrittenRead.arrayBuffer()), png);
   assert.equal((await mediaRead(new Request('https://hltpc.test/media?id=invalid'))).status, 404);
 });
 test('restoration creates a new revision and keeps owner-only access', async () => {
