@@ -4,7 +4,7 @@ const { connectLambda, getStore } = require("./storage");
 const versions = new WeakMap();
 
 function store(event) {
-  connectLambda(event);
+  if (event) connectLambda(event);
   return getStore(STORE_NAME);
 }
 

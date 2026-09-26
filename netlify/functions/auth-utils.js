@@ -20,8 +20,8 @@ function sign(payload, secret) {
   return crypto.createHmac("sha256", secret).update(payload).digest("base64url");
 }
 
-function createSession(username, secret, role = "owner", mustChangePassword = false) {
-  const payload = Buffer.from(JSON.stringify({ sub: username, role, mustChangePassword, exp: Date.now() + MAX_AGE * 1000 })).toString("base64url");
+function createSession(username, secret, role = "owner", mustChangePassword = false, authVersion = null) {
+  const payload = Buffer.from(JSON.stringify({ sub: username, role, mustChangePassword, authVersion, exp: Date.now() + MAX_AGE * 1000 })).toString("base64url");
   return `${payload}.${sign(payload, secret)}`;
 }
 
@@ -59,4 +59,15 @@ function json(statusCode, body, headers = {}) {
   return { statusCode, headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store", ...headers }, body: JSON.stringify(body) };
 }
 
-module.exports = { configuration, createSession, readSession, cookie, json, safeEqual, normalizeUsername, hashPassword, verifyPassword };
+async function validateSession(cookieHeader, event) {
+  const config = configuration();
+  const session = config && readSession(cookieHeader, config.secret);
+  if (!session) return null;
+  if (session.role === 'owner') return normalizeUsername(session.sub) === normalizeUsername(config.username) ? session : null;
+  if (process.env.HLTPC_OWNER_ONLY === 'true') return null;
+  const stored = await require('./user-store').findUser(event, session.sub);
+  if (!stored?.active || stored.role !== 'admin' || (stored.authVersion && stored.authVersion !== session.authVersion)) return null;
+  return { ...session, role: stored.role, mustChangePassword: stored.mustChangePassword };
+}
+
+module.exports = { configuration, createSession, readSession, validateSession, cookie, json, safeEqual, normalizeUsername, hashPassword, verifyPassword };

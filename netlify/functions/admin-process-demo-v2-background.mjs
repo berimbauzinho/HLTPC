@@ -12,9 +12,8 @@ import { getContent, updateContent } from "./content-store-v2.mjs";
 const { configuration, readSession } = authUtils;
 const { processDemoPath } = demoProcessor;
 
-function authorized(request) {
-  const config = configuration();
-  const session = config && readSession(request.headers.get("cookie") || "", config.secret);
+async function authorized(request) {
+  const session = await authUtils.validateSession(request.headers.get("cookie") || "");
   return session && !session.mustChangePassword ? session : null;
 }
 
@@ -42,7 +41,7 @@ async function saveMatchUpdate(matchId, updater) {
 }
 
 export default async (request) => {
-  if (!authorized(request) || request.method !== "POST") return new Response(null, { status: 403 });
+  if (!await authorized(request) || request.method !== "POST") return new Response(null, { status: 403 });
 
   let directory = "";
   let matchId = "";

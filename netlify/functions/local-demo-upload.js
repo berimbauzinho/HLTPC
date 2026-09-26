@@ -9,7 +9,7 @@ const auth = require('./auth-utils');
 // hundreds of MB through a Netlify Function or the browser WASM parser.
 async function localDemoUpload(req, res) {
   const config = auth.configuration();
-  const session = config && auth.readSession(req.headers.cookie, config.secret);
+  const session = await auth.validateSession(req.headers.cookie);
   if (!session || session.mustChangePassword) return res.status(403).json({ error: 'Acesso administrativo necessário.' });
   let directory;
   try {

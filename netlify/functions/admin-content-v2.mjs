@@ -11,14 +11,14 @@ function json(status, value) {
   });
 }
 
-function authorized(request) {
-  const config = configuration();
-  const session = config && readSession(request.headers.get("cookie") || "", config.secret);
+async function authorized(request) {
+  const session = await authUtils.validateSession(request.headers.get("cookie") || "");
   return session && !session.mustChangePassword ? session : null;
 }
 
 export default async (request) => {
-  if (!authorized(request)) return json(403, { error: "Acesso administrativo necessário." });
+  const session = await authorized(request);
+  if (!session) return json(403, { error: "Acesso administrativo necessário." });
   try {
     if (request.method === "GET") {
       const content = await getContent();
@@ -86,7 +86,7 @@ export default async (request) => {
       else content[collection].unshift(record);
     }
     content.updatedAt = new Date().toISOString();
-    const saved = await saveContent(content, { expectedRevision: body._revision, actor: authorized(request).sub });
+    const saved = await saveContent(content, { expectedRevision: body._revision, actor: session.sub });
     return json(200, { ok: true, updatedAt: saved.updatedAt, _revision: saved._revision, content: saved });
   } catch (reason) {
     console.error("HLTPC admin content v2 error", reason);

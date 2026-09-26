@@ -4,7 +4,7 @@ import { getContent, saveContent, isValidContent } from './content-store-v2.mjs'
 const json = (status, body, headers = {}) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', ...headers } });
 export default async (request) => {
   const config = auth.configuration();
-  const session = config && auth.readSession(request.headers.get('cookie'), config.secret);
+  const session = await auth.validateSession(request.headers.get('cookie'));
   if (!session || session.mustChangePassword || session.role !== 'owner') return json(403, { error: 'Somente o owner pode exportar e restaurar versões.' });
   try {
     const store = storage.getStore({ name: 'hltpc-content', consistency: 'strong' });

@@ -13,14 +13,13 @@ function json(status, value) {
   });
 }
 
-function authorized(request) {
-  const config = configuration();
-  const session = config && readSession(request.headers.get("cookie") || "", config.secret);
+async function authorized(request) {
+  const session = await authUtils.validateSession(request.headers.get("cookie") || "");
   return session && !session.mustChangePassword ? session : null;
 }
 
 export default async (request) => {
-  if (!authorized(request)) return json(403, { error: "Acesso administrativo necessário." });
+  if (!await authorized(request)) return json(403, { error: "Acesso administrativo necessário." });
   if (request.method !== "POST") return json(405, { error: "Método não permitido." });
 
   try {

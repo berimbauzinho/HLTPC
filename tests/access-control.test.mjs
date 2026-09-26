@@ -1,0 +1,32 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+process.env.HLTPC_STORAGE = 'local';
+const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'hltpc-access-'));
+process.env.HLTPC_LOCAL_DATA_DIR = directory;
+process.env.HLTPC_OWNER_PASSWORD = 'test-owner-password';
+process.env.HLTPC_SESSION_SECRET = 'test-session-secret';
+const auth = (await import('../netlify/functions/auth-utils.js')).default;
+const storage = (await import('../netlify/functions/storage.js')).default;
+const store = storage.getStore('hltpc-admin-users');
+const user = { username: 'editor', active: true, role: 'admin', mustChangePassword: false, authVersion: 'version1' };
+const cookie = auth.cookie(auth.createSession('editor', process.env.HLTPC_SESSION_SECRET, 'admin', false, 'version1'));
+test('revoking or resetting a user invalidates an already signed-in session', async () => {
+  await store.setJSON('users', [user]);
+  assert.equal((await auth.validateSession(cookie)).sub, 'editor');
+  await store.setJSON('users', [{ ...user, active: false }]);
+  assert.equal(await auth.validateSession(cookie), null);
+  await store.setJSON('users', [{ ...user, authVersion: 'version2' }]);
+  assert.equal(await auth.validateSession(cookie), null);
+});
+test('owner-only mode blocks editors and rejects mismatched owner identities', async () => {
+  await store.setJSON('users', [user]);
+  process.env.HLTPC_OWNER_ONLY = 'true';
+  assert.equal(await auth.validateSession(cookie), null);
+  assert.equal(await auth.validateSession(auth.cookie(auth.createSession('someone', process.env.HLTPC_SESSION_SECRET))), null);
+  assert.equal((await auth.validateSession(auth.cookie(auth.createSession('lanches', process.env.HLTPC_SESSION_SECRET)))).role, 'owner');
+  delete process.env.HLTPC_OWNER_ONLY;
+});
+test.after(() => fs.rmSync(directory, { recursive: true, force: true }));

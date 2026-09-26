@@ -3,13 +3,12 @@ const os = require("node:os");
 const path = require("node:path");
 const { pipeline } = require("node:stream/promises");
 const { Readable } = require("node:stream");
-const { configuration, readSession } = require("./auth-utils");
+const { configuration, validateSession } = require("./auth-utils");
 const { getContent, saveContent } = require("./content-store");
 const { processDemoPath } = require("./demo-processor");
 
-function authorized(event) {
-  const config = configuration();
-  const session = config && readSession(event.headers.cookie, config.secret);
+async function authorized(event) {
+  const session = await validateSession(event.headers.cookie, event);
   return session && !session.mustChangePassword ? session : null;
 }
 
@@ -29,7 +28,7 @@ function downloadUrl(value) {
 }
 
 exports.handler = async (event) => {
-  if (!authorized(event) || event.httpMethod !== "POST") return { statusCode: 403 };
+  if (!await authorized(event) || event.httpMethod !== "POST") return { statusCode: 403 };
   let directory = "";
   let content = null;
   let match = null;
