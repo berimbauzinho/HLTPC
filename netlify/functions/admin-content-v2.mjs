@@ -1,5 +1,6 @@
 import authUtils from "./auth-utils.js";
 import { CONTENT_KEYS, getContent, isValidContent, saveContent } from "./content-store-v2.mjs";
+import teamRelations from './team-relations.js';
 
 const { configuration, readSession } = authUtils;
 
@@ -42,7 +43,10 @@ export default async (request) => {
     }
 
     const current = await getContent();
-    const content = Object.fromEntries(CONTENT_KEYS.map((key) => [key, [...current[key]]]));
+    if (!Number.isSafeInteger(body._revision) || body._revision !== Number(current._revision || 0)) {
+      return json(409, { error: 'O conteúdo mudou desde que você abriu o painel. Recarregue antes de salvar. Nenhuma alteração foi gravada.' });
+    }
+    const content = structuredClone(current);
     for (const change of changes) {
       const collection = String(change?.collection || "");
       const id = String(change?.id || "");
@@ -56,11 +60,33 @@ export default async (request) => {
       if (!change.record || typeof change.record !== "object" || Array.isArray(change.record) || String(change.record.id || "") !== id) {
         throw Object.assign(new Error("A alteração contém um registro inválido."), { statusCode: 422 });
       }
-      if (index >= 0) content[collection][index] = change.record;
-      else content[collection].unshift(change.record);
+      if (change.operation !== 'upsert') throw Object.assign(new Error('Operação inválida.'), { statusCode: 422 });
+      const record = structuredClone(change.record);
+      const teamIdForName = (name) => content.teams.find((team) => [team.name, ...(team.aliases || []), teamRelations.BASE_TEAM_NAMES[team.id]].includes(name))?.id;
+      if (['players', 'tournaments'].includes(collection) && Array.isArray(record.teams)) {
+        record.teamIds = record.teams.map((name) => {
+          const id = teamIdForName(name);
+          if (!id) throw Object.assign(new Error('O cadastro contém um time desconhecido.'), { statusCode: 422 });
+          return id;
+        });
+      }
+      if (collection === 'matches') {
+        const tournament = content.tournaments.find((event) => event.id === record.tournamentId);
+        if (!tournament) throw Object.assign(new Error('Campeonato inválido.'), { statusCode: 422 });
+        for (const side of ['A', 'B']) {
+          const name = record[`team${side}`];
+          if (!name) { record[`team${side}Id`] = ''; continue; }
+          const id = teamIdForName(name);
+          if (!id || !tournament.teamIds?.includes(id)) throw Object.assign(new Error('Selecione somente times inscritos nesta edição.'), { statusCode: 422 });
+          record[`team${side}Id`] = id;
+        }
+        if (record.winner) record.winnerId = teamIdForName(record.winner) || '';
+      }
+      if (index >= 0) content[collection][index] = record;
+      else content[collection].unshift(record);
     }
     content.updatedAt = new Date().toISOString();
-    const saved = await saveContent(content, { expectedRevision: current._revision });
+    const saved = await saveContent(content, { expectedRevision: body._revision, actor: authorized(request).sub });
     return json(200, { ok: true, updatedAt: saved.updatedAt, _revision: saved._revision, content: saved });
   } catch (reason) {
     console.error("HLTPC admin content v2 error", reason);

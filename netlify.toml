@@ -1,5 +1,6 @@
 [build]
-  publish = "."
+  command = "node tools/build-public.js"
+  publish = "dist"
   functions = "netlify/functions"
 
 [functions]
@@ -33,6 +34,11 @@
 [[redirects]]
   from = "/api/content"
   to = "/.netlify/functions/content-v2"
+  status = 200
+
+[[redirects]]
+  from = "/api/admin/history"
+  to = "/.netlify/functions/admin-history"
   status = 200
 
 [[redirects]]

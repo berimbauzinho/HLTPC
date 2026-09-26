@@ -1,4 +1,4 @@
-import { getStore } from "@netlify/blobs";
+import { getStore } from "./storage.js";
 
 function imageResponse(request, data, contentType, bytes) {
   return new Response(request.method === "HEAD" ? null : data, {

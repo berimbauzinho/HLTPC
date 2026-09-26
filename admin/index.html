@@ -45,6 +45,7 @@
         <button data-section="tournaments"><i>★</i>Campeonatos</button>
         <button data-section="news"><i>▤</i>Notícias</button>
         <button data-section="users" data-owner-only><i>♙</i>Usuários e acessos</button>
+        <button data-section="history" data-owner-only><i>↶</i>Histórico e backup</button>
       </nav>
       <div class="sidebar-footer"><a href="../">↗ Ver site público</a><button id="logoutButton">⇥ Sair</button></div>
     </aside>
@@ -56,7 +57,7 @@
         <div class="admin-user"><span class="status-dot"></span><span id="currentUser">Owner</span><b id="currentInitials">OW</b></div>
       </header>
 
-      <div class="demo-banner"><b>Deploy Preview</b><span>Alterações salvas aqui são compartilhadas e aparecem no site de teste. Imagens devem ter até 2 MB. Demos acima de 500 MB são registradas sem leitura local; Leetify, print e resultado manual continuam funcionando normalmente.</span></div>
+      <div class="demo-banner"><b>Conteúdo compartilhado</b><span>Imagens de até 30 MB são otimizadas antes do envio. Para demos grandes, use um link do Drive ou o processador no PC. Uma alteração só é confirmada após ser gravada; versões anteriores ficam no histórico.</span></div>
 
       <section class="content" id="content"></section>
     </main>
@@ -65,6 +66,7 @@
       <form method="dialog" id="editorForm">
         <header><div><span id="dialogEyebrow">NOVO REGISTRO</span><h2 id="dialogTitle">Adicionar</h2></div><button type="button" id="closeDialog" aria-label="Fechar">×</button></header>
         <div class="form-body" id="formFields"></div>
+        <div class="helper storage-warning" id="saveError" role="alert" hidden></div>
         <footer><button type="button" class="danger" id="deleteButton">Excluir</button><div><button type="button" class="ghost" id="cancelButton">Cancelar</button><button class="primary" value="save" type="submit">Salvar</button></div></footer>
       </form>
     </dialog>
@@ -75,6 +77,6 @@
     <script src="../data.js"></script>
     <script src="../data-2025.js?v=2025-import-2"></script>
     <script src="auth.js"></script>
-    <script src="admin.js?v=2026-logo-v3"></script>
+    <script src="admin.js?v=persistent-admin-1"></script>
   </body>
 </html>

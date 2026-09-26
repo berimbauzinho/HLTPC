@@ -4,13 +4,17 @@
   "version": "1.0.0",
   "scripts": {
     "dev": "node server.js",
-    "build": "node -e 'console.log(\"Build ready\")'",
+    "build": "node tools/build-public.js",
     "start": "node server.js",
-    "lint": "node -e 'console.log(\"Lint passed\")'"
+    "lint": "node tools/check-code.js",
+    "test": "node --test tests/*.test.mjs"
   },
   "dependencies": {
     "@laihoe/demoparser2": "^0.42.0",
-    "@netlify/blobs": "file:./mock-blobs",
+    "@netlify/blobs": "^10.0.10",
     "express": "^5.2.1"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8"
   }
 }

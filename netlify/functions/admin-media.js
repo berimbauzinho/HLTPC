@@ -1,5 +1,5 @@
 const crypto = require("node:crypto");
-const { connectLambda, getStore } = require("@netlify/blobs");
+const { connectLambda, getStore } = require("./storage");
 const { configuration, readSession, json } = require("./auth-utils");
 
 const STORE_NAME = "hltpc-content";

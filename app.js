@@ -94,7 +94,7 @@
     if (saved.format && saved.format !== "A definir") event.format = saved.format;
     if (saved.champion) event.champion = canonicalTeamName(saved.champion, saved.championId);
     if (saved.category) event.category = saved.category;
-    if (saved.status) event.status = saved.status;
+    if (['ongoing', 'finished', 'upcoming'].includes(saved.status)) event.status = saved.status;
     if (saved.eventStatus) event.status = saved.eventStatus;
     if (saved.banner) event.banner = saved.banner;
     if (saved.logo) event.logo = saved.logo;
@@ -122,7 +122,7 @@
     });
   });
   if (Array.isArray(shared.matches)) data.matches = shared.matches.filter((item) => ["published", "scheduled", "live", "finished"].includes(item.status)).map((match) => ({ ...match, teamA: canonicalTeamName(match.teamA, match.teamAId), teamB: canonicalTeamName(match.teamB, match.teamBId), winner: canonicalTeamName(match.winner, match.winnerId) }));
-  if (Array.isArray(shared.news) && shared.news.length) data.news = shared.news.filter((item) => item.status === "published").map((item) => ({ id: item.id, title: item.name, summary: item.subtitle, body: item.body || item.subtitle, author: item.author || "HLTPC", date: /^\d{4}-\d{2}-\d{2}$/.test(item.date || "") ? item.date : new Date().toISOString().slice(0, 10), tournamentId: item.tournamentId || null, image: item.image || "" }));
+  if (Array.isArray(shared.news)) data.news = shared.news.filter((item) => item.status === "published").map((item) => ({ id: item.id, title: item.name, summary: item.subtitle, body: item.body || item.subtitle, author: item.author || "HLTPC", date: /^\d{4}-\d{2}-\d{2}$/.test(item.date || "") ? item.date : new Date().toISOString().slice(0, 10), tournamentId: item.tournamentId || null, image: item.image || "" }));
   const isOfficialEvent = (event) => ["major", "official"].includes(event.category);
   const officialEvents = data.tournaments.filter(isOfficialEvent);
   const playerHistory = new Map(data.players.map((player) => [player, []]));

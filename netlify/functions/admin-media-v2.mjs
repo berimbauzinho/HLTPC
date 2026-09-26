@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import { getStore } from "@netlify/blobs";
+import { getStore } from "./storage.js";
 import authUtils from "./auth-utils.js";
 
 const { configuration, readSession } = authUtils;
@@ -39,7 +39,7 @@ export default async (request) => {
     if (written.modified === false) throw new Error("O identificador da imagem já estava em uso.");
 
     const verification = await store.getWithMetadata(id, { type: "arrayBuffer" });
-    if (!verification?.data || verification.data.byteLength !== bytes.byteLength) {
+    if (!verification?.data || !Buffer.from(verification.data).equals(Buffer.from(bytes))) {
       throw new Error("O arquivo gravado não pôde ser lido integralmente.");
     }
 
