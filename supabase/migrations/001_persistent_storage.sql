@@ -10,8 +10,9 @@ create table if not exists public.hltpc_objects (
   primary key (store, key)
 );
 alter table public.hltpc_objects enable row level security;
-revoke all on public.hltpc_objects from anon, authenticated;
-grant all on public.hltpc_objects to service_role;
+revoke all on public.hltpc_objects from public, anon, authenticated;
+revoke all on public.hltpc_objects from service_role;
+grant select, insert, update on public.hltpc_objects to service_role;
 
 create or replace function public.hltpc_write_object(
   p_store text, p_key text, p_value jsonb, p_kind text,
@@ -50,3 +51,10 @@ grant execute on function public.hltpc_write_object(text,text,jsonb,text,jsonb,u
 insert into storage.buckets(id, name, public, file_size_limit, allowed_mime_types)
 values ('hltpc-media', 'hltpc-media', false, 1500000, array['image/png','image/jpeg','image/webp'])
 on conflict (id) do nothing;
+
+-- Supabase's internal RLS trigger must not be callable through the public API.
+do $$ begin
+  if to_regprocedure('public.rls_auto_enable()') is not null then
+    execute 'revoke execute on function public.rls_auto_enable() from public, anon, authenticated';
+  end if;
+end $$;

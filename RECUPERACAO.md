@@ -2,7 +2,9 @@
 
 O Netlify continua publicando o site. O Supabase passa a guardar o conteúdo, contas e imagens, com gravação condicional e histórico de versões. Demos grandes podem ser processadas no PC, sem subir o arquivo inteiro para uma função do Netlify. Restringir editores ajuda no controle, mas não substitui a proteção contra duas gravações simultâneas.
 
-Esta mudança está preparada no código; não cria uma conta Supabase nem configura o ambiente publicado. Não mescle antes de preparar e validar a migração.
+Esta mudança está preparada no código. O projeto Supabase `wmpewqelsxyhkuazrxfa` já foi inspecionado e recebeu a estrutura privada, a função de gravação e a restrição de acesso à função interna de RLS. A cópia pública da revisão 13 foi preservada em `hltpc-recovery/published-20260926-revision-13` e verificada: 18 jogadores, 10 times, 4 campeonatos, 18 partidas e 3 notícias. Essa cópia de recuperação ainda não é o conteúdo ativo do site. A importação completa e a troca das variáveis do Netlify aguardam o acesso ao armazenamento original. Não mescle antes de preparar e validar a migração.
+
+Na inspeção de 26/09/2026, o banco não tinha tabelas do aplicativo, buckets, arquivos ou usuários Supabase antes desta preparação. O banco real confirmou RLS, ausência de acesso de leitura/gravação para anon/authenticated e rejeição de uma gravação com etag inválido. A função interna `rls_auto_enable` perdeu as permissões públicas desnecessárias. O único aviso de segurança restante é informativo: RLS sem políticas na tabela privada, proposital para negar acesso direto aos clientes. O backend usa service_role. O arquivo `/api/media/c3e3a383-4c14-4ef8-93b6-c2b2e2b6bf32` retornou 404 no site original e precisa ser procurado na exportação privada; não há confirmação de recuperação desse arquivo.
 
 ## Primeiro, preserve o que existe
 
