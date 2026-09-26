@@ -1,4 +1,4 @@
-const { connectLambda, getStore } = require("@netlify/blobs");
+const { connectLambda, getStore } = require("./storage");
 
 exports.handler = async (event) => {
   if (event.httpMethod !== "GET" && event.httpMethod !== "HEAD") return { statusCode: 405, body: "" };

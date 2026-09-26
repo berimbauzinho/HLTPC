@@ -48,7 +48,9 @@ function normalizeContentTeamReferences(content) {
       match[idKey] = id;
       match[nameKey] = currentName(id, previous);
       if (match[`slot${side}`] === previous) match[`slot${side}`] = match[nameKey];
-      (match.statistics || []).forEach((player) => { if (player.team === previous) player.team = match[nameKey]; });
+      [match.statistics, ...(match.maps || []).map((map) => map.statistics)].forEach((rows) => {
+        (rows || []).forEach((player) => { if (player.team === previous) player.team = match[nameKey]; });
+      });
     });
     const winnerId = resolveId(match.winnerId, match.winner);
     if (winnerId) { match.winnerId = winnerId; match.winner = currentName(winnerId, match.winner); }

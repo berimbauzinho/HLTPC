@@ -1,4 +1,4 @@
-import { getStore } from "@netlify/blobs";
+import { getStore } from "./storage.js";
 
 function imageResponse(request, data, contentType, bytes) {
   return new Response(request.method === "HEAD" ? null : data, {
@@ -16,7 +16,10 @@ export default async (request) => {
   if (request.method !== "GET" && request.method !== "HEAD") return new Response(null, { status: 405 });
 
   try {
-    const id = new URL(request.url).searchParams.get("id") || "";
+    const url = new URL(request.url);
+    // Netlify v2 keeps the original request URL during rewrites. The query
+    // added by the redirect is therefore not always present in request.url.
+    const id = url.searchParams.get("id") || url.pathname.match(/^\/api\/media\/([0-9a-f-]{36})$/i)?.[1] || "";
     if (!/^[0-9a-f-]{36}$/i.test(id)) return new Response(null, { status: 404 });
 
     const mediaStore = getStore({ name: "hltpc-media-v2", consistency: "strong" });

@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import { getStore } from "@netlify/blobs";
+import { getStore } from "./storage.js";
 import authUtils from "./auth-utils.js";
 
 const { configuration, readSession } = authUtils;
@@ -13,14 +13,13 @@ function json(status, value) {
   });
 }
 
-function authorized(request) {
-  const config = configuration();
-  const session = config && readSession(request.headers.get("cookie") || "", config.secret);
+async function authorized(request) {
+  const session = await authUtils.validateSession(request.headers.get("cookie") || "");
   return session && !session.mustChangePassword ? session : null;
 }
 
 export default async (request) => {
-  if (!authorized(request)) return json(403, { error: "Acesso administrativo necessário." });
+  if (!await authorized(request)) return json(403, { error: "Acesso administrativo necessário." });
   if (request.method !== "POST") return json(405, { error: "Método não permitido." });
 
   try {
@@ -39,7 +38,7 @@ export default async (request) => {
     if (written.modified === false) throw new Error("O identificador da imagem já estava em uso.");
 
     const verification = await store.getWithMetadata(id, { type: "arrayBuffer" });
-    if (!verification?.data || verification.data.byteLength !== bytes.byteLength) {
+    if (!verification?.data || !Buffer.from(verification.data).equals(Buffer.from(bytes))) {
       throw new Error("O arquivo gravado não pôde ser lido integralmente.");
     }
 

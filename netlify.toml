@@ -1,9 +1,13 @@
 [build]
-  publish = "."
+  command = "node tools/build-public.js"
+  publish = "dist"
   functions = "netlify/functions"
 
 [functions]
   external_node_modules = ["@laihoe/demoparser2"]
+
+[functions."admin-process-demo-v2-background"]
+  included_files = ["node_modules/@laihoe/demoparser2/**", "node_modules/@laihoe/demoparser2-linux-x64-gnu/**"]
 
 [[redirects]]
   from = "/api/admin/login"
@@ -33,6 +37,11 @@
 [[redirects]]
   from = "/api/content"
   to = "/.netlify/functions/content-v2"
+  status = 200
+
+[[redirects]]
+  from = "/api/admin/history"
+  to = "/.netlify/functions/admin-history"
   status = 200
 
 [[redirects]]

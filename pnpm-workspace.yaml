@@ -1,0 +1,9 @@
+# Include the Linux parser when deploying from a Windows PC.
+supportedArchitectures:
+  os:
+    - current
+    - linux
+  cpu:
+    - x64
+  libc:
+    - glibc

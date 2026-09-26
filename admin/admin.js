@@ -28,7 +28,7 @@
     news: source.news.map((item) => ({ id: item.id, name: item.title, subtitle: item.summary, body: item.body || item.summary, author: item.author, date: item.date, tournamentId: item.tournamentId, status: "published", updated: item.date }))
   };
 
-  const labels = { overview: "Visão geral", players: "Jogadores", teams: "Times", tournaments: "Campeonatos", matches: "Partidas", news: "Notícias", users: "Usuários e acessos" };
+  const labels = { overview: "Visão geral", players: "Jogadores", teams: "Times", tournaments: "Campeonatos", matches: "Partidas", news: "Notícias", users: "Usuários e acessos", history: 'Histórico e backup' };
   const singular = { players: "jogador", teams: "time", tournaments: "campeonato", matches: "partida", news: "notícia" };
   let section = "overview";
   let editingId = null;
@@ -39,6 +39,7 @@
   let contentRevision = null;
   let sharedContentLoaded = false;
   let persistedSnapshot = null;
+  let localDemoUpload = false;
   const CONTENT_KEYS = ["players", "teams", "tournaments", "matches", "news"];
   const DEMO_PARSER_MODULE = new URL("./vendor/demoparser2.js", window.location.href).href;
   const DEMO_PARSER_WASM_PARTS = [1, 2, 3].map((part) => new URL(`./vendor/demoparser2_bg.wasm.part${part}`, window.location.href).href);
@@ -59,7 +60,7 @@
   }, true);
 
   function initials(value) {
-    return value.replace(/gaming|e-sports/ig, "").trim().split(/\s+/).map((part) => part[0]).join("").slice(0, 3).toUpperCase();
+    return String(value || "").replace(/gaming|e-sports/ig, "").trim().split(/\s+/).map((part) => part[0] || "").join("").slice(0, 3).toUpperCase();
   }
 
   function normalizedTeamName(value) {
@@ -193,7 +194,10 @@
   async function contentRequest(options = {}) {
     const response = await fetch("/api/admin/content", { credentials: "same-origin", ...options });
     const result = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(result.error || "Não foi possível sincronizar o conteúdo.");
+    if (!response.ok) {
+      if (response.status === 409) sharedContentLoaded = false;
+      throw new Error(result.error || "Não foi possível sincronizar o conteúdo.");
+    }
     return result;
   }
 
@@ -216,10 +220,14 @@
     for (let attempt = 0; attempt < 180; attempt += 1) {
       await new Promise((resolve) => window.setTimeout(resolve, 5000));
       const saved = await contentRequest();
-      acceptSharedContent(saved);
-      const processedTarget = target();
-      if (processedTarget?.demoProcessing?.status === "error") throw new Error(processedTarget.demoProcessing.error || "A demo não pôde ser processada.");
+      const savedMatch = saved.matches.find((item) => item.id === matchId);
+      const processedTarget = Number.isInteger(mapIndex) ? savedMatch?.maps?.[mapIndex] : savedMatch;
+      if (processedTarget?.demoProcessing?.status === "error") {
+        acceptSharedContent(saved);
+        throw new Error(processedTarget.demoProcessing.error || "A demo não pôde ser processada.");
+      }
       if (processedTarget?.demoProcessing?.status === "complete" && processedTarget.demoProcessing.processedAt !== previous) {
+        acceptSharedContent(saved);
         return {
           mapName: processedTarget.demoInfo?.mapName || "",
           rounds: processedTarget.demoInfo?.rounds || 0,
@@ -267,13 +275,11 @@
     try {
       const saved = await contentRequest();
       acceptSharedContent(saved);
+      const health = await fetch('/api/health').then((response) => response.ok ? response.json() : {}).catch(() => ({}));
+      localDemoUpload = health.localDemoUpload === true;
       go(section);
       showToast("Conteúdo compartilhado carregado em modo seguro");
-      // Existing Drive links from before the MD3 screen are upgraded as soon
-      // as an authenticated Admin opens the panel; no second upload is needed.
-      syncPendingServerDemos().then((processed) => {
-        if (processed) showToast(`${processed} demo${processed > 1 ? "s" : ""} pendente${processed > 1 ? "s" : ""} processada${processed > 1 ? "s" : ""} no servidor`);
-      }).catch((reason) => showToast(`Processamento pendente: ${reason.message}`));
+      // Reading/login never writes or starts imports. Demos run after an explicit save.
     } catch (reason) {
       sharedContentLoaded = false;
       contentRevision = null;
@@ -865,31 +871,22 @@
   async function uploadOptimizedImage(file, kind) {
     const blob = await optimizedImageBlob(file, kind);
     const contentType = blob.type || (file.type === "image/png" && kind === "logo" ? "image/png" : "image/webp");
-    try {
       const response = await fetch("/api/admin/media", {
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": contentType },
         body: blob
       });
-      if (response.ok) {
-        const result = await response.json();
-        if (result?.url) return result.url;
-      }
-      const errorJson = await response.json().catch(() => ({}));
+      const result = await response.json().catch(() => ({}));
       if (response.status === 403) {
         throw new Error("Sessão expirada. Faça login novamente no painel.");
       }
-      if (errorJson?.error) {
-        throw new Error(`Erro no servidor ao salvar mídia: ${errorJson.error}`);
-      }
-    } catch (error) {
-      if (error.message?.includes("Sessão expirada") || error.message?.includes("Erro no servidor")) {
-        throw error;
-      }
-      console.warn("Upload de mídia via endpoint falhou, usando data URL:", error);
-    }
-    return fileAsDataUrl(blob);
+      if (!response.ok || !result.url) throw new Error(result.error || 'Não foi possível guardar a imagem. O cadastro anterior foi preservado.');
+      const verification = await fetch(result.url, { cache: 'no-store' });
+      if (!verification.ok) throw new Error('A imagem enviada ainda não pode ser lida. O cadastro anterior foi preservado.');
+      const verified = await verification.blob();
+      if (verified.size !== blob.size) throw new Error('A imagem não foi gravada integralmente. Tente novamente.');
+      return result.url;
   }
 
   function dataUrlAsBlob(value) {
@@ -1163,6 +1160,14 @@
 
   async function parseDemoFile(file, match) {
     if (!file.name.toLowerCase().endsWith(".dem")) throw new Error("Selecione um arquivo .dem do Counter-Strike 2.");
+    if (localDemoUpload) {
+      const response = await fetch(`/api/admin/process-demo-file?matchId=${encodeURIComponent(match.id)}`, {
+        method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/octet-stream', 'X-Demo-Name': encodeURIComponent(file.name) }, body: file
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error || 'Não foi possível ler a demo no processador local.');
+      return result;
+    }
     if (file.size > MAX_LOCAL_DEMO_BYTES) {
       const playedAt = demoPlayedAt(file);
       return {
@@ -1485,7 +1490,9 @@
     }
     if (demoFile?.size) {
       try {
-        Object.assign(record, await parseDemoFile(demoFile, record));
+        const processed = await parseDemoFile(demoFile, record);
+        if (record.manualResult) ['score', 'winner', 'winnerId', 'resultSource', 'status', 'evidenceNote'].forEach((key) => delete processed[key]);
+        Object.assign(record, processed);
         record.subtitle = record.demoInfo.playedAtLabel;
         record.updated = record.demoInfo.extractionStatus === "skipped-large" ? "Demo grande registrada; leitura local ignorada" : "Demo processada pelo painel";
       } catch (reason) {
@@ -1528,7 +1535,11 @@
       }
     }
     if (index >= 0) list[index] = record; else list.unshift(record);
-    if (section === "tournaments") ensureTournamentFixtures(index >= 0 ? list[index] : record);
+    if (section === 'matches' && record.maps?.length) {
+      const { consolidateSeries } = await import('./demo-series.mjs');
+      consolidateSeries(record);
+    }
+      if (section === "tournaments") ensureTournamentFixtures(index >= 0 ? list[index] : record);
     await persistContent();
     let serverDemoResult = null;
     const shouldProcessOnServer = section === "matches" && record.demoUrl && record.statisticsSource !== "demo" && (
@@ -1563,7 +1574,8 @@
     if (!editingId) return;
     const index = state[section].findIndex((item) => item.id === editingId);
     const [removed] = state[section].splice(index, 1);
-    await persistContent();
+    try { await persistContent(); }
+    catch (reason) { state[section].splice(index, 0, removed); throw reason; }
     dialog.close();
     showToast(`${removed.name} foi removido`);
     listView();
@@ -1592,7 +1604,34 @@
     document.querySelector("#breadcrumb").textContent = labels[section];
     document.querySelectorAll("#adminNav button").forEach((button) => button.classList.toggle("active", button.dataset.section === section));
     document.querySelector(".sidebar").classList.remove("open");
-    if (section === "overview") overview(); else if (section === "users") usersView(); else if (section === "tournaments") tournamentsView(); else listView();
+    if (section === "overview") overview(); else if (section === "users") usersView(); else if (section === 'history') historyView(); else if (section === "tournaments") tournamentsView(); else listView();
+  }
+
+  async function historyView() {
+    content.innerHTML = `${pageTitle('Histórico e backup', 'Cada gravação preserva a versão anterior. Restaurar também cria uma nova versão.', false)}<p><a class="primary" href="/api/admin/history?export=1">Baixar cópia dos dados</a></p><div id="historyVersions">Carregando versões…</div>`;
+    try {
+      const response = await fetch('/api/admin/history', { credentials: 'same-origin' });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error);
+      const target = document.querySelector('#historyVersions');
+      if (!target) return;
+      target.innerHTML = result.versions.length ? result.versions.map((version) => `<article class="panel"><b>Versão ${escapeHtml(version.revision)}</b><p>${escapeHtml(version.at)} · ${escapeHtml(version.actor)}</p><button class="secondary-add" data-restore-version="${escapeHtml(version.key)}">Restaurar esta versão</button></article>`).join('') : '<p>O histórico começa no primeiro salvamento com esta versão do painel.</p>';
+      target.querySelectorAll('[data-restore-version]').forEach((button) => button.addEventListener('click', async () => {
+        if (!window.confirm('Restaurar os dados dessa versão? A versão atual ficará no histórico.')) return;
+        button.disabled = true;
+        try {
+          const response = await fetch('/api/admin/history', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: button.dataset.restoreVersion, _revision: contentRevision }) });
+          const result = await response.json();
+          if (!response.ok) throw new Error(result.error);
+          acceptSharedContent(result.content);
+          showToast('Versão restaurada e preservada no histórico.');
+          historyView();
+        } catch (error) { button.disabled = false; showToast(error.message); }
+      }));
+    } catch (error) {
+      const target = document.querySelector('#historyVersions');
+      if (target) target.textContent = error.message;
+    }
   }
 
   function closeEditor() {
@@ -1609,8 +1648,10 @@
     event.preventDefault();
     if (!form.reportValidity()) return;
     try {
+      document.querySelector('#saveError').hidden = true;
       await saveEditor();
     } catch (reason) {
+      if (persistedSnapshot) CONTENT_KEYS.forEach((key) => { state[key] = structuredClone(persistedSnapshot[key]); });
       console.error("Erro ao salvar:", reason);
       const saveButton = form.querySelector('button[type="submit"]');
       if (saveButton) {
@@ -1618,6 +1659,12 @@
         saveButton.textContent = "Salvar";
       }
       showToast(reason?.message || "Ocorreu um erro ao salvar as alterações");
+      const message = document.querySelector('#saveError');
+      message.textContent = reason?.message || 'Falha ao salvar. Os dados anteriores foram preservados.';
+      message.hidden = false;
+    } finally {
+      const button = form.querySelector('button[type="submit"]');
+      if (button) { button.disabled = false; button.textContent = 'Salvar'; }
     }
   });
 

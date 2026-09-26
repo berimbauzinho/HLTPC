@@ -1,0 +1,13 @@
+import fs from 'node:fs';
+import storage from '../netlify/functions/storage.js';
+import { isValidContent, runtimeContent } from '../netlify/functions/content-store-v2.mjs';
+const [file] = process.argv.slice(2);
+if (!file) throw new Error('Uso: node tools/import-content.mjs caminho/backup.json');
+const raw = JSON.parse(fs.readFileSync(file, 'utf8'));
+if (!isValidContent(raw)) throw new Error('Backup inválido; nenhuma gravação feita.');
+const content = runtimeContent(raw);
+content._revision = Number(content._revision || 1);
+const target = storage.getStore({ name: 'hltpc-content', consistency: 'strong' });
+const result = await target.setJSON('current', content, { onlyIfNew: true });
+if (!result.modified) throw new Error('O destino já contém uma base. Importação bloqueada para não sobrescrever dados.');
+console.log(`Importado no armazenamento ${storage.provider()}: ${content.matches.length} partidas, ${content.news.length} notícias.`);

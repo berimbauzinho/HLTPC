@@ -1,19 +1,25 @@
 const STORE_NAME = "hltpc-admin-users";
 const USERS_KEY = "users";
-const { connectLambda, getStore } = require("@netlify/blobs");
+const { connectLambda, getStore } = require("./storage");
+const versions = new WeakMap();
 
 function store(event) {
-  connectLambda(event);
+  if (event) connectLambda(event);
   return getStore(STORE_NAME);
 }
 
 async function listUsers(event) {
-  const users = await store(event).get(USERS_KEY, { type: "json" });
-  return Array.isArray(users) ? users : [];
+  const item = await store(event).getWithMetadata(USERS_KEY, { type: 'json' });
+  const users = Array.isArray(item?.data) ? item.data : [];
+  versions.set(users, item?.etag || null);
+  return users;
 }
 
 async function saveUsers(event, users) {
-  await store(event).setJSON(USERS_KEY, users);
+  if (!versions.has(users)) throw new Error('Recarregue os usuários antes de salvar.');
+  const etag = versions.get(users);
+  const result = await store(event).setJSON(USERS_KEY, users, etag ? { onlyIfMatch: etag } : { onlyIfNew: true });
+  if (!result.modified) throw Object.assign(new Error('Os acessos mudaram em outra sessão. Recarregue antes de salvar.'), { statusCode: 409 });
 }
 
 async function findUser(event, username) {

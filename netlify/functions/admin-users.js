@@ -1,16 +1,17 @@
-const { configuration, readSession, json, normalizeUsername, hashPassword } = require("./auth-utils");
+const { configuration, validateSession, json, normalizeUsername, hashPassword } = require("./auth-utils");
 const { listUsers, saveUsers } = require("./user-store");
 
 const TEMPORARY_PASSWORD = "mudar1234";
+const crypto = require('node:crypto');
 
-function owner(event) {
+async function owner(event) {
   const config = configuration();
-  const session = config && readSession(event.headers.cookie, config.secret);
+  const session = await validateSession(event.headers.cookie, event);
   return config && session?.role === "owner" && !session.mustChangePassword ? { config, session } : null;
 }
 
 exports.handler = async (event) => {
-  const access = owner(event);
+  const access = await owner(event);
   if (!access) return json(403, { error: "Apenas o owner pode administrar usuários." });
   let users = [];
   let storageError = null;
@@ -30,12 +31,12 @@ exports.handler = async (event) => {
   const index = users.findIndex((user) => user.username === username);
   if (event.httpMethod === "POST") {
     if (index >= 0) return json(409, { error: "Esse usuário já está cadastrado." });
-    users.push({ username, role: "admin", mustChangePassword: true, active: true, createdAt: new Date().toISOString(), ...hashPassword(TEMPORARY_PASSWORD) });
+    users.push({ username, role: "admin", mustChangePassword: true, active: true, authVersion: crypto.randomUUID(), createdAt: new Date().toISOString(), ...hashPassword(TEMPORARY_PASSWORD) });
     await saveUsers(event, users); return json(201, { username, temporaryPassword: TEMPORARY_PASSWORD });
   }
   if (index < 0) return json(404, { error: "Usuário não encontrado." });
   if (event.httpMethod === "PUT") {
-    users[index] = { ...users[index], ...hashPassword(TEMPORARY_PASSWORD), mustChangePassword: true, active: true };
+    users[index] = { ...users[index], ...hashPassword(TEMPORARY_PASSWORD), mustChangePassword: true, active: true, authVersion: crypto.randomUUID() };
     await saveUsers(event, users); return json(200, { username, temporaryPassword: TEMPORARY_PASSWORD });
   }
   if (event.httpMethod === "DELETE") {

@@ -1,19 +1,18 @@
 const crypto = require("node:crypto");
-const { connectLambda, getStore } = require("@netlify/blobs");
-const { configuration, readSession, json } = require("./auth-utils");
+const { connectLambda, getStore } = require("./storage");
+const { configuration, validateSession, json } = require("./auth-utils");
 
 const STORE_NAME = "hltpc-content";
 const MEDIA_PREFIX = "media-v2/";
 const MAX_OPTIMIZED_BYTES = 1_500_000;
 
-function authorized(event) {
-  const config = configuration();
-  const session = config && readSession(event.headers.cookie, config.secret);
+async function authorized(event) {
+  const session = await validateSession(event.headers.cookie, event);
   return session && !session.mustChangePassword ? session : null;
 }
 
 exports.handler = async (event) => {
-  if (!authorized(event)) return json(403, { error: "Acesso administrativo necessário." });
+  if (!await authorized(event)) return json(403, { error: "Acesso administrativo necessário." });
   if (event.httpMethod !== "POST") return json(405, { error: "Método não permitido." });
   try {
     const contentType = String(event.headers["content-type"] || "").split(";")[0].toLowerCase();

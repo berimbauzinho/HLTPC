@@ -2,12 +2,13 @@ const express = require('express');
 const path = require('path');
 
 const app = express();
-const PORT = 3000;
-const HOST = '0.0.0.0';
+const PORT = Number(process.env.PORT || 3000);
+const HOST = '127.0.0.1';
 
 app.set('trust proxy', true);
 
 // Parse raw bodies for all /api endpoints up to 25MB (supports json, text, and binary images)
+app.post('/api/admin/process-demo-file', require('./netlify/functions/local-demo-upload').localDemoUpload);
 app.use('/api', express.raw({ type: '*/*', limit: '25mb' }));
 
 async function startServer() {
@@ -22,6 +23,7 @@ async function startServer() {
   const adminContentV2 = (await import('./netlify/functions/admin-content-v2.mjs')).default;
   const adminMediaV2 = (await import('./netlify/functions/admin-media-v2.mjs')).default;
   const mediaV2 = (await import('./netlify/functions/media-v2.mjs')).default;
+  const history = (await import('./netlify/functions/admin-history.mjs')).default;
   const adminProcessDemo = (await import('./netlify/functions/admin-process-demo-v2-background.mjs')).default;
 
   // Helper for Netlify v1 lambda handlers
@@ -101,6 +103,7 @@ async function startServer() {
 
   app.all('/api/content', handleWeb(contentV2));
   app.all('/api/admin/content', handleWeb(adminContentV2));
+  app.all('/api/admin/history', handleWeb(history));
   app.all('/api/admin/media', handleWeb(adminMediaV2));
 
   // Media route: /api/media/:id -> /media-v2?id=:id
@@ -127,11 +130,11 @@ async function startServer() {
 
   // Health check endpoint
   app.get('/api/health', (req, res) => {
-    res.json({ status: 'ok' });
+    res.json({ status: 'ok', localDemoUpload: true });
   });
 
   // --- Static Files ---
-  const publicDir = path.resolve(__dirname);
+  const publicDir = path.resolve(__dirname, 'dist');
 
   // Serve /admin directory
   app.use('/admin', express.static(path.join(publicDir, 'admin')));
