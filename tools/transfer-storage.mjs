@@ -4,7 +4,8 @@ import { isDeepStrictEqual } from 'node:util';
 import { getStore as netlifyStore } from '@netlify/blobs';
 import storage from '../netlify/functions/storage.js';
 const stores = ['hltpc-content', 'hltpc-admin-users', 'hltpc-media', 'hltpc-media-v2'];
-const [mode, file] = process.argv.slice(2);
+const [mode, file, resumeFlag] = process.argv.slice(2);
+const resume = resumeFlag === '--resume';
 if (!file || !['export-netlify', 'import'].includes(mode)) throw new Error('Use: transfer-storage.mjs export-netlify|import caminho/backup.json');
 if (mode === 'export-netlify') {
   if (!process.env.NETLIFY_SITE_ID || !process.env.NETLIFY_AUTH_TOKEN) throw new Error('Configure NETLIFY_SITE_ID e NETLIFY_AUTH_TOKEN somente no PC.');
@@ -26,10 +27,25 @@ if (mode === 'export-netlify') {
   if (storage.provider() === 'netlify') throw new Error('Escolha armazenamento local ou Supabase para o destino.');
   const backup = JSON.parse(await fs.readFile(file, 'utf8'));
   if (backup.format !== 'hltpc-storage-backup-v1' || !Array.isArray(backup.objects)) throw new Error('Backup inválido.');
-  // Preflight all stores before the first write. Resume only against a new target.
-  for (const name of stores) if ((await storage.getStore(name).list()).blobs.length) throw new Error('Destino já preenchido. Nenhum objeto foi sobrescrito. Use um destino vazio.');
+  const imported = new Set();
+  // Resumption is allowed only when every existing object exactly matches this
+  // backup. A different value, metadata or unexpected key stops all writes.
+  for (const name of stores) {
+    const destination = storage.getStore(name);
+    const { blobs } = await destination.list();
+    if (blobs.length && !resume) throw new Error('Destino já preenchido. Use --resume somente para continuar este mesmo backup.');
+    for (const {key} of blobs) {
+      const item = backup.objects.find(item=>item.store===name && item.key===key);
+      if (!item) throw new Error('O destino contém um objeto que não pertence a este backup. Nada foi sobrescrito.');
+      const existing = await destination.getWithMetadata(key,{type:item.kind==='binary'?'arrayBuffer':'json'});
+      const matches = item.kind==='binary' ? Buffer.from(existing?.data||[]).equals(Buffer.from(item.value,'base64')) : isDeepStrictEqual(existing?.data,item.value);
+      if (!matches || !isDeepStrictEqual(existing?.metadata||{},item.metadata||{})) throw new Error('O destino mudou desde a importação. Nenhum objeto será sobrescrito.');
+      imported.add(`${name}/${key}`);
+    }
+  }
   for (const item of backup.objects) {
     if (!stores.includes(item.store) || !['binary', 'json'].includes(item.kind)) throw new Error('Objeto inválido no backup.');
+    if (imported.has(`${item.store}/${item.key}`)) continue;
     const destination = storage.getStore(item.store);
     const options = { onlyIfNew: true, metadata: item.metadata || {} };
     const result = item.kind === 'binary'
