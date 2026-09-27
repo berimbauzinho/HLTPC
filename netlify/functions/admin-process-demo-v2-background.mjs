@@ -130,7 +130,7 @@ export default async (request) => {
           demoProcessing: { status: "complete", startedAt, processedAt: new Date().toISOString(), error: "" },
           updated: "Demo do mapa processada no servidor HLTPC · fonte principal"
         });
-        if (!manualMap) Object.assign(target, { score, winner, winnerId, resultSource, status, evidenceNote, scoreSource: "demo" });
+        if (!manualMap && score) Object.assign(target, { score, winner, winnerId, resultSource, status, evidenceNote, scoreSource: "demo" });
         consolidateSeries(match);
         match.updated = `Demo do mapa ${mapIndex + 1} processada no servidor HLTPC`;
         return;

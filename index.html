@@ -12,8 +12,10 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&family=Oswald:wght@500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
   <link rel="stylesheet" href="refinements.css?v=dashboard-2" />
+    <link rel="stylesheet" href="viewer.css?v=major-2026-1" />
   </head>
-  <body>
+  <body class="public-site">
+    <a class="skip-link" href="#mainContent">Pular para o conteúdo</a>
     <header class="site-header">
       <div class="header-main shell">
         <a class="brand site-brand" href="#inicio" aria-label="HLTPC — início"><img data-hltpc-mark src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=" alt="" /><span class="site-wordmark">HLTPC</span><small>A Plataforma Oficial do TAMPICOUNTERS</small></a>
@@ -21,6 +23,7 @@
       </div>
       <nav class="navigation shell" aria-label="Navegação principal">
         <a href="#inicio" data-route="inicio">Início</a>
+        <a href="#partidas" data-route="partidas">Partidas</a>
         <a href="#campeonatos" data-route="campeonatos">Campeonatos</a>
         <a href="#jogadores" data-route="jogadores">Jogadores</a>
         <a href="#times" data-route="times">Times</a>
@@ -29,15 +32,19 @@
 
     <div class="ticker"><div class="shell"><strong>HLTPC AGORA</strong><span id="tickerText"></span></div></div>
 
-    <main class="shell">
+    <main class="shell" id="mainContent" tabindex="-1">
       <section class="view" data-view="inicio">
         <div id="hero"></div>
         <div class="home-grid">
           <div>
-            <div class="section-heading"><div><span>AGENDA</span><h2>Próxima partida</h2></div></div>
+            <div class="section-heading"><div><span>NO SERVIDOR</span><h2>Resultados recentes</h2></div><a href="#partidas">Todas as partidas →</a></div>
+            <div id="homeResults" class="recent-results"></div>
+            <div class="section-heading spaced"><div><span>AGENDA</span><h2>Próxima partida</h2></div></div>
             <div id="homeUpcoming"></div>
             <div class="section-heading spaced team-power-heading"><div><span>POWER RANKING</span><h2>Ranking HLTPC de times</h2></div><small id="teamPowerContext"></small></div>
             <div id="teamPowerRanking" class="team-power-ranking"></div>
+            <div class="section-heading spaced"><div><span>DA COMUNIDADE</span><h2>Últimas notícias</h2></div><a href="#noticias">Ver arquivo →</a></div>
+            <div id="homeNews" class="news-list"></div>
           </div>
           <aside>
             <div class="section-heading"><div><span>HISTÓRICO</span><h2>Ranking de títulos</h2></div></div>
@@ -47,7 +54,7 @@
       </section>
 
       <section class="view" data-view="partidas">
-        <header class="page-heading"><span>JOGOS CONFIRMADOS</span><h1>Partidas</h1><p>Somente confrontos, mapas e placares realmente cadastrados.</p></header>
+        <header class="page-heading"><span>JOGOS CONFIRMADOS</span><h1>Partidas</h1><p>Acompanhe os confrontos e explore os números de cada mapa.</p></header>
         <div class="section-heading"><div><span>AGENDA</span><h2>Próximas partidas</h2></div></div>
         <div id="upcomingMatches"></div>
         <div class="section-heading spaced"><div><span>ARQUIVO</span><h2>Resultados</h2></div></div>
@@ -55,7 +62,7 @@
       </section>
 
       <section class="view" data-view="campeonatos">
-        <header class="page-heading"><span>2024 — 2026</span><h1>Campeonatos</h1><p>Cada edição mantém seus próprios times, escalações e nível de dados disponível.</p></header>
+        <header class="page-heading"><span>2024 — 2026</span><h1>Campeonatos</h1><p>Dos primeiros confrontos às grandes finais. Explore cada edição.</p></header>
         <div class="filters" id="tournamentFilters">
           <button class="active" data-filter="all">Todos</button><button data-filter="major">Majors</button><button data-filter="official">Oficiais</button><button data-filter="resenha">Resenha</button>
         </div>
@@ -71,8 +78,8 @@
       </section>
 
       <section class="view" data-view="jogadores">
-        <header class="page-heading"><span>PERFIS DERIVADOS</span><h1>Jogadores</h1><p>Participações e títulos calculados automaticamente a partir das escalações.</p></header>
-        <label class="search"><span>⌕</span><input id="playerSearch" type="search" placeholder="Buscar jogador..." /></label>
+        <header class="page-heading"><span>QUEM FAZ O JOGO</span><h1>Jogadores</h1><p>Conheça os jogadores, suas conquistas e suas atuações.</p></header>
+        <label class="search"><span class="sr-only">Buscar jogador</span><input id="playerSearch" type="search" placeholder="Buscar jogador..." /></label>
         <div id="players" class="player-directory-grid"></div>
       </section>
 
@@ -81,7 +88,7 @@
       </section>
 
       <section class="view" data-view="times">
-        <header class="page-heading"><span>ORGANIZAÇÕES</span><h1>Times</h1><p>Não existe elenco permanente: cada formação está ligada ao campeonato em que jogou.</p></header>
+        <header class="page-heading"><span>ORGANIZAÇÕES</span><h1>Times</h1><p>Conheça as equipes e as formações que fizeram história em cada edição.</p></header>
         <div id="teams" class="card-grid teams-grid"></div>
       </section>
 
@@ -99,7 +106,7 @@
       </section>
     </main>
 
-    <footer><div class="shell"><div class="footer-brand-lockup"><img class="footer-logo" data-hltpc-mark src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=" alt="" /><strong>HLTPC</strong></div><p>A Plataforma Oficial do TAMPICOUNTERS</p></div></footer>
+    <footer><div class="shell"><div class="footer-brand-lockup"><img class="footer-logo" data-hltpc-mark src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=" alt="" /><strong>HLTPC</strong></div><p>A Plataforma Oficial do TAMPICOUNTERS</p><nav aria-label="Mais conteúdo"><a href="#partidas">Resultados</a><a href="#noticias">Notícias</a><a href="#campeonatos">Campeonatos</a></nav></div></footer>
 
     <script src="data.js"></script>
     <script src="data-2025.js?v=2025-import-2"></script>
