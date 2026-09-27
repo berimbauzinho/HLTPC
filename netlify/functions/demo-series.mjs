@@ -35,7 +35,9 @@ function consolidateSeries(match) {
   })).sort((a, b) => b.rating - a.rating || b.kills - a.kills);
   match.statisticsSource = "demo";
   match.statisticsSecondarySource = "";
-  match.demoInfo = { ...(match.demoInfo || {}), rounds: totalRounds, mapCount: maps.length, extractionStatus: "complete", rawFileStored: false };
+  const partial = maps.some(map => map.statisticsStatus === "partial" || map.demoInfo?.extractionStatus === "partial") || (match.maps || []).some(map => map.score && !map.statistics?.length);
+  match.statisticsStatus = partial ? "partial" : "complete";
+  match.demoInfo = { ...(match.demoInfo || {}), rounds: totalRounds, mapCount: maps.length, extractionStatus: partial ? "partial" : "complete", rawFileStored: false };
 
   const scores = (match.maps || []).map((map) => scoreParts(map.score)).filter((score) => score.length);
   const winsNeeded = Math.ceil(number(match.bestOf || match.maps?.length) / 2);

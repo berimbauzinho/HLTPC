@@ -1,5 +1,5 @@
 const parser = require("@laihoe/demoparser2");
-const { officialMatchEvents } = require('./demo-rounds');
+const { officialMatchEvents, hasCompetitiveActivity, isFinalCompetitiveScore } = require('./demo-rounds');
 
 function numberValue(value) {
   const number = Number(value);
@@ -216,7 +216,7 @@ function processDemoPath(filePath, match, content, fileMeta = {}) {
   });
   if (scoreA + scoreB !== rounds) warnings.push("Nem todos os rounds puderam ser ligados automaticamente aos times.");
 
-  const statistics = [...stats.values()].map((player) => {
+  const statistics = [...stats.values()].filter(hasCompetitiveActivity).map((player) => {
     const kastRounds = perRound.filter((round) => {
       const flags = round.get(player.steamid);
       return flags && (flags.kill || flags.assist || !flags.death || flags.traded);
@@ -237,7 +237,9 @@ function processDemoPath(filePath, match, content, fileMeta = {}) {
 
   const fileName = fileMeta.fileName || filePath.split(/[\\/]/).pop();
   const playedAt = playedAtFromName(fileName);
-  const officialResult = scoreA + scoreB === rounds && scoreA !== scoreB ? {
+  const complete = scoreA + scoreB === rounds && isFinalCompetitiveScore(scoreA, scoreB);
+  if (!complete) warnings.push('A demo não contém um placar final completo. O resultado oficial não será substituído.');
+  const officialResult = complete ? {
     score: `${scoreA} - ${scoreB}`,
     winner: scoreA > scoreB ? match.teamA : match.teamB,
     winnerId: scoreA > scoreB ? match.teamAId || "" : match.teamBId || "",
@@ -251,6 +253,7 @@ function processDemoPath(filePath, match, content, fileMeta = {}) {
     subtitle: playedAt.label || match.subtitle || "",
     statistics,
     statisticsSource: "demo",
+    statisticsStatus: complete ? 'complete' : 'partial',
     statisticsSecondarySource: match.leetifyUrl ? "leetify" : "",
     demoInfo: {
       fileName,
@@ -264,7 +267,8 @@ function processDemoPath(filePath, match, content, fileMeta = {}) {
       parser: "demoparser2 0.42.0 · servidor HLTPC",
       rawFileStored: false,
       storedExternally: Boolean(match.demoUrl),
-      extractionStatus: statistics.length ? "complete" : "pending",
+      extractionStatus: statistics.length ? (complete ? 'complete' : 'partial') : "pending",
+      observedScore: `${scoreA} - ${scoreB}`,
       finalScoreRead: Boolean(officialResult.score),
       teamMapping: { matchedBySteamId: statistics.filter((player) => player.team).length, confidence: statistics.filter((player) => player.team).length === statistics.length ? 1000 : 500 },
       warnings: [...new Set(warnings)]

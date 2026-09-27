@@ -20,3 +20,12 @@ test('a cancelled live round before a restart cannot alter official score or eve
 test('a demo without begin_new_match retains non-warmup rounds', () => {
   assert.equal(rounds.officialMatchEvents([{event_name:'round_end',tick:1,is_warmup_period:'true'},{event_name:'round_end',tick:2,is_warmup_period:false}]).length,1);
 });
+test('spectators without competitive activity cannot become players with perfect KAST', () => {
+  assert.equal(rounds.hasCompetitiveActivity({rawTeam:'SPECTATOR',kills:0,deaths:0,damage:0,shots:0}),false);
+  assert.equal(rounds.hasCompetitiveActivity({rawTeam:'CT',kills:0,deaths:0}),true);
+  assert.equal(rounds.hasCompetitiveActivity({rawTeam:'SPECTATOR',kills:4,deaths:3}),true);
+});
+test('a truncated 12-10 demo cannot replace the official 13-10 result', () => {
+  for(const score of [[12,10],[13,12],[15,14],[16,15]])assert.equal(rounds.isFinalCompetitiveScore(...score),false);
+  for(const score of [[13,7],[2,13],[16,14],[19,17]])assert.equal(rounds.isFinalCompetitiveScore(...score),true);
+});

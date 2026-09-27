@@ -16,3 +16,14 @@ test('processing a demo preserves a manually confirmed result', () => {
   assert.equal(match.score, '13 - 11');
   assert.equal(match.winner, 'B');
 });
+test('an official series score can be complete while its player statistics remain partial', () => {
+  const match = { bestOf: 3, teamA: 'A', teamB: 'B', maps: [
+    { score: '13 - 7', rounds: 20, statistics: [{ name: 'P', team: 'A', kills: 8 }], statisticsStatus: 'partial' },
+    { score: '13 - 9', rounds: 22, statistics: [] }
+  ] };
+  consolidateSeries(match);
+  assert.equal(match.score, '2 - 0');
+  assert.equal(match.statisticsStatus, 'partial');
+  assert.equal(match.demoInfo.extractionStatus, 'partial');
+  assert.equal(match.demoInfo.rounds, 20);
+});
