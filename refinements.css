@@ -63,17 +63,17 @@
 }
 
 .group-standings > header span {
-  font: 700 7px JetBrains Mono, monospace;
+  font: 700 7px "Chakra Petch", monospace;
   color: var(--amber);
 }
 
 .group-standings > header h4 {
-  font: 600 15px Oswald, sans-serif;
+  font: 600 15px "Chakra Petch", sans-serif;
   margin: 0;
 }
 
 .group-standings > header small {
-  font: 600 7px JetBrains Mono, monospace;
+  font: 600 7px "Chakra Petch", monospace;
   color: #94a2ae;
   text-align: right;
 }
@@ -94,7 +94,7 @@
   min-height: 30px;
   background: #202b35;
   color: #8e9ca8;
-  font: 700 7px JetBrains Mono, monospace;
+  font: 700 7px "Chakra Petch", monospace;
 }
 
 .group-standings-head > span {
@@ -109,7 +109,7 @@
   min-height: 50px;
   border-top: 1px solid #3f4f5d;
   color: #dce3e8;
-  font: 700 9px JetBrains Mono, monospace;
+  font: 700 9px "Chakra Petch", monospace;
 }
 
 .group-standing-row > strong,
@@ -125,7 +125,7 @@
   min-width: 0;
   color: #eef2f5;
   text-decoration: none;
-  font: 600 11px Oswald, sans-serif;
+  font: 600 11px "Chakra Petch", sans-serif;
 }
 
 .group-standing-row > a > span {
@@ -137,7 +137,7 @@
   background: #1b252e;
   border: 1px solid #3c4a57;
   color: #8996a2;
-  font: 700 8px JetBrains Mono, monospace;
+  font: 700 8px "Chakra Petch", monospace;
   overflow: hidden;
 }
 
@@ -228,7 +228,7 @@
   padding: 6px 8px;
   border: 1px solid #3b404b;
   color: #a9adb7;
-  font: 700 7px JetBrains Mono, monospace;
+  font: 700 7px "Chakra Petch", monospace;
   white-space: nowrap;
 }
 
@@ -253,14 +253,14 @@
 
 .event-retrospective small {
   color: #91a0ad;
-  font: 700 7px JetBrains Mono, monospace;
+  font: 700 7px "Chakra Petch", monospace;
 }
 
 .event-retrospective b {
   display: block;
   margin: 8px 0 4px;
   color: #fff;
-  font: 600 23px Oswald, sans-serif;
+  font: 600 23px "Chakra Petch", sans-serif;
 }
 
 .event-retrospective p {
@@ -295,12 +295,12 @@
 
 .event-overview-match > header span {
   color: var(--amber);
-  font: 700 7px JetBrains Mono, monospace;
+  font: 700 7px "Chakra Petch", monospace;
 }
 
 .event-overview-match > header time {
   color: #8e9ba7;
-  font: 600 7px JetBrains Mono, monospace;
+  font: 600 7px "Chakra Petch", monospace;
 }
 
 .event-overview-match > div {
@@ -319,7 +319,7 @@
   gap: 9px;
   color: #fff;
   text-decoration: none;
-  font: 600 11px Oswald, sans-serif;
+  font: 600 11px "Chakra Petch", sans-serif;
 }
 
 .event-overview-match > div > a:last-child {
@@ -336,7 +336,7 @@
   background: #17212a;
   border: 1px solid #3b4854;
   color: var(--amber2);
-  font: 700 7px JetBrains Mono, monospace;
+  font: 700 7px "Chakra Petch", monospace;
   overflow: hidden;
 }
 
@@ -354,7 +354,7 @@
 .event-overview-match > div > strong {
   color: #fff;
   text-align: center;
-  font: 700 19px Oswald, sans-serif;
+  font: 700 19px "Chakra Petch", sans-serif;
 }
 
 .event-overview-match > div > strong i {
@@ -370,7 +370,7 @@
   gap: 10px;
   background: #111820;
   color: #8795a2;
-  font: 600 7px JetBrains Mono, monospace;
+  font: 600 7px "Chakra Petch", monospace;
 }
 
 .event-overview-match > footer em {
@@ -388,12 +388,12 @@
 
 .event-overview-match.empty-match > span {
   color: var(--amber);
-  font: 700 7px JetBrains Mono, monospace;
+  font: 700 7px "Chakra Petch", monospace;
 }
 
 .event-overview-match.empty-match > b {
   margin: 7px 0 4px;
-  font: 600 16px Oswald, sans-serif;
+  font: 600 16px "Chakra Petch", sans-serif;
 }
 
 .event-overview-match.empty-match > small {
@@ -464,7 +464,7 @@ footer {
 .site-wordmark {
   margin-left: 22px;
   color: #fff !important;
-  font: 700 39px/1 Oswald, sans-serif;
+  font: 700 39px/1 "Chakra Petch", sans-serif;
   letter-spacing: .055em;
 }
 
@@ -490,13 +490,13 @@ footer {
 
 .footer-brand-lockup strong {
   color: #fff;
-  font: 700 28px/1 Oswald, sans-serif;
+  font: 700 28px/1 "Chakra Petch", sans-serif;
   letter-spacing: .05em;
 }
 
 footer p {
   color: #c6c1b8;
-  font: 700 9px JetBrains Mono, monospace;
+  font: 700 9px "Chakra Petch", monospace;
   letter-spacing: .08em;
   text-transform: uppercase;
 }
@@ -663,14 +663,14 @@ footer p {
 
 .player-directory-copy > span {
   color: var(--amber);
-  font: 700 8px JetBrains Mono, monospace;
+  font: 700 8px "Chakra Petch", monospace;
   letter-spacing: .12em;
 }
 
 .player-directory-copy h3 {
   margin: 7px 0 3px;
   color: #f5f2ec;
-  font: 700 27px Oswald, sans-serif;
+  font: 700 27px "Chakra Petch", sans-serif;
 }
 
 .player-directory-copy > p {
@@ -688,12 +688,12 @@ footer p {
 
 .player-directory-copy > div b {
   color: #d5d2cc;
-  font: 600 12px Oswald, sans-serif;
+  font: 600 12px "Chakra Petch", sans-serif;
 }
 
 .player-directory-copy > div small {
   color: #85868d;
-  font: 600 8px JetBrains Mono, monospace;
+  font: 600 8px "Chakra Petch", monospace;
 }
 
 .player-directory-portrait {
@@ -714,7 +714,7 @@ footer p {
 .player-directory-portrait strong {
   align-self: center;
   color: #ffffff22;
-  font: 700 58px Oswald, sans-serif;
+  font: 700 58px "Chakra Petch", sans-serif;
 }
 
 .player-directory-card > i {
@@ -723,7 +723,7 @@ footer p {
   bottom: 9px;
   z-index: 3;
   color: var(--amber2);
-  font: 700 7px JetBrains Mono, monospace;
+  font: 700 7px "Chakra Petch", monospace;
   font-style: normal;
 }
 
@@ -1125,18 +1125,18 @@ footer p {
 }
 
 .match-series-panel > ol b {
-  font: 600 14px Oswald, sans-serif;
+  font: 600 14px "Chakra Petch", sans-serif;
   color: #fff;
 }
 
 .match-series-panel > ol small {
   color: #8e9ba7;
-  font: 700 8px "JetBrains Mono", monospace;
+  font: 700 8px "Chakra Petch", monospace;
 }
 
 .match-series-panel > ol strong {
   color: var(--amber2);
-  font: 700 15px "JetBrains Mono", monospace;
+  font: 700 15px "Chakra Petch", monospace;
   white-space: nowrap;
 }
 
@@ -1172,12 +1172,12 @@ footer p {
   align-items: center;
   justify-content: center;
   gap: 9px;
-  font: 600 13px Oswald, sans-serif;
+  font: 600 13px "Chakra Petch", sans-serif;
 }
 
 .match-stat-tabs button small {
   color: #8998a7;
-  font: 700 8px "JetBrains Mono", monospace;
+  font: 700 8px "Chakra Petch", monospace;
 }
 
 .match-stat-tabs button.active {
@@ -1206,12 +1206,12 @@ footer p {
 }
 
 .match-stat-context b {
-  font: 600 13px Oswald, sans-serif;
+  font: 600 13px "Chakra Petch", sans-serif;
 }
 
 .match-stat-context span {
   color: #93a1af;
-  font: 700 8px "JetBrains Mono", monospace;
+  font: 700 8px "Chakra Petch", monospace;
 }
 
 @media (max-width: 650px) {
@@ -1241,7 +1241,7 @@ footer p {
 /* Tournament directory: prominent logo at left, year at right. */
 .tournament-link { min-height: 132px; padding: 20px 26px; gap: 24px; background: radial-gradient(circle at 8% 50%, #f29d2414, transparent 18%); }
 .tournament-link:hover { background: radial-gradient(circle at 8% 50%, #f29d2428, transparent 20%), #202126; }
-.event-list-brand { position: relative; width: 96px; height: 92px; flex: none; display: grid; place-items: center; color: var(--amber2); font: 700 18px Oswald, sans-serif; }
+.event-list-brand { position: relative; width: 96px; height: 92px; flex: none; display: grid; place-items: center; color: var(--amber2); font: 700 18px "Chakra Petch", sans-serif; }
 .event-list-brand::before { content: ""; position: absolute; inset: -12px; border-radius: 50%; background: radial-gradient(circle, #f29d242e, #f29d240d 48%, transparent 72%); }
 .event-list-brand img { position: relative; z-index: 1; width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 12px 18px #0009); }
 .tournament-link .event-main { flex: 1; }
@@ -1258,8 +1258,8 @@ footer p {
 .match-event-link { top: 21px; display: flex; align-items: center; gap: 10px; color: #e7e3dd; }
 .match-event-link > img { width: 44px; height: 44px; object-fit: contain; filter: drop-shadow(0 7px 12px #000a); }
 .match-event-link > span { display: flex; align-items: flex-start; flex-direction: column; gap: 2px; }
-.match-event-link b { color: var(--amber2); font: 700 9px JetBrains Mono, monospace; }
-.match-event-link small { color: #85868c; font: 700 8px JetBrains Mono, monospace; }
+.match-event-link b { color: var(--amber2); font: 700 9px "Chakra Petch", monospace; }
+.match-event-link small { color: #85868c; font: 700 8px "Chakra Petch", monospace; }
 .match-detail-team, .match-detail-team.team-a, .match-detail-team.team-b { position: relative; z-index: 2; min-width: 0; flex-direction: column; justify-content: center; gap: 15px; }
 .match-team-art { position: relative; width: min(230px, 100%); aspect-ratio: 1; display: grid; place-items: center; }
 .match-team-art::before { content: ""; position: absolute; inset: -14%; border-radius: 50%; background: radial-gradient(circle, #f29d2436, #f29d2414 43%, transparent 70%); }
@@ -1271,7 +1271,7 @@ footer p {
 .match-detail-score { position: relative; z-index: 3; }
 .match-detail-score time { font-size: 10px; }
 .match-detail-score strong { margin: 12px 0; font-size: clamp(58px, 6vw, 82px); text-shadow: 0 10px 24px #0009; }
-.match-detail-score span { color: #a9a7a2; font: 700 9px JetBrains Mono, monospace; }
+.match-detail-score span { color: #a9a7a2; font: 700 9px "Chakra Petch", monospace; }
 
 /* News cover with a real image blended into the right side. */
 .news-hero { min-height: 420px; align-items: center; background: radial-gradient(circle at 82% 25%, #f29d2418, transparent 38%), linear-gradient(115deg, #111318, #1a1815); isolation: isolate; }
@@ -1293,20 +1293,20 @@ footer p {
 /* Full news article. */
 .news-detail-page { max-width: 980px; margin: 0 auto; overflow: hidden; background: #17181c; border: 1px solid #36373d; }
 .news-detail-header { padding: clamp(28px, 5vw, 64px); background: radial-gradient(circle at 100% 0, #f29d241d, transparent 38%), #1c1d22; border-bottom: 1px solid #383940; }
-.news-event-chip { width: fit-content; display: flex; align-items: center; gap: 10px; color: #bfc0c4; text-decoration: none; font: 700 9px JetBrains Mono, monospace; }
+.news-event-chip { width: fit-content; display: flex; align-items: center; gap: 10px; color: #bfc0c4; text-decoration: none; font: 700 9px "Chakra Petch", monospace; }
 .news-event-chip img { width: 42px; height: 42px; object-fit: contain; filter: drop-shadow(0 7px 12px #0008); }
 .news-event-chip b { color: var(--amber2); }
-.news-detail-kicker { color: var(--amber); font: 700 9px JetBrains Mono, monospace; letter-spacing: .12em; }
-.news-detail-header h1 { max-width: 850px; margin: 20px 0 14px; font: 700 clamp(39px, 6vw, 68px)/1.03 Oswald, sans-serif; }
+.news-detail-kicker { color: var(--amber); font: 700 9px "Chakra Petch", monospace; letter-spacing: .12em; }
+.news-detail-header h1 { max-width: 850px; margin: 20px 0 14px; font: 700 clamp(39px, 6vw, 68px)/1.03 "Chakra Petch", sans-serif; }
 .news-detail-header > p { max-width: 760px; color: #b0afb0; font-size: 16px; line-height: 1.65; }
-.news-detail-header > div { display: flex; gap: 18px; margin-top: 25px; color: #8d8e94; font: 700 9px JetBrains Mono, monospace; }
+.news-detail-header > div { display: flex; gap: 18px; margin-top: 25px; color: #8d8e94; font: 700 9px "Chakra Petch", monospace; }
 .news-detail-image { margin: 0; background: #101115; }
 .news-detail-image img { width: 100%; max-height: 660px; display: block; object-fit: contain; }
 .news-detail-body { max-width: 780px; margin: 0 auto; padding: 44px 32px 54px; }
 .news-detail-body p { margin: 0 0 22px; color: #d1cec8; font-size: 17px; line-height: 1.85; }
 .news-detail-page > footer { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 22px 32px; border-top: 1px solid #36373d; background: #141519; }
-.news-detail-page > footer span { color: #86878d; font: 700 8px JetBrains Mono, monospace; }
-.news-detail-page > footer a { color: var(--amber2); text-decoration: none; font: 700 10px JetBrains Mono, monospace; }
+.news-detail-page > footer span { color: #86878d; font: 700 8px "Chakra Petch", monospace; }
+.news-detail-page > footer a { color: var(--amber2); text-decoration: none; font: 700 10px "Chakra Petch", monospace; }
 
 @media (max-width: 780px) {
   .tournament-link { min-height: 108px; padding: 14px; gap: 14px; flex-wrap: wrap; }
@@ -1339,9 +1339,9 @@ footer p {
 .rank-row { grid-template-columns: 28px 46px minmax(0, 1fr) auto; gap: 10px; }
 .rank-avatar { width: 42px; height: 42px; display: grid; place-items: end center; overflow: hidden; background: linear-gradient(145deg, #272a31, #14161b); border: 1px solid #383b44; font-style: normal; }
 .rank-avatar img { width: 100%; height: 100%; object-fit: contain; object-position: center bottom; }
-.rank-avatar > b { align-self: center; color: #a0712c; font: 700 14px Oswald, sans-serif; }
+.rank-avatar > b { align-self: center; color: #a0712c; font: 700 14px "Chakra Petch", sans-serif; }
 .event-team-identity { min-width: 0; display: inline-flex; align-items: center; justify-content: center; gap: 10px; }
-.event-team-identity > span { width: 42px; height: 42px; flex: none; display: grid; place-items: center; color: var(--amber2); font: 700 8px JetBrains Mono, monospace; }
+.event-team-identity > span { width: 42px; height: 42px; flex: none; display: grid; place-items: center; color: var(--amber2); font: 700 8px "Chakra Petch", monospace; }
 .event-team-identity > span img { width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 6px 8px #0008); }
 .event-team-identity strong { min-width: 0; color: inherit; font: inherit; }
 .home-match .event-match { min-height: 90px; }
@@ -1351,25 +1351,25 @@ footer p {
 .individual-award { min-width: 225px; padding: 12px; display: flex; align-items: center; gap: 11px; color: #f5f2ec; text-decoration: none; background: #222c36; border: 1px solid #48525c; }
 .individual-award > i { width: 38px; height: 38px; flex: none; display: grid; place-items: center; border-radius: 50%; color: #1d1508; background: linear-gradient(145deg, #ffd779, #b7791d); font-style: normal; font-size: 18px; }
 .individual-award > span { display: flex; flex-direction: column; gap: 4px; }
-.individual-award b { font: 700 13px Oswald, sans-serif; text-transform: uppercase; }
-.individual-award small { color: #99a5af; font: 600 8px JetBrains Mono, monospace; }
+.individual-award b { font: 700 13px "Chakra Petch", sans-serif; text-transform: uppercase; }
+.individual-award small { color: #99a5af; font: 600 8px "Chakra Petch", monospace; }
 .individual-award.crowd > i { color: #fff; background: linear-gradient(145deg, #e96955, #91372b); }
 .individual-award.bagre > i { color: #e9f7f5; background: linear-gradient(145deg, #47978e, #204e49); }
 .individual-award.major-award { border-color: #a77528; box-shadow: inset 0 0 24px #d6972524; }
 
 .team-power-heading { align-items: flex-end; }
-.team-power-heading > small { max-width: 390px; color: #777c86; text-align: right; font: 600 7px/1.5 JetBrains Mono, monospace; }
+.team-power-heading > small { max-width: 390px; color: #777c86; text-align: right; font: 600 7px/1.5 "Chakra Petch", monospace; }
 .team-power-ranking { background: #15171c; border: 1px solid #30333b; }
 .team-power-row { min-height: 72px; display: grid; grid-template-columns: 34px 54px minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 9px 15px; color: #f5f2ec; text-decoration: none; border-bottom: 1px solid #30333b; transition: background .15s, border-color .15s; }
 .team-power-row:last-child { border-bottom: 0; }
 .team-power-row:hover { background: #201d18; box-shadow: inset 3px 0 var(--amber); }
-.team-power-row > span { color: #8a8f99; font: 700 9px JetBrains Mono, monospace; }
-.team-power-row > i { width: 50px; height: 50px; display: grid; place-items: center; color: var(--amber2); font: 700 8px JetBrains Mono, monospace; font-style: normal; }
+.team-power-row > span { color: #8a8f99; font: 700 9px "Chakra Petch", monospace; }
+.team-power-row > i { width: 50px; height: 50px; display: grid; place-items: center; color: var(--amber2); font: 700 8px "Chakra Petch", monospace; font-style: normal; }
 .team-power-row > i img { width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 7px 8px #0009); }
-.team-power-row > b { min-width: 0; font: 600 16px Oswald, sans-serif; }
-.team-power-row > b small { display: block; margin-top: 4px; color: #858b95; font: 600 8px JetBrains Mono, monospace; }
-.team-power-row > strong { color: var(--amber2); text-align: right; font: 700 20px Oswald, sans-serif; }
-.team-power-row > strong small { display: block; color: #777c86; font: 600 7px JetBrains Mono, monospace; text-transform: uppercase; }
+.team-power-row > b { min-width: 0; font: 600 16px "Chakra Petch", sans-serif; }
+.team-power-row > b small { display: block; margin-top: 4px; color: #858b95; font: 600 8px "Chakra Petch", monospace; }
+.team-power-row > strong { color: var(--amber2); text-align: right; font: 700 20px "Chakra Petch", sans-serif; }
+.team-power-row > strong small { display: block; color: #777c86; font: 600 7px "Chakra Petch", monospace; text-transform: uppercase; }
 
 @media (max-width: 650px) {
   .rank-row { grid-template-columns: 23px 40px minmax(0, 1fr) auto; gap: 7px; }
@@ -1384,24 +1384,24 @@ footer p {
 }
 
 /* Imagens remotas: nunca exibir o ícone quebrado do navegador. */
-.media-image-fallback { position: relative; z-index: 1; display: grid; place-items: center; width: 100%; height: 100%; color: var(--amber2); font: 700 15px/1 JetBrains Mono, monospace; letter-spacing: .04em; background: linear-gradient(145deg, #202630, #12151b); border: 1px solid #ffffff12; }
+.media-image-fallback { position: relative; z-index: 1; display: grid; place-items: center; width: 100%; height: 100%; color: var(--amber2); font: 700 15px/1 "Chakra Petch", monospace; letter-spacing: .04em; background: linear-gradient(145deg, #202630, #12151b); border: 1px solid #ffffff12; }
 .media-image-fallback[hidden] { display: none !important; }
 .event-list-brand > .media-image-fallback { width: 74px; height: 74px; border-radius: 50%; }
-.event-brand-art > .media-image-fallback { width: min(270px, 65%); height: min(270px, 70%); border: 0; background: transparent; color: #f0a83f; font: 700 clamp(42px, 5vw, 78px) Oswald, sans-serif; text-shadow: 0 14px 35px #000; }
+.event-brand-art > .media-image-fallback { width: min(270px, 65%); height: min(270px, 70%); border: 0; background: transparent; color: #f0a83f; font: 700 clamp(42px, 5vw, 78px) "Chakra Petch", sans-serif; text-shadow: 0 14px 35px #000; }
 .team-card-head > span > .media-image-fallback, .entity-mark > .media-image-fallback, .participant-team > span > .media-image-fallback, .event-team-identity > span > .media-image-fallback, .stage-team > span > .media-image-fallback, .group-standing-row > a > span > .media-image-fallback { font-size: 10px; }
-.match-team-logo > .media-image-fallback { border: 0; background: transparent; font: 700 22px Oswald, sans-serif; }
+.match-team-logo > .media-image-fallback { border: 0; background: transparent; font: 700 22px "Chakra Petch", sans-serif; }
 
 /* Estatísticas do campeonato. */
 .tournament-statistics { min-height: 460px; }
 .tournament-stats-toolbar { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; padding: 20px 22px; background: #181c23; border: 1px solid #353a43; border-left: 3px solid var(--amber2); }
-.tournament-stats-toolbar label { display: flex; flex-direction: column; gap: 8px; color: #9ca5b2; font: 700 9px JetBrains Mono, monospace; text-transform: uppercase; letter-spacing: .08em; }
-.tournament-stats-toolbar select { min-width: min(520px, 50vw); height: 44px; border: 1px solid #3c424d; background: #101319; color: #f1eee8; padding: 0 40px 0 13px; font: 600 12px Inter, sans-serif; outline: none; }
+.tournament-stats-toolbar label { display: flex; flex-direction: column; gap: 8px; color: #9ca5b2; font: 700 9px "Chakra Petch", monospace; text-transform: uppercase; letter-spacing: .08em; }
+.tournament-stats-toolbar select { min-width: min(520px, 50vw); height: 44px; border: 1px solid #3c424d; background: #101319; color: #f1eee8; padding: 0 40px 0 13px; font: 600 12px Barlow, sans-serif; outline: none; }
 .tournament-stats-toolbar select:focus { border-color: var(--amber2); }
 .tournament-stats-switch { display: flex; border: 1px solid #3c424d; background: #101319; }
-.tournament-stats-switch button { min-width: 130px; height: 42px; border: 0; border-right: 1px solid #3c424d; background: transparent; color: #9ea7b4; font: 700 10px JetBrains Mono, monospace; cursor: pointer; }
+.tournament-stats-switch button { min-width: 130px; height: 42px; border: 0; border-right: 1px solid #3c424d; background: transparent; color: #9ea7b4; font: 700 10px "Chakra Petch", monospace; cursor: pointer; }
 .tournament-stats-switch button:last-child { border-right: 0; }
 .tournament-stats-switch button.active { background: var(--amber2); color: #11151c; }
-.tournament-stats-note { margin: 12px 0 17px; color: #848e9e; font: 500 9px/1.55 JetBrains Mono, monospace; }
+.tournament-stats-note { margin: 12px 0 17px; color: #848e9e; font: 500 9px/1.55 "Chakra Petch", monospace; }
 .tournament-stats-panels > [hidden] { display: none; }
 .tournament-stats-scroll { overflow-x: auto; border: 1px solid #3a414c; background: #151920; }
 .tournament-stats-table { min-width: 900px; }
@@ -1410,38 +1410,38 @@ footer p {
 .player-stats-table > header, .player-stats-table > div { grid-template-columns: minmax(205px, 1.6fr) 38px 48px 70px 42px 48px 58px 58px 58px 76px 62px 62px 68px 70px; }
 .team-stats-table { min-width: 1080px; }
 .team-stats-table > header, .team-stats-table > div { grid-template-columns: minmax(220px, 1.55fr) 62px 82px 74px 92px 58px 110px 62px 68px; }
-.tournament-stats-table > header { height: 42px; background: #2d3947; color: #a7b4c4; font: 700 8px JetBrains Mono, monospace; text-transform: uppercase; }
-.tournament-stats-table > div { min-height: 62px; border-top: 1px solid #3b4653; color: #e7e9ec; font: 600 11px JetBrains Mono, monospace; }
+.tournament-stats-table > header { height: 42px; background: #2d3947; color: #a7b4c4; font: 700 8px "Chakra Petch", monospace; text-transform: uppercase; }
+.tournament-stats-table > div { min-height: 62px; border-top: 1px solid #3b4653; color: #e7e9ec; font: 600 11px "Chakra Petch", monospace; }
 .tournament-stats-table > div:nth-child(odd) { background: #1b212a; }
 .tournament-stats-table > div > span:not(:first-child), .tournament-stats-table > div > strong:not(:first-child) { text-align: center; }
 .stats-player, .stats-team { display: flex; align-items: center; gap: 12px; min-width: 0; }
-.stats-player > i, .stats-team > i { color: #6f7d90; font: 700 8px JetBrains Mono, monospace; font-style: normal; }
-.stats-player > b { display: flex; flex-direction: column; gap: 4px; min-width: 0; font: 600 13px Inter, sans-serif; }
-.stats-player small { font: 500 8px JetBrains Mono, monospace; color: #8491a1; }
+.stats-player > i, .stats-team > i { color: #6f7d90; font: 700 8px "Chakra Petch", monospace; font-style: normal; }
+.stats-player > b { display: flex; flex-direction: column; gap: 4px; min-width: 0; font: 600 13px Barlow, sans-serif; }
+.stats-player small { font: 500 8px "Chakra Petch", monospace; color: #8491a1; }
 .stats-player a, .stats-team a { color: inherit; text-decoration: none; }
 .stats-player a:hover, .stats-team a:hover { color: var(--amber2); }
 .stats-team > span { width: 36px; height: 36px; display: grid; place-items: center; flex: none; }
 .stats-team > span img { width: 100%; height: 100%; object-fit: contain; }
 .stats-team > span .media-image-fallback { font-size: 8px; }
-.stats-team > b { font: 600 13px Inter, sans-serif; }
+.stats-team > b { font: 600 13px Barlow, sans-serif; }
 .tournament-stats-table .positive, .tournament-stats-table .rating.high { color: #50d79e; }
 .tournament-stats-table .negative, .tournament-stats-table .rating.low { color: #ff6262; }
 .tournament-stats-table .rating.mid { color: #f3f3f3; }
 .statistics-highlights { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 18px; }
 .statistics-highlights > article { position: relative; min-height: 128px; padding: 18px; overflow: hidden; background: radial-gradient(circle at 90% 15%, #e39a2b22, transparent 42%), #181c23; border: 1px solid #343941; border-top: 2px solid var(--amber2); display: flex; flex-direction: column; }
-.statistics-highlights > article > span { color: #d99b3c; font: 700 8px JetBrains Mono, monospace; letter-spacing: .09em; }
-.statistics-highlights > article > b { margin: 8px 0 2px; color: #fff; font: 700 34px Oswald, sans-serif; }
-.statistics-highlights > article > a { color: #f0ede7; font: 600 13px Inter, sans-serif; text-decoration: none; }
+.statistics-highlights > article > span { color: #d99b3c; font: 700 8px "Chakra Petch", monospace; letter-spacing: .09em; }
+.statistics-highlights > article > b { margin: 8px 0 2px; color: #fff; font: 700 34px "Chakra Petch", sans-serif; }
+.statistics-highlights > article > a { color: #f0ede7; font: 600 13px Barlow, sans-serif; text-decoration: none; }
 .statistics-highlights > article > a:hover { color: var(--amber2); }
-.statistics-highlights > article > small { margin-top: 4px; color: #7f8997; font: 600 8px JetBrains Mono, monospace; }
+.statistics-highlights > article > small { margin-top: 4px; color: #7f8997; font: 600 8px "Chakra Petch", monospace; }
 .player-comparison { margin-bottom: 26px; padding: 20px; background: #181c23; border: 1px solid #353a43; }
 .player-comparison > header { display: flex; align-items: flex-end; justify-content: space-between; gap: 18px; padding-bottom: 15px; border-bottom: 1px solid #343a44; }
-.player-comparison > header span { color: var(--amber2); font: 700 8px JetBrains Mono, monospace; letter-spacing: .1em; }
-.player-comparison > header h3 { margin: 4px 0 0; color: #f3f0ea; font: 600 22px Oswald, sans-serif; }
-.player-comparison > header small { max-width: 430px; color: #7f8996; text-align: right; font: 500 8px/1.5 JetBrains Mono, monospace; }
+.player-comparison > header span { color: var(--amber2); font: 700 8px "Chakra Petch", monospace; letter-spacing: .1em; }
+.player-comparison > header h3 { margin: 4px 0 0; color: #f3f0ea; font: 600 22px "Chakra Petch", sans-serif; }
+.player-comparison > header small { max-width: 430px; color: #7f8996; text-align: right; font: 500 8px/1.5 "Chakra Petch", monospace; }
 .comparison-selectors { display: grid; grid-template-columns: minmax(0, 1fr) 34px minmax(0, 1fr); align-items: end; gap: 10px; margin: 16px 0; }
-.comparison-selectors label { display: flex; flex-direction: column; gap: 6px; color: #8d97a5; font: 700 8px JetBrains Mono, monospace; text-transform: uppercase; }
-.comparison-selectors select { width: 100%; height: 42px; padding: 0 12px; border: 1px solid #3c424c; background: #101319; color: #fff; font: 600 11px Inter, sans-serif; }
+.comparison-selectors label { display: flex; flex-direction: column; gap: 6px; color: #8d97a5; font: 700 8px "Chakra Petch", monospace; text-transform: uppercase; }
+.comparison-selectors select { width: 100%; height: 42px; padding: 0 12px; border: 1px solid #3c424c; background: #101319; color: #fff; font: 600 11px Barlow, sans-serif; }
 .comparison-selectors > b { padding-bottom: 12px; color: var(--amber2); text-align: center; }
 .comparison-identities { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 14px; }
 .comparison-identity { min-height: 72px; display: flex; align-items: center; gap: 12px; padding: 10px 14px; background: linear-gradient(120deg, #2d2113, #151921 72%); border: 1px solid #664b23; border-left: 3px solid var(--amber2); }
@@ -1449,104 +1449,104 @@ footer p {
 .comparison-identity > span { width: 52px; height: 52px; flex: none; display: grid; place-items: center; overflow: hidden; background: #0f1217; }
 .comparison-identity > span img { width: 100%; height: 100%; object-fit: contain; object-position: center bottom; }
 .comparison-identity > div { min-width: 0; display: flex; flex-direction: column; }
-.comparison-identity small { color: #c68d38; font: 700 7px JetBrains Mono, monospace; letter-spacing: .1em; }
+.comparison-identity small { color: #c68d38; font: 700 7px "Chakra Petch", monospace; letter-spacing: .1em; }
 .comparison-identity.player-b small { color: #6ca6cf; }
-.comparison-identity b { margin-top: 3px; overflow: hidden; color: #f4f1eb; font: 600 18px Oswald, sans-serif; text-overflow: ellipsis; white-space: nowrap; }
-.comparison-identity em { color: #8993a1; font: 600 8px JetBrains Mono, monospace; font-style: normal; }
+.comparison-identity b { margin-top: 3px; overflow: hidden; color: #f4f1eb; font: 600 18px "Chakra Petch", sans-serif; text-overflow: ellipsis; white-space: nowrap; }
+.comparison-identity em { color: #8993a1; font: 600 8px "Chakra Petch", monospace; font-style: normal; }
 .comparison-chart { display: grid; grid-template-columns: repeat(4, minmax(125px, 1fr)); gap: 10px; }
 .comparison-metric { min-height: 218px; padding: 12px 10px 10px; background: linear-gradient(#1d232c, #12161c); border: 1px solid #353d48; }
-.comparison-metric > b { min-height: 30px; display: block; color: #abb4c1; font: 700 8px/1.35 JetBrains Mono, monospace; text-align: center; text-transform: uppercase; }
+.comparison-metric > b { min-height: 30px; display: block; color: #abb4c1; font: 700 8px/1.35 "Chakra Petch", monospace; text-align: center; text-transform: uppercase; }
 .comparison-columns { position: relative; height: 160px; display: grid; grid-template-columns: repeat(2, 1fr); align-items: end; gap: 9px; padding: 27px 10px 0; overflow: hidden; background: repeating-linear-gradient(to top, transparent 0 31px, #ffffff0b 31px 32px); border-bottom: 1px solid #4a535f; }
 .comparison-column { position: relative; height: 100%; display: flex; align-items: center; justify-content: flex-end; flex-direction: column; }
-.comparison-column > strong { position: absolute; top: 4px; left: 50%; z-index: 2; transform: translateX(-50%); color: #f5f2ed; font: 700 9px JetBrains Mono, monospace; white-space: nowrap; text-shadow: 0 1px 3px #000; }
+.comparison-column > strong { position: absolute; top: 4px; left: 50%; z-index: 2; transform: translateX(-50%); color: #f5f2ed; font: 700 9px "Chakra Petch", monospace; white-space: nowrap; text-shadow: 0 1px 3px #000; }
 .comparison-column > i { width: min(48px, 90%); min-height: 3px; display: block; background: linear-gradient(180deg, #ffc35a, #a96008); box-shadow: 0 0 18px #f5a6232b; transition: height .3s ease; }
 .comparison-column.player-b > i { background: linear-gradient(180deg, #72b9e9, #286389); box-shadow: 0 0 18px #4b91c52b; }
-.comparison-column > small { position: absolute; bottom: 5px; color: #17130d; font: 800 8px JetBrains Mono, monospace; }
+.comparison-column > small { position: absolute; bottom: 5px; color: #17130d; font: 800 8px "Chakra Petch", monospace; }
 .comparison-column.player-b > small { color: #0e1820; }
 .compact-heading { margin: 24px 0 10px; }
-.compact-heading h3 { margin: 3px 0 0; color: #f3f0ea; font: 600 20px Oswald, sans-serif; }
+.compact-heading h3 { margin: 3px 0 0; color: #f3f0ea; font: 600 20px "Chakra Petch", sans-serif; }
 @media (max-width: 760px) { .tournament-stats-toolbar { align-items: stretch; flex-direction: column; } .tournament-stats-toolbar select { width: 100%; min-width: 0; } .tournament-stats-switch button { min-width: 0; flex: 1; } .tournament-stats-switch { width: 100%; } .event-brand-art > .media-image-fallback { font-size: 42px; } }
 @media (max-width: 1050px) { .comparison-chart { grid-template-columns: repeat(2, minmax(125px, 1fr)); } }
 @media (max-width: 700px) { .statistics-highlights { grid-template-columns: 1fr; } .player-comparison > header { align-items: flex-start; flex-direction: column; } .player-comparison > header small { text-align: left; } .comparison-selectors { grid-template-columns: 1fr; } .comparison-selectors > b { display: none; } .comparison-identities { grid-template-columns: 1fr; } .comparison-chart { grid-template-columns: repeat(2, minmax(115px, 1fr)); } .comparison-metric { min-height: 190px; } .comparison-columns { height: 135px; padding-inline: 4px; } }
 
 /* Dashboard estatístico HLTPC. */
-.tournament-stats-toolbar > small { max-width: 340px; color: #858f9e; font: 600 9px/1.55 "JetBrains Mono", monospace; text-align: right; }
+.tournament-stats-toolbar > small { max-width: 340px; color: #858f9e; font: 600 9px/1.55 "Chakra Petch", monospace; text-align: right; }
 .statistics-section-tabs { display: flex; margin-top: 14px; overflow-x: auto; background: #11141a; border: 1px solid #373d47; scrollbar-width: thin; }
-.statistics-section-tabs button { min-width: max-content; height: 48px; padding: 0 20px; border: 0; border-right: 1px solid #343a43; border-bottom: 3px solid transparent; background: transparent; color: #9da6b3; cursor: pointer; font: 700 10px "JetBrains Mono", monospace; transition: color .15s, background .15s, border-color .15s; }
+.statistics-section-tabs button { min-width: max-content; height: 48px; padding: 0 20px; border: 0; border-right: 1px solid #343a43; border-bottom: 3px solid transparent; background: transparent; color: #9da6b3; cursor: pointer; font: 700 10px "Chakra Petch", monospace; transition: color .15s, background .15s, border-color .15s; }
 .statistics-section-tabs button:hover { color: #fff; background: #1b2028; }
 .statistics-section-tabs button.active { color: #fff; border-bottom-color: var(--amber2); background: linear-gradient(180deg, #27231c, #191b20); }
 .advanced-empty { min-height: 280px; display: flex; align-items: flex-start; justify-content: center; flex-direction: column; padding: clamp(28px, 6vw, 72px); background: radial-gradient(circle at 85% 30%, #f29d241c, transparent 32%), #181c23; border: 1px solid #353a43; border-left: 3px solid var(--amber2); }
-.advanced-empty > span { color: var(--amber2); font: 700 9px "JetBrains Mono", monospace; letter-spacing: .12em; }
-.advanced-empty h3 { max-width: 700px; margin: 10px 0 8px; color: #f5f2ec; font: 600 clamp(28px, 4vw, 46px)/1.05 Oswald, sans-serif; }
+.advanced-empty > span { color: var(--amber2); font: 700 9px "Chakra Petch", monospace; letter-spacing: .12em; }
+.advanced-empty h3 { max-width: 700px; margin: 10px 0 8px; color: #f5f2ec; font: 600 clamp(28px, 4vw, 46px)/1.05 "Chakra Petch", sans-serif; }
 .advanced-empty p { max-width: 650px; margin: 0; color: #a7aeba; font-size: 15px; line-height: 1.6; }
-.advanced-empty small { max-width: 650px; margin-top: 18px; color: #747f8e; font: 600 9px/1.5 "JetBrains Mono", monospace; }
+.advanced-empty small { max-width: 650px; margin-top: 18px; color: #747f8e; font: 600 9px/1.5 "Chakra Petch", monospace; }
 .metric-dashboard, .timeline-dashboard, .scatter-panel, .player-career-chart { margin-bottom: 20px; overflow: hidden; background: #181c23; border: 1px solid #353b45; }
 .metric-dashboard > header, .timeline-dashboard > header, .scatter-panel > header, .player-career-chart > header { min-height: 92px; display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; padding: 18px 20px; background: linear-gradient(100deg, #222833, #171a21 64%, #2a2116); border-bottom: 1px solid #3a424d; }
-.metric-dashboard header span, .timeline-dashboard header span, .scatter-panel header span, .player-career-chart header span { color: var(--amber2); font: 700 8px "JetBrains Mono", monospace; letter-spacing: .12em; }
-.metric-dashboard header h3, .timeline-dashboard header h3, .scatter-panel header h3, .player-career-chart header h2 { margin: 4px 0 0; color: #f5f2ed; font: 600 25px Oswald, sans-serif; }
+.metric-dashboard header span, .timeline-dashboard header span, .scatter-panel header span, .player-career-chart header span { color: var(--amber2); font: 700 8px "Chakra Petch", monospace; letter-spacing: .12em; }
+.metric-dashboard header h3, .timeline-dashboard header h3, .scatter-panel header h3, .player-career-chart header h2 { margin: 4px 0 0; color: #f5f2ed; font: 600 25px "Chakra Petch", sans-serif; }
 .metric-dashboard header p, .timeline-dashboard header p { margin: 5px 0 0; color: #8994a2; font-size: 11px; }
-.metric-dashboard label, .timeline-dashboard label, .player-career-chart label { display: flex; align-items: flex-start; flex-direction: column; gap: 6px; color: #8b96a5; font: 700 8px "JetBrains Mono", monospace; text-transform: uppercase; }
-.metric-dashboard select, .timeline-dashboard select, .player-career-chart select { min-width: 190px; height: 40px; padding: 0 34px 0 11px; border: 1px solid #444c58; background: #101319; color: #fff; font: 600 11px Inter, sans-serif; }
+.metric-dashboard label, .timeline-dashboard label, .player-career-chart label { display: flex; align-items: flex-start; flex-direction: column; gap: 6px; color: #8b96a5; font: 700 8px "Chakra Petch", monospace; text-transform: uppercase; }
+.metric-dashboard select, .timeline-dashboard select, .player-career-chart select { min-width: 190px; height: 40px; padding: 0 34px 0 11px; border: 1px solid #444c58; background: #101319; color: #fff; font: 600 11px Barlow, sans-serif; }
 .timeline-dashboard > header > div:last-child { display: flex; gap: 10px; }
 .metric-leaderboard { padding: 10px 18px 18px; }
 .metric-bar-row { min-height: 72px; display: grid; grid-template-columns: 32px 48px minmax(150px, 230px) minmax(180px, 1fr) 80px; align-items: center; gap: 12px; border-bottom: 1px solid #343b45; }
 .metric-bar-row:last-child { border-bottom: 0; }
-.metric-bar-row > span { color: #6f7988; font: 700 9px "JetBrains Mono", monospace; }
-.metric-bar-row > i { width: 42px; height: 42px; display: grid; place-items: center; overflow: hidden; color: var(--amber2); font: 700 10px "JetBrains Mono", monospace; font-style: normal; }
+.metric-bar-row > span { color: #6f7988; font: 700 9px "Chakra Petch", monospace; }
+.metric-bar-row > i { width: 42px; height: 42px; display: grid; place-items: center; overflow: hidden; color: var(--amber2); font: 700 10px "Chakra Petch", monospace; font-style: normal; }
 .metric-bar-row > i img { width: 100%; height: 100%; object-fit: contain; object-position: center bottom; }
-.metric-bar-row > a { min-width: 0; color: #f3f0ea; font: 600 14px Inter, sans-serif; text-decoration: none; }
+.metric-bar-row > a { min-width: 0; color: #f3f0ea; font: 600 14px Barlow, sans-serif; text-decoration: none; }
 .metric-bar-row > a:hover { color: var(--amber2); }
-.metric-bar-row > a small { display: block; margin-top: 4px; overflow: hidden; color: #788494; font: 600 8px "JetBrains Mono", monospace; text-overflow: ellipsis; white-space: nowrap; }
+.metric-bar-row > a small { display: block; margin-top: 4px; overflow: hidden; color: #788494; font: 600 8px "Chakra Petch", monospace; text-overflow: ellipsis; white-space: nowrap; }
 .metric-bar-row > div { height: 13px; overflow: hidden; background: #0f1217; border: 1px solid #303640; }
 .metric-bar-row > div > b { height: 100%; display: block; background: linear-gradient(90deg, #86500c, #ffb53e); box-shadow: 0 0 18px #f29d2445; transition: width .35s ease; }
-.metric-bar-row > strong { color: #fff; text-align: right; font: 700 15px "JetBrains Mono", monospace; }
-.scatter-panel > header small { color: #7f8997; font: 600 8px "JetBrains Mono", monospace; }
+.metric-bar-row > strong { color: #fff; text-align: right; font: 700 15px "Chakra Petch", monospace; }
+.scatter-panel > header small { color: #7f8997; font: 600 8px "Chakra Petch", monospace; }
 .scatter-panel svg { width: 100%; height: auto; min-height: 330px; display: block; background: radial-gradient(circle at 50% 40%, #293543, #141820 72%); }
 .scatter-grid line, .timeline-grid line { stroke: #ffffff18; stroke-width: 1; }
 .scatter-panel circle { fill: #cf7c13; stroke: #ffc86a; stroke-width: 2; transition: r .15s, fill .15s; }
 .scatter-panel circle.top { fill: #f4a62f; }
 .scatter-panel a:hover circle { r: 12; fill: #fff; }
-.scatter-panel text { fill: #d5d9df; font: 700 10px "JetBrains Mono", monospace; pointer-events: none; }
+.scatter-panel text { fill: #d5d9df; font: 700 10px "Chakra Petch", monospace; pointer-events: none; }
 .scatter-panel .axis-x, .scatter-panel .axis-y { fill: #7e8998; font-size: 9px; letter-spacing: .08em; }
 .timeline-chart { padding: 10px 18px 18px; }
 .timeline-summary { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 4px 0; }
-.timeline-summary b { color: #fff; font: 600 18px Oswald, sans-serif; }
-.timeline-summary span { color: #8994a2; font: 600 8px "JetBrains Mono", monospace; }
+.timeline-summary b { color: #fff; font: 600 18px "Chakra Petch", sans-serif; }
+.timeline-summary span { color: #8994a2; font: 600 8px "Chakra Petch", monospace; }
 .timeline-chart svg, .player-career-chart svg { width: 100%; min-height: 330px; display: block; overflow: visible; }
 .timeline-chart polyline, .player-career-chart polyline { fill: none; stroke: var(--amber2); stroke-width: 4; filter: drop-shadow(0 0 7px #f29d2466); }
 .timeline-chart circle, .player-career-chart circle { fill: #141820; stroke: var(--amber2); stroke-width: 4; }
-.timeline-chart .point-value, .player-career-chart .point-value { fill: #fff; font: 700 10px "JetBrains Mono", monospace; text-anchor: middle; }
-.timeline-chart .point-label, .player-career-chart .point-label { fill: #85909f; font: 700 8px "JetBrains Mono", monospace; text-anchor: middle; }
+.timeline-chart .point-value, .player-career-chart .point-value { fill: #fff; font: 700 10px "Chakra Petch", monospace; text-anchor: middle; }
+.timeline-chart .point-label, .player-career-chart .point-label { fill: #85909f; font: 700 8px "Chakra Petch", monospace; text-anchor: middle; }
 
 /* Perfil estatístico individual. */
 .player-profile-tabs { display: flex; margin: 0 0 22px; background: #15191f; border: 1px solid #343943; }
-.player-profile-tabs a { min-width: 180px; padding: 16px 22px; color: #999faa; text-align: center; text-decoration: none; font: 600 13px Oswald, sans-serif; border-right: 1px solid #343943; border-bottom: 3px solid transparent; }
+.player-profile-tabs a { min-width: 180px; padding: 16px 22px; color: #999faa; text-align: center; text-decoration: none; font: 600 13px "Chakra Petch", sans-serif; border-right: 1px solid #343943; border-bottom: 3px solid transparent; }
 .player-profile-tabs a.active { color: #fff; border-bottom-color: var(--amber2); background: #20252c; }
 .player-statistics-page { min-height: 440px; }
 .player-stat-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 18px; }
 .player-stat-kpis article { min-height: 130px; display: flex; justify-content: center; flex-direction: column; padding: 18px; background: radial-gradient(circle at 85% 20%, #f29d241f, transparent 44%), #191d24; border: 1px solid #383e48; border-top: 2px solid var(--amber2); }
-.player-stat-kpis span { color: #c88d35; font: 700 8px "JetBrains Mono", monospace; letter-spacing: .1em; }
-.player-stat-kpis b { margin: 8px 0 3px; color: #fff; font: 700 36px Oswald, sans-serif; }
-.player-stat-kpis small { color: #7f8997; font: 600 8px "JetBrains Mono", monospace; }
+.player-stat-kpis span { color: #c88d35; font: 700 8px "Chakra Petch", monospace; letter-spacing: .1em; }
+.player-stat-kpis b { margin: 8px 0 3px; color: #fff; font: 700 36px "Chakra Petch", sans-serif; }
+.player-stat-kpis small { color: #7f8997; font: 600 8px "Chakra Petch", monospace; }
 .player-career-chart > div { padding: 10px 18px 18px; }
 .player-event-stat-table { overflow-x: auto; background: #181c23; border: 1px solid #3a414c; }
 .player-event-stat-table > header, .player-event-stat-table > div { min-width: 880px; display: grid; grid-template-columns: minmax(220px, 1.6fr) minmax(150px, 1fr) 50px 80px 70px 70px 70px; align-items: center; gap: 12px; padding: 0 18px; }
-.player-event-stat-table > header { height: 42px; color: #9eaaba; background: #2d3947; font: 700 8px "JetBrains Mono", monospace; text-transform: uppercase; }
-.player-event-stat-table > div { min-height: 66px; color: #f0ede8; border-top: 1px solid #3b4653; font: 600 11px "JetBrains Mono", monospace; }
+.player-event-stat-table > header { height: 42px; color: #9eaaba; background: #2d3947; font: 700 8px "Chakra Petch", monospace; text-transform: uppercase; }
+.player-event-stat-table > div { min-height: 66px; color: #f0ede8; border-top: 1px solid #3b4653; font: 600 11px "Chakra Petch", monospace; }
 .player-event-stat-table > div:nth-child(odd) { background: #1c222b; }
-.player-event-stat-table a { color: #fff; text-decoration: none; font: 600 13px Inter, sans-serif; }
+.player-event-stat-table a { color: #fff; text-decoration: none; font: 600 13px Barlow, sans-serif; }
 .player-event-stat-table a:hover { color: var(--amber2); }
-.player-event-stat-table a small { display: block; margin-top: 4px; color: #7f8997; font: 600 8px "JetBrains Mono", monospace; }
+.player-event-stat-table a small { display: block; margin-top: 4px; color: #7f8997; font: 600 8px "Chakra Petch", monospace; }
 .player-event-stat-table .rating.high { color: #50d79e; }
 .player-event-stat-table .rating.low { color: #ff6262; }
 .player-recent-matches { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
 .player-recent-matches > a { min-height: 150px; display: flex; flex-direction: column; padding: 16px; color: #fff; text-decoration: none; background: linear-gradient(145deg, #1e2630, #15181e); border: 1px solid #39414b; }
 .player-recent-matches > a:hover { border-color: var(--amber2); }
-.player-recent-matches > a > span { color: var(--amber2); font: 700 8px "JetBrains Mono", monospace; }
-.player-recent-matches > a > b { margin: 7px 0 14px; font: 600 16px Oswald, sans-serif; }
+.player-recent-matches > a > span { color: var(--amber2); font: 700 8px "Chakra Petch", monospace; }
+.player-recent-matches > a > b { margin: 7px 0 14px; font: 600 16px "Chakra Petch", sans-serif; }
 .player-recent-matches > a > div { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: auto; }
-.player-recent-matches strong { color: #fff; font: 700 14px "JetBrains Mono", monospace; }
-.player-recent-matches small { display: block; margin-top: 3px; color: #768291; font: 600 7px "JetBrains Mono", monospace; text-transform: uppercase; }
+.player-recent-matches strong { color: #fff; font: 700 14px "Chakra Petch", monospace; }
+.player-recent-matches small { display: block; margin-top: 3px; color: #768291; font: 600 7px "Chakra Petch", monospace; text-transform: uppercase; }
 .player-empty-stats { margin-top: 0; }
 
 @media (max-width: 900px) {
