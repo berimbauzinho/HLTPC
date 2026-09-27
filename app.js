@@ -34,27 +34,12 @@
     shared.players = mergeVersioned(shared.players, historicalImport2025.players, "identityImportVersion");
     shared.matches = mergeVersioned(shared.matches, historicalImport2025.matches, "importVersion");
   }
-  const confirmedPlayerIdentities = [
-    { name: "cuavila", steamId: "76561199001115634", aliases: ["MANO CHORIS", "KMKZ | MANO CHORIS"] },
-    { name: "Cuazzi", steamId: "76561198359845217", aliases: ["Voulin Raba", "cuallen", "cualy", "KMKZ | cuallen"] },
-    { name: "JohnWeed", steamId: "76561198090993134", aliases: ["ᴊʜᴏɴʏsᴋ8🛹"] },
-    { name: "Oblivion", steamId: "76561199591751431", aliases: ["DEF | Oblivion"] }
-  ];
-  const identityNick = (value) => String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("pt-BR").replace(/[^a-z0-9]/g, "");
-  const identityBySteam = new Map(confirmedPlayerIdentities.map((identity) => [identity.steamId, identity]));
-  (shared.players || []).forEach((player) => {
-    const identity = confirmedPlayerIdentities.find((candidate) => identityNick(candidate.name) === identityNick(player.name));
-    if (!identity) return;
-    const reservedAliases = new Set(confirmedPlayerIdentities.flatMap((candidate) => candidate === identity ? [] : candidate.aliases).map(identityNick));
-    const retained = [...(player.aliases || []), ...String(player.alias || "").split(/[,;|]/)].map((alias) => String(alias || "").trim()).filter((alias) => alias && !reservedAliases.has(identityNick(alias)));
-    player.steamId = identity.steamId;
-    player.aliases = [...new Set([...retained, ...identity.aliases])];
-    player.alias = player.aliases.join(", ");
-  });
+  // The shared base owns player identities; do not maintain a second identity list here.
+  const identityBySteam = new Map((shared.players || []).filter(player => player.steamId).map(player => [String(player.steamId), player.name]));
   (shared.matches || []).forEach((match) => {
     const correct = (player) => {
-      const identity = identityBySteam.get(String(player.steamid || player.steam64Id || "").trim());
-      return identity ? { ...player, name: identity.name } : player;
+      const name = identityBySteam.get(String(player.steamid || player.steam64Id || "").trim());
+      return name ? { ...player, name } : player;
     };
     if (Array.isArray(match.statistics)) match.statistics = match.statistics.map(correct);
     (match.maps || []).forEach((map) => { if (Array.isArray(map.statistics)) map.statistics = map.statistics.map(correct); });
