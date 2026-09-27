@@ -109,5 +109,53 @@
 .public-site :is(.match-detail-score>strong,.match-map-panel strong,.match-series-panel strong,.group-standing-row>strong){white-space:nowrap;font-variant-numeric:tabular-nums}
 .public-site .match-detail-team{min-width:0}.public-site .match-detail-team>a{overflow-wrap:anywhere}.public-site .match-detail-score{min-width:100px}
 .public-site :is(.news-detail-header h1,.entity-hero h1,.player-profile-hero h1){font-family:"Chakra Petch",sans-serif;line-height:1.14}
+/* Distinct team marks in result rows. */
+.public-site .result-team{display:flex;align-items:center;justify-content:center;gap:10px;min-width:0;text-align:left}
+.public-site .result-team:last-child{justify-content:center}
+.public-site .result-team>img,.public-site .result-team>.media-image-fallback{width:38px;height:38px;flex:none;object-fit:contain;background:transparent;border:0}
+.public-site .result-team>span:last-child{min-width:0;overflow-wrap:anywhere}
+
+/* A deliberate story change, respecting reduced-motion preference below. */
+.featured-news.story-enter{animation:featured-story-next .38s cubic-bezier(.2,.75,.25,1) both}
+.featured-news.story-enter-previous{animation-name:featured-story-previous}
+@keyframes featured-story-next{from{opacity:.28;transform:translateX(24px)}to{opacity:1;transform:translateX(0)}}
+@keyframes featured-story-previous{from{opacity:.28;transform:translateX(-24px)}to{opacity:1;transform:translateX(0)}}
+
+/* Championship identity, winner and navigation form one clear header. */
+.public-site .event-hero{display:grid;grid-template-columns:150px minmax(0,1fr) minmax(230px,320px);gap:28px;align-items:center;min-height:236px;padding:28px 32px}
+.public-site .event-brand-art{position:relative;inset:auto;width:150px;height:174px;overflow:visible;place-items:center}
+.public-site .event-brand-art::before,.public-site .event-brand-art::after{display:none}
+.public-site .event-brand-art .event-logo,.public-site .event-brand-art img{position:static;width:100%;height:100%;max-width:none;object-fit:contain;filter:drop-shadow(0 12px 20px #0008)}
+.public-site .event-hero-copy{position:relative;z-index:2;min-width:0}
+.public-site .event-hero-copy .event-state{display:inline-flex;align-items:center;min-height:30px;padding:5px 10px;background:var(--surface-2);color:var(--accent);font:700 11px Barlow,sans-serif;letter-spacing:.08em}
+.public-site .event-hero-copy h1{max-width:none;font-size:clamp(30px,3vw,40px);line-height:1.2;margin:10px 0 5px}
+.public-site .event-hero-copy p{font-size:14px}
+.public-site .event-champion{position:relative;z-index:2;display:flex;align-items:center;gap:14px;min-width:0;padding:18px;background:#24211b;border:1px solid #685336;border-radius:10px;text-decoration:none}
+.public-site .event-trophy{width:32px;height:32px;flex:none;color:var(--accent)}
+.public-site .event-champion-logo{display:grid;place-items:center;width:60px;height:60px;flex:none}
+.public-site .event-champion-logo img,.public-site .event-champion-logo .media-image-fallback{width:100%;height:100%;object-fit:contain;background:transparent;border:0}
+.public-site .event-champion-copy{display:flex;flex-direction:column;min-width:0}
+.public-site .event-champion-copy small{font:700 11px Barlow,sans-serif;letter-spacing:.1em;color:var(--accent)}
+.public-site .event-champion-copy strong{font:600 18px/1.2 "Chakra Petch",sans-serif;overflow-wrap:anywhere}
+.public-site .event-tabs{height:auto;min-height:54px;margin:12px 0 26px;padding:0;gap:8px;border:0;border-bottom:1px solid var(--line);background:transparent}
+.public-site .event-tabs a{display:inline-flex;align-items:center;justify-content:center;min-width:0;height:auto;min-height:52px;padding:12px 18px;border:0;border-bottom:3px solid transparent;background:transparent;color:var(--muted);font:600 15px Barlow,sans-serif}
+.public-site .event-tabs a.active{border:0;border-bottom:3px solid var(--accent);background:transparent;color:var(--text)}
+.public-site .event-tabs a.active::after{content:none}
+.public-site .event-retrospective{grid-template-columns:repeat(3,minmax(0,1fr))}
+.public-site .event-retrospective .format-note p{margin:12px 0 0;font-size:16px;line-height:1.5;color:var(--text)}
+.public-site .event-overview-matches:has(> :only-child){grid-template-columns:minmax(0,1fr)}
+.public-site .event-overview-match{background:var(--surface);border-radius:10px}
+.public-site .event-overview-match>header,.public-site .event-overview-match>footer{background:transparent;border-color:var(--line);padding:14px 22px}
+.public-site .event-overview-match>div{min-height:150px;padding:18px 22px;grid-template-columns:minmax(0,1fr) 88px minmax(0,1fr)}
+.public-site .event-overview-match>div>a{gap:14px;font:600 18px/1.25 Barlow,sans-serif}
+.public-site .event-overview-match>div>a>span{display:grid;place-items:center;width:70px;height:70px;flex:none;background:transparent;border:0;overflow:visible}
+.public-site .event-overview-match>div>a>span img{width:100%;height:100%;object-fit:contain}
+.public-site .event-overview-match>div>a>b{font:600 18px/1.25 Barlow,sans-serif}
+.public-site .event-overview-match>div>strong{font-size:30px}
+.public-site .event-overview-match>footer{font-size:12px}
+@media(max-width:900px){.public-site .event-hero{grid-template-columns:104px minmax(0,1fr);gap:18px}.public-site .event-brand-art{width:104px;height:125px}.public-site .event-champion{grid-column:1/-1}.public-site .event-overview-match>div>a>span{width:56px;height:56px}}
+@media(max-width:700px){.public-site .result-team{flex-direction:column;gap:4px;text-align:center}.public-site .result-team>img,.public-site .result-team>.media-image-fallback{width:36px;height:36px}.public-site .event-hero{grid-template-columns:90px minmax(0,1fr);min-height:0;padding:20px;gap:14px}.public-site .event-brand-art{width:90px;height:104px}.public-site .event-hero-copy h1{font-size:25px}.public-site .event-champion{padding:12px}.public-site .event-champion-logo{width:50px;height:50px}.public-site .event-tabs{gap:0}.public-site .event-tabs a{flex:1;padding:10px 6px;font-size:13px}.public-site .event-retrospective{grid-template-columns:repeat(2,minmax(0,1fr))}.public-site .event-retrospective .format-note{grid-column:1/-1;min-height:0}.public-site .event-overview-match>div{grid-template-columns:minmax(0,1fr) 70px minmax(0,1fr);gap:6px;padding:14px 10px}.public-site .event-overview-match>div>a{flex-direction:column;gap:6px;text-align:center}.public-site .event-overview-match>div>a:last-child{flex-direction:column;text-align:center}.public-site .event-overview-match>div>a>span{width:48px;height:48px}.public-site .event-overview-match>div>a>b{font-size:13px}.public-site .event-overview-match>div>strong{font-size:22px}}
+@media(max-width:390px){.public-site .event-hero{grid-template-columns:72px minmax(0,1fr);gap:10px;padding:16px}.public-site .event-brand-art{width:72px;height:90px}.public-site .event-hero-copy h1{font-size:22px}.public-site .event-champion{gap:8px}.public-site .event-trophy{width:26px;height:26px}.public-site .event-champion-logo{width:44px;height:44px}.public-site .event-champion-copy strong{font-size:15px}.public-site .event-overview-match>div>a>span{width:42px;height:42px}}
+@media(prefers-reduced-motion:reduce){.featured-news.story-enter{animation:none}}
 @media(max-width:900px){.featured-copy{padding:28px}.featured-image{min-height:320px}.public-site .featured-copy h1{font-size:32px}.public-site .home-grid{grid-template-columns:minmax(0,1fr)}}
 @media(max-width:700px){.featured-news.with-image{grid-template-columns:1fr}.featured-copy{padding:24px}.featured-image{min-height:0;max-height:330px}.featured-image img{height:auto;max-height:330px}.public-site .featured-copy h1{font-size:30px}.featured-heading{align-items:flex-start;flex-direction:column;gap:4px}.public-site .featured-heading h2{font-size:25px}.featured-heading>a{font-size:13px}.featured-controls{justify-content:center}.public-site .event-overview-match>div{padding:16px 12px;gap:8px;grid-template-columns:minmax(0,1fr) 76px minmax(0,1fr)}.public-site .event-overview-match>div>a{flex-direction:column;align-items:center;text-align:center}.public-site .event-overview-match>div>a:last-child{flex-direction:column;text-align:center}.public-site .stage-team{gap:10px}.public-site .match-detail-score{min-width:84px}.public-site .match-detail-score>strong{font-size:32px}}
