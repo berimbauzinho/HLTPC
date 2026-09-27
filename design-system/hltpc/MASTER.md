@@ -3,12 +3,12 @@
 Applied from UI UX Pro Max (nextlevelbuilder/ui-ux-pro-max-skill), using the sports results editorial dashboard search after one off-topic recommendation.
 
 ## Direction
-An editorial esports archive. Lead with the latest Major champion, provide direct access to the final and playoffs, then recent results, rankings and community news. Preserve actual team logos and player photographs. No automatic carousel or decorative 3D effects.
+An editorial esports archive. Lead with featured community news and supplied photographs, with reader-controlled story navigation. Recent results and rankings follow; matches remain accessible inside each championship, without a separate primary navigation tab. Preserve actual team logos and player photographs. No automatic carousel or decorative 3D effects.
 
 ## Foundations
 - Charcoal background #101216, surfaces #191c22 and #20242c, borders #343a45.
 - Primary text #f5f5f2, secondary text #abb3c0, championship accent #efb449. Gold buttons use dark text.
-- Existing Inter for reading and Oswald for titles; JetBrains Mono for scores. Body 16px, essential labels 12–14px, headings 26–54px.
+- Barlow for reading and Chakra Petch for titles and scores. Body 16px, essential labels 12–14px, headings 26–54px. Use tabular numerals and a dedicated 48px score cell for bracket cards; result summaries reserve 76–80px for a pair of scores.
 - 8px spacing foundation, 24–40px section separation, 10–16px panel radii. Desktop content width 1200px.
 
 ## Interaction

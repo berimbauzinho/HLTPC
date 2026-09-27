@@ -316,15 +316,28 @@
   }
 
   function renderHero() {
-    const event = [...data.tournaments].sort((a, b) => b.year - a.year || b.id.localeCompare(a.id)).find(item => item.category === "major" && item.champion);
+    const items = [...data.news].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 3);
     const target = document.querySelector("#hero");
-    if (!event) {
-      target.innerHTML = `<article class="championship-spotlight"><div><span class="eyebrow">TAMPICOUNTERS</span><h1>O nosso jogo.<br>A nossa história.</h1><p>Resultados, campeonatos e os jogadores que fazem tudo acontecer.</p><a class="primary-link" href="#campeonatos">Explorar campeonatos →</a></div></article>`;
+    if (!items.length) {
+      target.innerHTML = `<article class="featured-news"><div class="featured-copy"><span class="eyebrow">HLTPC</span><h1>O nosso jogo.<br>A nossa história.</h1><p>Campeonatos, equipes e os jogadores que fazem tudo acontecer.</p><a class="primary-link" href="#campeonatos">Explorar campeonatos →</a></div></article>`;
       return;
     }
-    const final = orderedEventMatches(event).find(match => match.round === "final" && match.score);
-    const base = `#campeonato/${encodeURIComponent(event.id)}`;
-    target.innerHTML = `<article class="championship-spotlight"><div class="spotlight-copy"><span class="eyebrow">${escapeHtml(event.name)} ${event.year} · ENCERRADO</span><h1>${escapeHtml(event.champion)}<br><span>no topo do Major.</span></h1><p>A taça tem dono. Reviva o mata-mata e confira os números de cada mapa.</p><div class="spotlight-actions"><a class="primary-link" href="${base}/matches">Ver o mata-mata →</a><a class="secondary-link" href="${base}/statistics">Estatísticas</a></div></div><div class="spotlight-result"><span class="eyebrow">CAMPEÃO ${event.year}</span><div class="spotlight-logo">${teamBadge(event.champion)}</div><h2>${escapeHtml(event.champion)}</h2>${final ? `<a class="spotlight-final" href="#partida/${encodeURIComponent(final.id)}"><span>GRANDE FINAL · MD${final.bestOf || 3}</span><strong>${escapeHtml(final.teamA)} <b>${escapeHtml(final.score.replace(" - ", " : "))}</b> ${escapeHtml(final.teamB)}</strong><small>Explorar a final →</small></a>` : `<a href="${base}/overview">Ver campeonato →</a>`}</div></article>`;
+    let selected = 0;
+    const draw = () => {
+      const item = items[selected];
+      const url = `#noticia/${encodeURIComponent(item.id)}`;
+      target.innerHTML = `<section class="featured-news-section" aria-label="Notícias em destaque"><header class="featured-heading"><div><span class="eyebrow">DA COMUNIDADE</span><h2>Notícias em destaque</h2></div><a href="#noticias">Todas as notícias →</a></header><article class="featured-news ${item.image ? "with-image" : ""}"><div class="featured-copy"><span class="featured-meta">${formatDate(item.date)} · ${escapeHtml(item.author)}</span><h1><a href="${url}">${escapeHtml(item.title)}</a></h1><p>${escapeHtml(item.summary)}</p><a class="primary-link" href="${url}">Ler notícia →</a></div>${item.image ? `<a class="featured-image" href="${url}" aria-label="Ler ${escapeHtml(item.title)}"><img src="${escapeHtml(item.image)}" alt="${escapeHtml(item.title)}" /></a>` : ""}</article>${items.length > 1 ? `<nav class="featured-controls" aria-label="Escolher notícia em destaque"><button type="button" data-featured-step="-1" aria-label="Notícia anterior">←</button><div class="featured-dots">${items.map((news, index) => `<button type="button" data-featured-index="${index}" class="${selected === index ? "active" : ""}" aria-pressed="${selected === index}" aria-label="Mostrar ${escapeHtml(news.title)}"><span></span></button>`).join("")}</div><span class="featured-count" aria-live="polite">${selected + 1} / ${items.length}</span><button type="button" data-featured-step="1" aria-label="Próxima notícia">→</button></nav>` : ""}</section>`;
+      target.querySelectorAll("[data-featured-index]").forEach(button => button.addEventListener("click", () => {
+        selected = Number(button.dataset.featuredIndex); draw();
+        target.querySelector(`[data-featured-index="${selected}"]`)?.focus({ preventScroll: true });
+      }));
+      target.querySelectorAll("[data-featured-step]").forEach(button => button.addEventListener("click", () => {
+        const step = button.dataset.featuredStep;
+        selected = (selected + Number(step) + items.length) % items.length; draw();
+        target.querySelector(`[data-featured-step="${step}"]`)?.focus({ preventScroll: true });
+      }));
+    };
+    draw();
   }
 
   function orderedEventMatches(event) {
@@ -678,8 +691,8 @@
       const teamA = match.teamA || match.slotA || "A decidir";
       const teamB = match.teamB || match.slotB || "A decidir";
       const scores = String(match.score || "").match(/\d+/g) || [];
-      const teamRow = (team, confirmed, score, side) => `<div class="stage-team ${match.winner === team ? "winner" : ""}"><span>${confirmed && teams.has(team) ? teamBadge(team) : "?"}</span>${confirmed && teams.has(team) ? `<a class="stage-team-name" href="#time/${encodeURIComponent(team)}">${escapeHtml(team)}</a>` : `<b>${escapeHtml(team)}</b>`}<strong>${score ?? (match.score ? "—" : "")}</strong><i>${side}</i></div>`;
-      return `<article class="stage-match clickable-match" data-open-match="${escapeHtml(match.id)}" role="link" tabindex="0"><header><time>${escapeHtml(match.subtitle || "Data a definir")}</time><em>MD${match.bestOf || 1}</em></header>${teamRow(teamA, Boolean(match.teamA), scores[0], "A")}${teamRow(teamB, Boolean(match.teamB), scores[1], "B")}<footer><span>${escapeHtml(match.name || "Partida")}</span>${matchSourcesMarkup(match, true) || `<small>${match.score ? "Finalizada" : "Aguardando"}</small>`}</footer></article>`;
+      const teamRow = (team, confirmed, score) => `<div class="stage-team ${match.winner === team ? "winner" : ""}"><span>${confirmed && teams.has(team) ? teamBadge(team) : "?"}</span>${confirmed && teams.has(team) ? `<a class="stage-team-name" href="#time/${encodeURIComponent(team)}">${escapeHtml(team)}</a>` : `<b>${escapeHtml(team)}</b>`}<strong>${score ?? (match.score ? "—" : "")}</strong></div>`;
+      return `<article class="stage-match clickable-match" data-open-match="${escapeHtml(match.id)}" role="link" tabindex="0"><header><time>${escapeHtml(match.subtitle || "Data a definir")}</time><em>MD${match.bestOf || 1}</em></header>${teamRow(teamA, Boolean(match.teamA), scores[0])}${teamRow(teamB, Boolean(match.teamB), scores[1])}<footer><span>${escapeHtml(match.name || "Partida")}</span>${matchSourcesMarkup(match, true) || `<small>${match.score ? "Finalizada" : "Aguardando"}</small>`}</footer></article>`;
     };
     const playoffColumns = [];
     if (semifinals.length) playoffColumns.push(`<section><header><b>Semifinal${semifinals.length > 1 ? "is" : ""}</b><small>${semifinals.length} confronto${semifinals.length > 1 ? "s" : ""}</small></header>${semifinals.map(stageMatch).join("")}</section>`);
@@ -1194,7 +1207,7 @@
       if (item) renderNewsPage(item); else location.hash = "noticias";
     }
     document.querySelectorAll(".view").forEach((view) => view.classList.toggle("active", view.dataset.view === route));
-    const navRoute = ({ jogador: "jogadores", time: "times", campeonato: "campeonatos", partida: "partidas", noticia: "inicio", noticias: "inicio" })[route] || route;
+    const navRoute = ({ jogador: "jogadores", time: "times", campeonato: "campeonatos", partida: "campeonatos", noticia: "inicio", noticias: "inicio" })[route] || route;
     document.querySelectorAll("[data-route]").forEach((link) => { const active = link.dataset.route === navRoute; link.classList.toggle("active", active); if (active) link.setAttribute("aria-current", "page"); else link.removeAttribute("aria-current"); });
     window.scrollTo({ top: 0, behavior: "instant" });
   }
