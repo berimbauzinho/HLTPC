@@ -34,7 +34,9 @@ function tournamentFixtures(tournament) {
       id: finalId,
       name: `Final · MD${bestOf}`,
       teamA: teams[0],
+      teamAId: tournament.teamIds?.[0] || "",
       teamB: teams[1],
+      teamBId: tournament.teamIds?.[1] || "",
       slotA: teams[0],
       slotB: teams[1],
       round: "final",
@@ -109,6 +111,13 @@ function ensureAllTournamentFixtures(content) {
       if (!existing) {
         content.matches.push(fixture);
       } else {
+        if (fixture.formatType === "two_team_md5" && !existing.score && !existing.demoInfo) {
+          for (const side of ["A", "B"]) {
+            existing[`team${side}`] = fixture[`team${side}`];
+            existing[`team${side}Id`] = fixture[`team${side}Id`];
+            existing[`slot${side}`] = fixture[`slot${side}`];
+          }
+        }
         if (!existing.round) existing.round = fixture.round;
         if (!existing.bestOf) existing.bestOf = fixture.bestOf;
         if (!existing.slotA) existing.slotA = fixture.slotA;
