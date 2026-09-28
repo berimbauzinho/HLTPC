@@ -601,6 +601,7 @@
   function formatCards(value = "three_team_series") {
     return [
       ["two_team_md3", "2 times", "Final direta", "1 partida · MD3"],
+      ["two_team_md5", "2 times", "Final direta", "1 partida · MD5"],
       ["three_team_series", "3 times", "Grupos + semifinal", "8 partidas"],
       ["four_team_groups", "4 times", "Grupos + chave", "9 partidas"]
     ].map(([key, title, subtitle, detail]) => `<label class="format-card"><input type="radio" name="formatType" value="${key}" ${value === key ? "checked" : ""} /><span><i>${title.split(" ")[0]}</i><b>${title}</b><small>${subtitle}</small><em>${detail}</em></span></label>`).join("");
@@ -609,6 +610,7 @@
   function formatDefinition(type) {
     return {
       two_team_md3: { teamCount: 2, matchCount: 1, label: "Final direta · 2 times", description: "Os dois times disputam uma única série MD3. O vencedor da série é o campeão.", steps: ["Final MD3", "Campeão"] },
+      two_team_md5: { teamCount: 2, matchCount: 1, label: "Final direta · 2 times", description: "Os dois times disputam uma única série MD5. O vencedor da série é o campeão.", steps: ["Final MD5", "Campeão"] },
       three_team_series: { teamCount: 3, matchCount: 8, label: "3 times · grupos e playoffs", description: "Cada time enfrenta os outros duas vezes em MD1. O 2º e o 3º jogam uma semifinal MD3; o 1º colocado avança direto para a final MD3.", steps: ["6 jogos MD1", "Semifinal MD3", "Final MD3"] },
       four_team_groups: { teamCount: 4, matchCount: 9, label: "4 times · grupos e chave", description: "Os quatro times jogam entre si uma vez em MD1. As semifinais MD3 são 1º × 4º e 2º × 3º; os vencedores disputam a final MD3.", steps: ["6 jogos MD1", "2 semifinais MD3", "Final MD3"] }
     }[type] || null;
@@ -617,8 +619,9 @@
   function tournamentFixtures(tournament) {
     const teams = tournament.teams || [];
     const common = { tournamentId: tournament.id, subtitle: "Data a definir", score: "", status: tournament.status === "published" ? "published" : "draft", generatedByFormat: true, formatType: tournament.formatType };
-    if (tournament.formatType === "two_team_md3" && teams.length === 2) {
-      return [{ ...common, id: `${tournament.id}-final`, name: "Final · MD3", teamA: teams[0], teamB: teams[1], slotA: teams[0], slotB: teams[1], round: "final", bestOf: 3, order: 1, updated: "Final gerada pelo formato" }];
+    if (["two_team_md3", "two_team_md5"].includes(tournament.formatType) && teams.length === 2) {
+      const bestOf = tournament.formatType === "two_team_md5" ? 5 : 3;
+      return [{ ...common, id: `${tournament.id}-final`, name: `Final · MD${bestOf}`, teamA: teams[0], teamB: teams[1], slotA: teams[0], slotB: teams[1], round: "final", bestOf, order: 1, updated: "Final gerada pelo formato" }];
     }
     if (tournament.formatType === "three_team_series" && teams.length === 3) {
       const [a, b, c] = teams;
@@ -687,7 +690,7 @@
     if (!preview || !definition) return;
     const teamName = (index, fallback) => escapeHtml(selectedTeams[index] || fallback);
     let diagram = "";
-    if (type === "two_team_md3") diagram = `<div class="format-diagram final-only"><div class="diagram-stage"><small>FINAL · MD3</small><b>${teamName(0, "Time 1")}</b><i>×</i><b>${teamName(1, "Time 2")}</b></div><span>🏆 Campeão</span></div>`;
+    if (["two_team_md3", "two_team_md5"].includes(type)) diagram = `<div class="format-diagram final-only"><div class="diagram-stage"><small>FINAL · ${type === "two_team_md5" ? "MD5" : "MD3"}</small><b>${teamName(0, "Time 1")}</b><i>×</i><b>${teamName(1, "Time 2")}</b></div><span>🏆 Campeão</span></div>`;
     if (type === "three_team_series") diagram = `<div class="format-diagram"><div class="diagram-groups"><small>FASE DE GRUPOS · MD1</small><b>${teamName(0, "Time 1")} × ${teamName(1, "Time 2")} · 2 jogos</b><b>${teamName(0, "Time 1")} × ${teamName(2, "Time 3")} · 2 jogos</b><b>${teamName(1, "Time 2")} × ${teamName(2, "Time 3")} · 2 jogos</b></div><span>→</span><div class="diagram-playoffs"><small>SEMIFINAL · MD3</small><b>2º colocado × 3º colocado</b><small>FINAL · MD3</small><b>1º colocado × vencedor</b></div></div>`;
     if (type === "four_team_groups") diagram = `<div class="format-diagram"><div class="diagram-groups"><small>FASE DE GRUPOS · MD1</small><b>Todos contra todos · 6 jogos</b><em>${[0, 1, 2, 3].map((index) => teamName(index, `Time ${index + 1}`)).join(" · ")}</em></div><span>→</span><div class="diagram-playoffs"><small>SEMIFINAIS · MD3</small><b>1º × 4º</b><b>2º × 3º</b><small>FINAL · MD3</small><b>Vencedor 1 × Vencedor 2</b></div></div>`;
     preview.innerHTML = `<header><div><span>PRÉVIA DA ESTRUTURA</span><h4>${definition.label}</h4></div><strong>${definition.matchCount} partida${definition.matchCount === 1 ? "" : "s"}</strong></header><p>${definition.description}</p><div class="format-steps">${definition.steps.map((step, index) => `<b>${step}${index < definition.steps.length - 1 ? " →" : ""}</b>`).join("")}</div>${diagram}`;

@@ -26,20 +26,21 @@ function tournamentFixtures(tournament) {
     }));
   };
 
-  if (common.formatType === "two_team_md3" && teams.length === 2) {
+  if (["two_team_md3", "two_team_md5"].includes(common.formatType) && teams.length === 2) {
     const finalId = `${tournament.id}-final`;
+    const bestOf = common.formatType === "two_team_md5" ? 5 : 3;
     return [{
       ...common,
       id: finalId,
-      name: "Final · MD3",
+      name: `Final · MD${bestOf}`,
       teamA: teams[0],
       teamB: teams[1],
       slotA: teams[0],
       slotB: teams[1],
       round: "final",
-      bestOf: 3,
+      bestOf,
       order: 1,
-      maps: createMaps(finalId, 3),
+      maps: createMaps(finalId, bestOf),
       updated: "Final gerada pelo formato"
     }];
   }
