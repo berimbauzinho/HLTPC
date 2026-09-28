@@ -4,7 +4,7 @@ const { ensureAllTournamentFixtures } = require('../netlify/functions/tournament
 
 test('a two-team MD5 tournament creates one final with five editable maps', () => {
   const content = {
-    tournaments: [{ id: 'fpg-2026', status: 'published', formatType: 'two_team_md5', teams: ['Time 1', 'Time 2'] }],
+    tournaments: [{ id: 'fpg-2026', status: 'published', formatType: 'two_team_md5', teams: ['Time 1', 'Time 2'], teamIds: ['slot-1', 'slot-2'] }],
     matches: []
   };
   ensureAllTournamentFixtures(content);
@@ -13,7 +13,15 @@ test('a two-team MD5 tournament creates one final with five editable maps', () =
   assert.equal(final.name, 'Final · MD5');
   assert.equal(final.bestOf, 5);
   assert.deepEqual([final.teamA, final.teamB], ['Time 1', 'Time 2']);
+  assert.deepEqual([final.teamAId, final.teamBId], ['slot-1', 'slot-2']);
   assert.deepEqual(final.maps.map((map) => map.order), [1, 2, 3, 4, 5]);
   ensureAllTournamentFixtures(content);
   assert.equal(content.matches.length, 1);
+  final.teamA = 'Old alias 1';
+  final.teamAId = 'old-1';
+  final.slotA = 'Old alias 1';
+  ensureAllTournamentFixtures(content);
+  assert.equal(final.teamA, 'Time 1');
+  assert.equal(final.teamAId, 'slot-1');
+  assert.equal(final.slotA, 'Time 1');
 });

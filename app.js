@@ -47,13 +47,14 @@
   const baselineTeamNames = [...new Set(data.tournaments.flatMap((event) => event.entries.map((entry) => entry.team)))];
   const baselineTeamIdByName = new Map(baselineTeamNames.map((name, index) => [name, `team-${index}`]));
   const sharedTeamById = new Map((shared.teams || []).map((team) => [team.id, team]));
+  const sharedTeamByExactName = new Map((shared.teams || []).map((team) => [team.name, team]));
   const normalizedTeam = (value) => String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("pt-BR").replace(/[^a-z0-9]/g, "");
   const sharedTeamIdByName = new Map();
   (shared.teams || []).forEach((team) => {
     const baseline = baselineTeamNames[Number(String(team.id || "").match(/^team-(\d+)$/)?.[1])];
     [team.name, ...(team.aliases || []), baseline].filter(Boolean).forEach((name) => sharedTeamIdByName.set(normalizedTeam(name), team.id));
   });
-  const canonicalTeamName = (name, id = "") => sharedTeamById.get(id)?.name || sharedTeamById.get(sharedTeamIdByName.get(normalizedTeam(name)))?.name || name;
+  const canonicalTeamName = (name, id = "") => sharedTeamById.get(id)?.name || sharedTeamByExactName.get(name)?.name || sharedTeamById.get(sharedTeamIdByName.get(normalizedTeam(name)))?.name || name;
   data.tournaments.forEach((event) => {
     event.entries = event.entries.map((entry) => {
       const teamId = entry.teamId || baselineTeamIdByName.get(entry.team) || "";
@@ -352,7 +353,7 @@
   }
 
   function nextSiteMatch() {
-    return data.tournaments.filter((event) => event.status === "ongoing").sort((a, b) => b.year - a.year).map(nextMatchForEvent).find(Boolean) || null;
+    return data.tournaments.filter((event) => ["ongoing", "upcoming"].includes(event.status)).sort((a, b) => b.year - a.year).map(nextMatchForEvent).find(Boolean) || null;
   }
 
   function matchTimestamp(match) {
@@ -371,7 +372,7 @@
   }
 
   function renderTicker() {
-    const current = data.tournaments.find((event) => event.status === "ongoing");
+    const current = data.tournaments.find((event) => event.status === "ongoing") || data.tournaments.find((event) => event.status === "upcoming");
     const next = current && nextMatchForEvent(current);
     document.querySelector("#tickerText").textContent = current
       ? next ? `${current.name} ${current.year}: próxima partida — ${next.teamA} × ${next.teamB}` : `${current.name} ${current.year}: aguardando definição da próxima fase`
@@ -477,7 +478,7 @@
         <a class="tournament-link" href="#campeonato/${encodeURIComponent(event.id)}/overview">
           <span class="event-list-brand">${mediaImage(saved.logo, `Logo de ${event.name}`, fallback)}</span>
           <div class="event-main"><h3>${escapeHtml(event.name)}</h3><p>${categoryLabel(event.category)} · ${event.entries.length} times</p></div>
-          <span class="event-status ${event.status}">${event.status === "ongoing" ? "EM ANDAMENTO" : "FINALIZADO"}</span>
+          <span class="event-status ${event.status}">${event.status === "upcoming" ? "EM BREVE" : event.status === "ongoing" ? "EM ANDAMENTO" : "FINALIZADO"}</span>
           <time class="event-year">${event.year}</time>
           <span class="event-enter">Ver campeonato <i>→</i></span>
         </a>
@@ -1079,7 +1080,7 @@
       body = `<section class="event-tab-body"><div class="event-retrospective"><article><small>ANDAMENTO</small><b>${completed.length}/${eventMatches.length}</b><p>partidas concluídas</p></article><article><small>PARTICIPANTES</small><b>${event.entries.length}</b><p>times confirmados</p></article><article class="format-note"><small>FORMATO</small><p>${eventMatches.filter((match) => match.round === "group").length ? "Fase de grupos e mata-mata." : "Decisão em confronto direto."}</p></article></div><div class="section-heading spaced"><div><span>RETROSPECTO</span><h2>${event.champion ? "A decisão do campeonato" : "Última e próxima partida"}</h2></div><a href="${base}/matches">Ver todas as partidas →</a></div><div class="event-overview-matches">${tournamentMatchSummary(latest, "ÚLTIMA PARTIDA", "Nenhum resultado registrado")}${event.champion ? "" : tournamentMatchSummary(next, "PRÓXIMA PARTIDA", "Aguardando definição")}</div><div class="section-heading spaced"><div><span>NOTÍCIAS</span><h2>Notícias relacionadas</h2></div></div>${relatedNews.length ? `<div class="news-list event-news">${newsMarkup(relatedNews.slice(0, 4))}</div>` : `<div class="empty compact"><b>Nenhuma notícia relacionada</b>As notícias vinculadas a este campeonato aparecerão aqui.</div>`}<div class="section-heading spaced"><div><span>PARTICIPANTES</span><h2>Times e escalações</h2></div></div><div class="participant-grid">${event.entries.map((entry) => `<article><a class="participant-team" href="#time/${encodeURIComponent(entry.team)}"><span>${teamBadge(entry.team)}</span><b>${escapeHtml(entry.team)}</b></a><ul>${entry.players.map((player) => `<li><a href="#jogador/${encodeURIComponent(player)}">${escapeHtml(player)}</a></li>`).join("")}</ul></article>`).join("")}</div></section>`;
     }
     const eventFallback = entityInitials(event.name);
-    document.querySelector("#tournamentPage").innerHTML = `<a class="profile-back" href="#campeonatos">← Voltar aos campeonatos</a><header class="event-hero"><div class="event-brand-art">${mediaImage(savedEvent.logo, `Logo de ${event.name}`, eventFallback, "event-logo")}</div><div class="event-hero-copy"><span class="event-state">${event.status === "ongoing" ? "EM ANDAMENTO" : "FINALIZADO"}</span><h1>${escapeHtml(event.name)} <b>${event.year}</b></h1><p>${categoryLabel(event.category)} · ${event.entries.length} times</p></div>${event.champion ? `<a class="event-champion" href="#time/${encodeURIComponent(event.champion)}"><svg class="event-trophy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 21h8M12 17v4M7 3h10v7a5 5 0 0 1-10 0V3ZM7 5H4v3a4 4 0 0 0 4 4m9-7h3v3a4 4 0 0 1-4 4"/></svg><span class="event-champion-logo">${teamBadge(event.champion)}</span><span class="event-champion-copy"><small>CAMPEÃO ${event.year}</small><strong>${escapeHtml(event.champion)}</strong></span></a>` : ""}</header>${tabs}${body}`;
+    document.querySelector("#tournamentPage").innerHTML = `<a class="profile-back" href="#campeonatos">← Voltar aos campeonatos</a><header class="event-hero"><div class="event-brand-art">${mediaImage(savedEvent.logo, `Logo de ${event.name}`, eventFallback, "event-logo")}</div><div class="event-hero-copy"><span class="event-state">${event.status === "upcoming" ? "EM BREVE" : event.status === "ongoing" ? "EM ANDAMENTO" : "FINALIZADO"}</span><h1>${escapeHtml(event.name)} <b>${event.year}</b></h1><p>${categoryLabel(event.category)} · ${event.entries.length} times</p></div>${event.champion ? `<a class="event-champion" href="#time/${encodeURIComponent(event.champion)}"><svg class="event-trophy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 21h8M12 17v4M7 3h10v7a5 5 0 0 1-10 0V3ZM7 5H4v3a4 4 0 0 0 4 4m9-7h3v3a4 4 0 0 1-4 4"/></svg><span class="event-champion-logo">${teamBadge(event.champion)}</span><span class="event-champion-copy"><small>CAMPEÃO ${event.year}</small><strong>${escapeHtml(event.champion)}</strong></span></a>` : ""}</header>${tabs}${body}`;
     if (validTab === "statistics") bindTournamentStatistics(event, eventMatches);
   }
 
