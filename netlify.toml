@@ -10,6 +10,11 @@
   included_files = ["node_modules/@laihoe/demoparser2/**", "node_modules/@laihoe/demoparser2-linux-x64-gnu/**"]
 
 [[redirects]]
+  from = "/api/community"
+  to = "/.netlify/functions/community"
+  status = 200
+
+[[redirects]]
   from = "/api/admin/login"
   to = "/.netlify/functions/admin-login"
   status = 200

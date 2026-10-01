@@ -12,7 +12,7 @@ function check(directory) {
   }
 }
 for (const directory of ['admin', 'netlify/functions', 'tools', 'tests']) check(directory);
-for (const file of ['app.js', 'server.js']) {
+for (const file of ['app.js', 'community.js', 'server.js']) {
   const result = spawnSync(process.execPath, ['--check', file], { stdio: 'inherit' });
   if (result.status !== 0) process.exit(result.status || 1);
 }

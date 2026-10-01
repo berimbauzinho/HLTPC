@@ -28,7 +28,7 @@
     news: source.news.map((item) => ({ id: item.id, name: item.title, subtitle: item.summary, body: item.body || item.summary, author: item.author, date: item.date, tournamentId: item.tournamentId, status: "published", updated: item.date }))
   };
 
-  const labels = { overview: "Visão geral", players: "Jogadores", teams: "Times", tournaments: "Campeonatos", matches: "Partidas", news: "Notícias", users: "Usuários e acessos", history: 'Histórico e backup' };
+  const labels = { overview: "Visão geral", players: "Jogadores", teams: "Times", tournaments: "Campeonatos", matches: "Partidas", news: "Notícias", users: "Usuários e acessos", history: 'Histórico e backup', community: 'Moderação da comunidade' };
   const singular = { players: "jogador", teams: "time", tournaments: "campeonato", matches: "partida", news: "notícia" };
   let section = "overview";
   let editingId = null;
@@ -1607,7 +1607,7 @@
     document.querySelector("#breadcrumb").textContent = labels[section];
     document.querySelectorAll("#adminNav button").forEach((button) => button.classList.toggle("active", button.dataset.section === section));
     document.querySelector(".sidebar").classList.remove("open");
-    if (section === "overview") overview(); else if (section === "users") usersView(); else if (section === 'history') historyView(); else if (section === "tournaments") tournamentsView(); else listView();
+    if (section === "overview") overview(); else if (section === "users") usersView(); else if (section === 'history') historyView(); else if (section === "tournaments") tournamentsView(); else if (section === "community") window.HLTPC_COMMUNITY_ADMIN.render(content); else listView();
   }
 
   async function historyView() {
