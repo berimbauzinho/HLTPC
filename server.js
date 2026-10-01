@@ -95,6 +95,7 @@ async function startServer() {
   }
 
   // --- API Routes ---
+  app.all('/api/community', handleLambda(require('./netlify/functions/community').handler));
   app.all('/api/admin/login', handleLambda(adminLogin));
   app.all('/api/admin/session', handleLambda(adminSession));
   app.all('/api/admin/logout', handleLambda(adminLogout));

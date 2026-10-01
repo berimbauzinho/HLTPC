@@ -219,8 +219,7 @@
 .public-site .match-series-panel > ol .unplayed { background: #1b1f27; }
 .public-site .match-series-panel > ol .unplayed strong { font-size: 12px; white-space: normal; text-align: right; }
 /* Team identity and ratings stay distinct from the page and table rows. */
-.public-site .match-stat-team { --team-cell: #353250; --team-cell-alt: #3c385c; border-color: #535c6e; background: #12151b; }
-.public-site .match-stat-team.team-b { --team-cell: #23453f; --team-cell-alt: #2b5049; }
+.public-site .match-stat-team { --team-cell: #242933; --team-cell-alt: #2c323d; border-color: #535c6e; background: #12151b; }
 .public-site .match-stat-team > header { display: flex; justify-content: flex-start; gap: 14px; padding: 18px 20px; background: #292f3b; border-bottom: 1px solid #535c6e; }
 .public-site .match-stat-team > header > a { font: 700 17px/1.4 Barlow, sans-serif; }
 .public-site .match-stat-team > header > span:last-child { margin-left: auto; }

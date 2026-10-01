@@ -469,7 +469,7 @@
       const meta = playerMeta.get(player) || {};
       const latest = history[0];
       return `<a class="player-directory-card ${meta.photo ? "has-photo" : "without-photo"}" href="#jogador/${encodeURIComponent(player)}" aria-label="Abrir perfil de ${escapeHtml(player)}">
-        <div class="player-directory-copy"><span>PLAYER HLTPC</span><h3>${escapeHtml(player)}</h3><div><b>${latest ? escapeHtml(latest.team) : "Sem equipe recente"}</b><small>${history.length} participaç${history.length === 1 ? "ão" : "ões"} · ${officialTitleCount(player)} título${officialTitleCount(player) === 1 ? "" : "s"}</small></div></div>
+        <div class="player-directory-copy"><h3>${escapeHtml(player)}</h3><div><small>${history.length} participaç${history.length === 1 ? "ão" : "ões"} · ${officialTitleCount(player)} título${officialTitleCount(player) === 1 ? "" : "s"}</small></div></div>
         <div class="player-directory-portrait">${meta.photo ? `<img src="${escapeHtml(meta.photo)}" alt="${escapeHtml(player)}" />` : `<strong>${escapeHtml(player.slice(0, 2).toUpperCase())}</strong>`}</div>
         <i>Ver perfil →</i>
       </a>`;
@@ -1178,8 +1178,9 @@
       if (item) renderNewsPage(item); else location.hash = "noticias";
     }
     document.querySelectorAll(".view").forEach((view) => view.classList.toggle("active", view.dataset.view === route));
-    const navRoute = ({ jogador: "jogadores", time: "times", campeonato: "campeonatos", partida: "campeonatos", noticia: "inicio", noticias: "inicio" })[route] || route;
+    const navRoute = ({ jogador: "jogadores", time: "times", campeonato: "campeonatos", partida: "campeonatos", noticia: "inicio", noticias: "inicio", topico: "forum" })[route] || route;
     document.querySelectorAll("[data-route]").forEach((link) => { const active = link.dataset.route === navRoute; link.classList.toggle("active", active); if (active) link.setAttribute("aria-current", "page"); else link.removeAttribute("aria-current"); });
+    window.dispatchEvent(new CustomEvent("hltpc:view", { detail: { route, parameter } }));
     window.scrollTo({ top: 0, behavior: "instant" });
   }
 

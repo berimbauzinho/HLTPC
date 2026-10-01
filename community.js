@@ -1,0 +1,81 @@
+(() => {
+  'use strict';
+  const escape = value => String(value ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const date = value => new Date(value).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'});
+  let user = null, returnTo = '#forum', generation = 0;
+  async function api(action, values, query = {}) {
+    const response = await fetch(`/api/community?${new URLSearchParams({action,...query})}`, values ? {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,...values}),credentials:'same-origin'} : {credentials:'same-origin'});
+    const result = await response.json();
+    if(!response.ok) throw Error(result.error || 'Não foi possível concluir. Tente novamente.');
+    return result;
+  }
+  function header() { document.querySelector('#communityAccount').textContent = user ? `@${user.username}` : 'Entrar / cadastrar'; }
+  const message = (root, value) => { const target=root.querySelector('[data-message]'); if(target) target.textContent=value; };
+  const login = () => `<p class="community-login-note"><a href="#conta" data-community-return="${escape(location.hash)}">Entre ou crie uma conta</a> para participar.</p>`;
+  const postForm = (kind,id) => user ? `<form class="community-form" data-community-form="post"><input type="hidden" name="kind" value="${kind}"/><input type="hidden" name="discussionId" value="${escape(id)}"/><label>Sua mensagem<textarea name="body" maxlength="2000" rows="4" required placeholder="Converse com respeito. Até 2.000 caracteres."></textarea></label><button class="community-primary" type="submit">Publicar como ${escape(user.username)}</button><p data-message role="status" aria-live="polite"></p></form>` : login();
+  function account() {
+    const root=document.querySelector('#accountPage');
+    root.innerHTML=user ? `<header class="page-heading"><span>SUA CONTA</span><h1>${escape(user.username)}</h1><p>Seu nickname identifica suas publicações na comunidade.</p></header><div class="community-account-grid"><form class="community-form" data-community-form="password"><h2>Alterar senha</h2><label>Senha atual<input name="currentPassword" type="password" autocomplete="current-password" required/></label><label>Nova senha<input name="password" type="password" autocomplete="new-password" minlength="12" maxlength="128" required/></label><label>Repita a nova senha<input name="confirmation" type="password" autocomplete="new-password" minlength="12" required/></label><button class="community-primary">Salvar senha</button><p data-message role="status" aria-live="polite"></p></form><div class="community-panel"><h2>Participe do HLTPC</h2><p>Comente nas notícias ou abra uma conversa no fórum.</p><a class="community-primary" href="#forum">Ir ao fórum →</a><button type="button" data-community-logout>Sair da conta</button><p data-message role="status"></p></div></div>` : `<header class="page-heading"><span>COMUNIDADE HLTPC</span><h1>Entre na conversa</h1><p>Uma conta para comentar nas notícias e participar do fórum.</p></header><div class="community-account-grid"><form class="community-form" data-community-form="login"><h2>Entrar</h2><label>Nickname<input name="username" autocomplete="username" minlength="3" maxlength="24" required/></label><label>Senha<input name="password" type="password" autocomplete="current-password" maxlength="128" required/></label><button class="community-primary">Entrar</button><p data-message role="status" aria-live="polite"></p></form><form class="community-form" data-community-form="signup"><h2>Criar conta</h2><label>Nickname<input name="username" autocomplete="username" minlength="3" maxlength="24" required placeholder="Letras, números, _ ou -"/></label><label>Senha<input name="password" type="password" autocomplete="new-password" minlength="12" maxlength="128" required placeholder="Pelo menos 12 caracteres"/></label><label>Repita a senha<input name="confirmation" type="password" autocomplete="new-password" minlength="12" required/></label><p>As publicações aparecem imediatamente. Spam, ofensas e conteúdo denunciado podem ser moderados.</p><button class="community-primary">Criar conta</button><p data-message role="status" aria-live="polite"></p></form></div><details class="community-recovery"><summary>Esqueci minha senha</summary><form class="community-form" data-community-form="recover"><p>Use a chave que recebeu ao criar a conta. Ela será substituída após a recuperação.</p><label>Nickname<input name="username" autocomplete="username" required/></label><label>Chave de recuperação<input name="recoveryCode" autocomplete="off" required/></label><label>Nova senha<input name="password" type="password" autocomplete="new-password" minlength="12" maxlength="128" required/></label><label>Repita a senha<input name="confirmation" type="password" autocomplete="new-password" minlength="12" required/></label><button class="community-primary">Recuperar conta</button><p data-message role="status" aria-live="polite"></p></form></details>`;
+  }
+  async function forum(token) {
+    const root=document.querySelector('#forumPage');
+    root.innerHTML=`<header class="page-heading"><span>COMUNIDADE</span><h1>Fórum HLTPC</h1><p>CS2, campeonatos e a resenha entre os jogos.</p></header><p class="community-rules">Converse com respeito. Publicações podem ser denunciadas; a moderação pode ocultar mensagens, fechar tópicos e suspender contas.</p>${user ? `<details class="community-new-topic"><summary>Criar tópico</summary><form class="community-form" data-community-form="topic"><label>Título<input name="title" maxlength="120" required/></label><label>Categoria<select name="category"><option>Geral</option><option>Campeonatos</option><option>CS2</option></select></label><label>Mensagem<textarea name="body" rows="5" maxlength="2000" required></textarea></label><button class="community-primary">Publicar tópico</button><p data-message role="status" aria-live="polite"></p></form></details>` : login()}<div id="forumTopics" class="community-topics"><p>Carregando tópicos…</p></div>`;
+    try {
+      const {topics}=await api('topics'); if(token!==generation) return;
+      root.querySelector('#forumTopics').innerHTML=topics.length ? topics.map(t=>`<a class="community-topic" href="#topico/${escape(t.id)}"><div><small>${escape(t.category)}${t.locked?' · Fechado':''}</small><h2>${escape(t.title)}</h2><p>por ${escape(t.username)} · ${date(t.createdAt)}</p></div><span>${t.replies} resposta${t.replies===1?'':'s'} <b>→</b></span></a>`).join('') : '<div class="community-panel"><h2>A conversa começa aqui</h2><p>Crie o primeiro tópico da comunidade.</p></div>';
+    } catch(error) { if(token===generation) root.querySelector('#forumTopics').textContent=error.message; }
+  }
+  async function discussion(root,kind,id,page=1) {
+    const token=generation;
+    root.innerHTML='<p>Carregando conversa…</p>';
+    try {
+      const result=await api('discussion',null,{kind,id,page:String(page)});
+      if(token!==generation || !root.isConnected) return;
+      root.innerHTML=`${kind==='forum'?`<a class="profile-back" href="#forum">← Voltar ao fórum</a><header class="page-heading"><span>${escape(result.category)}</span><h1>${escape(result.title)}</h1></header>`:'<h2>Comentários</h2>'}<div class="community-posts">${result.posts.length ? result.posts.map(p=>`<article class="community-post"><header><b>${escape(p.username)}</b><time>${date(p.createdAt)}</time></header><p>${escape(p.body)}</p>${user?`<details class="community-report"><summary>Denunciar</summary><form data-community-form="report" class="community-form"><input type="hidden" name="kind" value="${kind}"/><input type="hidden" name="discussionId" value="${escape(id)}"/><input type="hidden" name="postId" value="${escape(p.id)}"/><label>Motivo<textarea name="reason" maxlength="300" rows="2" required></textarea></label><button type="submit">Enviar denúncia</button><p data-message role="status" aria-live="polite"></p></form></details>`:''}</article>`).join(''):'<p>Ainda não há comentários. Seja o primeiro a participar.</p>'}</div>${result.total>20?`<nav class="community-pagination" aria-label="Páginas da conversa">${page>1?`<button data-discussion-page="${page-1}">← Anterior</button>`:''}<span>Página ${page} de ${Math.ceil(result.total/20)}</span>${page*20<result.total?`<button data-discussion-page="${page+1}">Próxima →</button>`:''}</nav>`:''}${result.locked?'<p class="community-login-note">Este tópico está fechado para novas respostas.</p>':postForm(kind,id)}`;
+      root.dataset.kind=kind;root.dataset.discussion=id;
+    } catch(error) { if(token===generation) root.innerHTML=`<p role="alert">${escape(error.message)}</p><a href="#forum">Voltar ao fórum</a>`; }
+  }
+  function render() {
+    generation++;
+    const [route,id]=location.hash.slice(1).split('/');
+    if(route==='conta') account();
+    if(route==='forum') forum(generation);
+    if(route==='topico' && id) discussion(document.querySelector('#topicPage'),'forum',decodeURIComponent(id));
+    if(route==='noticia' && id) {
+      const article=document.querySelector('#newsPage .news-detail-page');
+      if(!article) return;
+      document.querySelector('#newsComments')?.remove();
+      const root=document.createElement('section');root.id='newsComments';root.className='community-discussion';article.after(root);
+      discussion(root,'news',decodeURIComponent(id));
+    }
+  }
+  document.addEventListener('click',async event=>{
+    const returning=event.target.closest('[data-community-return]');
+    if(returning) returnTo=returning.dataset.communityReturn;
+    const page=event.target.closest('[data-discussion-page]');
+    if(page) {const root=page.closest('.community-discussion'); await discussion(root,root.dataset.kind,root.dataset.discussion,Number(page.dataset.discussionPage));}
+    const logout=event.target.closest('[data-community-logout]');
+    if(logout) {try {await api('logout',{});user=null;header();render();} catch(error) {message(logout.parentElement,error.message);} }
+  });
+  document.addEventListener('submit',async event=>{
+    const form=event.target.closest('[data-community-form]'); if(!form) return;
+    event.preventDefault();
+    const action=form.dataset.communityForm, values=Object.fromEntries(new FormData(form));
+    if(values.confirmation!==undefined && values.password!==values.confirmation) {message(form,'As senhas não coincidem.');return;}
+    const button=form.querySelector('button[type="submit"],button:not([type])');button.disabled=true;message(form,'Enviando…');
+    try {
+      const result=await api(action,values);
+      if(['login','signup','recover'].includes(action)) {
+        user=result.user;header();
+        if(result.recoveryCode) {
+          document.querySelector('#accountPage').innerHTML=`<div class="community-panel community-recovery-key"><h1>Conta pronta, ${escape(user.username)}</h1><p>Guarde esta chave em um lugar seguro. Ela permite recuperar sua conta se esquecer a senha e só aparece agora.</p><label>Chave de recuperação<input readonly value="${escape(result.recoveryCode)}" aria-label="Chave de recuperação"/></label><a class="community-primary" href="${escape(returnTo)}">Continuar →</a></div>`;
+        } else {location.hash=returnTo;render();}
+      } else if(action==='topic') location.hash=`topico/${result.id}`;
+      else if(action==='post') await discussion(form.closest('.community-discussion'),values.kind,values.discussionId,result.page);
+      else if(action==='report') {form.reset();message(form,'Denúncia enviada para a moderação.');}
+      else {form.reset();message(form,'Senha alterada.');}
+    } catch(error) {message(form,error.message);} finally {button.disabled=false;}
+  });
+  window.addEventListener('hltpc:view',render);
+  api('session').then(result=>{user=result.user;header();render();}).catch(()=>{header();});
+})();

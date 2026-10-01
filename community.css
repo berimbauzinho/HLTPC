@@ -1,0 +1,47 @@
+.public-site .community-account-link { margin-left: auto; border: 1px solid var(--line); border-radius: 6px; padding: 8px 12px; font-size: 13px; text-decoration: none; white-space: nowrap; }
+.community-account-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 24px; }
+.community-panel,.community-form,.community-post,.community-topic { background: #20252e; border: 1px solid #414958; border-radius: 10px; padding: 24px; }
+.community-form { display: flex; flex-direction: column; gap: 14px; }
+.community-form h2 { margin: 0 0 8px; }
+.community-form label,.community-recovery-key label { display: flex; flex-direction: column; gap: 7px; font-weight: 600; }
+.community-form :is(input,textarea,select),.community-recovery-key input { width: 100%; min-width: 0; padding: 12px; border: 1px solid #687183; border-radius: 6px; background: #12161d; color: #fff; font: inherit; }
+.community-form textarea { resize: vertical; }
+.community-form button,.community-panel button,.community-pagination button { align-self: flex-start; background: #303846; color: #fff; border: 1px solid #657083; border-radius: 6px; padding: 10px 16px; cursor: pointer; }
+.public-site .community-primary { display: inline-block; padding: 12px 18px; border: 0; border-radius: 6px; background: var(--accent); color: #15171b; text-decoration: none; font-weight: 700; }
+.community-form button:disabled { opacity: .65; cursor: wait; }
+.community-form [data-message]:empty { display: none; }
+.community-form [data-message] { margin: 0; color: #ffe4ad; }
+.community-login-note,.community-rules { padding: 16px 20px; border: 1px solid var(--line); border-radius: 8px; background: #1b2028; }
+.public-site .community-login-note a { color: var(--accent); }
+.community-new-topic,.community-recovery { margin: 24px 0; }
+.community-new-topic>summary,.community-recovery>summary { cursor: pointer; padding: 14px 0; font-weight: 600; color: var(--accent); }
+.community-topics { display: grid; gap: 12px; margin: 24px 0; }
+.community-topic { display: flex; align-items: center; justify-content: space-between; gap: 24px; text-decoration: none; }
+.community-topic:hover { border-color: var(--accent); }
+.community-topic h2 { margin: 7px 0; font-size: 22px; overflow-wrap: anywhere; }
+.community-topic p { margin: 0; font-size: 13px; }
+.community-topic>span { flex: none; color: var(--muted); font-size: 13px; }
+.community-topic>span b { margin-left: 14px; color: var(--accent); }
+.community-discussion { margin-top: 36px; }
+.community-posts { display: grid; gap: 16px; margin: 24px 0; }
+.community-post header { display: flex; align-items: center; gap: 16px; justify-content: space-between; }
+.community-post time { font-size: 12px; }
+.community-post>p { white-space: pre-wrap; overflow-wrap: anywhere; color: #e1e5ed; }
+.community-report summary { cursor: pointer; font-size: 12px; color: var(--muted); }
+.community-report .community-form { margin-top: 12px; padding: 16px; }
+.community-pagination { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; margin-bottom: 24px; }
+.community-recovery-key { max-width: 700px; margin: 24px auto; }
+.community-recovery-key .community-primary { margin-top: 24px; }
+.community-admin-section { margin: 24px 0; padding: 20px; background: #20242d; border: 1px solid #485263; border-radius: 8px; }
+.community-admin-section article { padding: 16px 0; border-bottom: 1px solid #49505e; }
+.community-admin-section article p { white-space: pre-wrap; overflow-wrap: anywhere; }
+.community-admin-section article small { display: block; margin: 6px 0; }
+.community-admin-section button { padding: 8px 12px; margin: 8px 8px 0 0; border: 1px solid #636e80; background: #343e4d; color: #fff; border-radius: 5px; cursor: pointer; }
+@media(max-width:760px) {
+  .community-account-grid { grid-template-columns: minmax(0,1fr); }
+  .public-site .community-account-link { font-size: 11px; padding: 7px; max-width: 145px; overflow: hidden; text-overflow: ellipsis; }
+  .public-site .season { display: none; }
+  .community-topic { align-items: flex-start; flex-direction: column; gap: 10px; }
+  .community-panel,.community-form,.community-post,.community-topic { padding: 18px; }
+  .community-post header { align-items: flex-start; flex-direction: column; gap: 4px; }
+}
