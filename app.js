@@ -382,10 +382,9 @@
   function newsMarkup(items) {
     return items.map((item) => `
       <a class="news-item" href="#noticia/${encodeURIComponent(item.id)}">
-        ${item.image ? `<span class="news-thumb"><img src="${escapeHtml(item.image)}" alt="" /></span>` : ""}
-        <time class="news-date">${formatDate(item.date)}</time>
-        <div><h3>${escapeHtml(item.title)}</h3><p>${escapeHtml(item.summary)} · por ${escapeHtml(item.author)}</p></div>
-        <span>›</span>
+        <span class="news-thumb" aria-hidden="true">${item.image ? `<img src="${escapeHtml(item.image)}" alt="" loading="lazy" />` : "HLTPC"}</span>
+        <div class="news-copy"><time class="news-date">${formatDate(item.date)}</time><h3>${escapeHtml(item.title)}</h3><p>${escapeHtml(item.summary)}</p><small class="news-author">por ${escapeHtml(item.author)}</small></div>
+        <span class="news-arrow" aria-hidden="true">→</span>
       </a>`).join("");
   }
 
