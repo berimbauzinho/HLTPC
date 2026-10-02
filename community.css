@@ -1,4 +1,11 @@
-.public-site .community-account-link { margin-left: auto; border: 1px solid var(--line); border-radius: 6px; padding: 8px 12px; font-size: 13px; text-decoration: none; white-space: nowrap; }
+.public-site .community-account-link { margin-left: auto; display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-width: 40px; min-height: 40px; padding: 8px; border: 0; border-radius: 50%; background: transparent; color: #c7ced8; font-size: 13px; text-decoration: none; white-space: nowrap; flex-shrink: 0; }
+.public-site .community-account-link svg { width: 23px; height: 23px; flex-shrink: 0; }
+.public-site .community-account-link:hover { background: #ffffff0c; color: #fff; }
+.public-site .community-account-link:focus-visible { outline: 2px solid #c7ced8; outline-offset: 3px; }
+.public-site .community-account-link.is-signed-in { border-radius: 8px; padding-inline: 10px; }
+.community-signin-prompt { margin: 18px 0; color: #aeb8c7; font-size: 14px; }
+.public-site .community-signin-prompt a { color: #e5e9ef; text-decoration: underline; text-underline-offset: 3px; }
+.public-site .community-signin-prompt a:hover { color: #fff; }
 .community-account-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 24px; }
 .community-panel,.community-form,.community-post,.community-topic { background: #20252e; border: 1px solid #414958; border-radius: 10px; padding: 24px; }
 .community-form { display: flex; flex-direction: column; gap: 14px; }
@@ -39,7 +46,7 @@
 .community-admin-section button { padding: 8px 12px; margin: 8px 8px 0 0; border: 1px solid #636e80; background: #343e4d; color: #fff; border-radius: 5px; cursor: pointer; }
 @media(max-width:760px) {
   .community-account-grid { grid-template-columns: minmax(0,1fr); }
-  .public-site .community-account-link { font-size: 11px; padding: 7px; max-width: 145px; overflow: hidden; text-overflow: ellipsis; }
+  .public-site .community-account-link { font-size: 13px; padding: 8px; }
   .public-site .season { display: none; }
   .community-topic { align-items: flex-start; flex-direction: column; gap: 10px; }
   .community-panel,.community-form,.community-post,.community-topic { padding: 18px; }
