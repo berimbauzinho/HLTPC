@@ -9,9 +9,10 @@
     if(!response.ok) throw Error(result.error || 'Não foi possível concluir. Tente novamente.');
     return result;
   }
-  function header() { const link=document.querySelector('#communityAccount'); link.textContent=user ? `@${user.username}` : 'Entrar'; link.href=user?'#conta':'#entrar'; }
+  const accountIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="8" r="3.5"/><path d="M5 20v-1.5a7 7 0 0 1 14 0V20"/></svg>';
+  function header() { const link=document.querySelector('#communityAccount'); link.innerHTML=accountIcon+(user?'<span>Perfil</span>':''); link.href=user?'#conta':'#entrar'; link.setAttribute('aria-label',user?'Meu perfil HLTPC':'Entrar na sua conta HLTPC'); link.title=user?'Meu perfil HLTPC':'Entrar na sua conta HLTPC'; link.classList.toggle('is-signed-in',Boolean(user)); }
   const message = (root, value) => { const target=root.querySelector('[data-message]'); if(target) target.textContent=value; };
-  const login = (verb='postar') => `<p class="community-login-note"><a class="community-primary" href="#entrar" data-community-return="${escape(location.hash)}">Entrar para ${verb}</a></p>`;
+  const login = (verb='postar') => `<p class="community-signin-prompt">Quer participar? <a href="#entrar" data-community-return="${escape(location.hash)}">Entre para ${verb}.</a></p>`;
   const postForm = (kind,id) => user ? `<form class="community-form" data-community-form="post"><input type="hidden" name="kind" value="${kind}"/><input type="hidden" name="discussionId" value="${escape(id)}"/><label>Sua mensagem<textarea name="body" maxlength="2000" rows="4" required placeholder="Converse com respeito. Até 2.000 caracteres."></textarea></label><button class="community-primary" type="submit">Publicar como ${escape(user.username)}</button><p data-message role="status" aria-live="polite"></p></form>` : login(kind==='news'?'comentar':'responder');
   function auth(route) {
     const root=document.querySelector('#'+({entrar:'loginPage',cadastro:'signupPage',recuperar:'recoveryPage'}[route]));
