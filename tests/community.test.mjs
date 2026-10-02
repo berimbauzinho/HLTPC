@@ -31,6 +31,18 @@ test('community permissions, persistence, moderation, recovery and abuse limits'
   assert.equal((await call('signup',{username:'TESTMEMBER',password:'a-secure-test-password'})).status,409);
   assert.equal((await call('login',{username:'TestMember',password:'wrong'})).status,401);
   const login=await call('login',{username:'testmember',password:'a-secure-test-password'});assert.equal(login.status,200);
+  await getStore('hltpc-content').setJSON('current',{_revision:1,_relationsVersion:1,players:[{id:'p1',name:'Player',teams:[],teamIds:[]}],teams:[{id:'t1',name:'Team'}],tournaments:[{id:'event1',name:'Event',teams:['Team'],teamIds:['t1']}],matches:[],news:[]});
+  assert.equal((await call('profile',{bio:'Anonymous'})).status,401);
+  assert.equal((await call('profile',{bio:'x'.repeat(501)},login.cookie)).status,422);
+  assert.equal((await call('profile',{bio:'Hello',favoriteTeam:'Unknown team'},login.cookie)).status,422);
+  const edited=await call('profile',{bio:'<script>literal text</script>',favoriteTeam:'Team',username:'OtherMember',active:false,version:999,credential:{}},login.cookie);
+  assert.equal(edited.status,200);assert.equal(edited.data.user.username,'TestMember');assert.equal(edited.data.user.active,true);
+  const publicProfile=await call('profile',null,'',{query:{username:'testmember'}});
+  assert.equal(publicProfile.status,200);assert.equal(publicProfile.data.user.favoriteTeam,'Team');assert.equal(publicProfile.data.user.bio,'<script>literal text</script>');
+  assert.equal(publicProfile.data.user.credential,undefined);assert.equal(publicProfile.data.user.recovery,undefined);assert.equal(publicProfile.data.user.version,undefined);
+  assert.equal((await call('session',null,login.cookie)).data.user.username,'TestMember');
+  const unchanged=await getStore('hltpc-community').get('user/testmember',{type:'json'});
+  assert.deepEqual(unchanged.credential,stored.credential);assert.equal(unchanged.version,1);
   const created=await call('topic',{title:'A real discussion',body:'<img src=x onerror=alert(1)>',category:'CS2'},login.cookie);
   assert.equal(created.status,201);const id=created.data.id;
   const posts=await Promise.all([1,2,3].map(i=>call('post',{kind:'forum',discussionId:id,body:`reply ${i}`},login.cookie)));

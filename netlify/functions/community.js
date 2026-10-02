@@ -44,7 +44,7 @@ function sessionCookie(user) {
   const payload = Buffer.from(JSON.stringify({ username: user.username, version: user.version, exp: Date.now() + HOURS * 1000 })).toString('base64url');
   return cookie(`${payload}.${sign(payload)}`);
 }
-function publicUser(user) { return { username: user.username, active: user.active, createdAt: user.createdAt }; }
+function publicUser(user) { return { username: user.username, active: user.active, createdAt: user.createdAt, bio: user.bio || '', favoriteTeam: user.favoriteTeam || '' }; }
 async function currentUser(event, required = false) {
   const raw = String(event.headers?.cookie || '').split(';').map(s => s.trim()).find(s => s.startsWith(`${COOKIE}=`))?.slice(COOKIE.length + 1);
   let user = null;
@@ -180,6 +180,11 @@ async function handle(event) {
     if (action === 'moderation') return await moderation(event, body);
     if (method === 'GET') {
       if (action === 'session') { const user = await currentUser(event); return json(200, { user: user ? publicUser(user) : null }); }
+      if (action === 'profile') {
+        const member = await store().get(keyForUser(query.username), {type:'json'});
+        if (!member?.active) fail(404,'Perfil não encontrado.');
+        return json(200,{user:publicUser(member)});
+      }
       if (action === 'topics') {
         const topics = (await discussions('discussion/forum/')).filter(d => !d.hidden).sort((a,b) => b.createdAt.localeCompare(a.createdAt));
         return json(200, { topics: topics.map(d => ({ id: d.id, title: d.title, category: d.category, username: d.username, createdAt: d.createdAt, locked: Boolean(d.locked), replies: Math.max(0,d.posts.filter(p => !p.hidden).length - 1) })) });
@@ -220,6 +225,21 @@ async function handle(event) {
     }
     if (action === 'logout') return json(200, { loggedOut: true }, { 'Set-Cookie': cookie('',0) });
     const user = await currentUser(event, true);
+    if (action === 'profile') {
+      const bio = typeof body.bio === 'string' ? body.bio.trim() : '';
+      const favoriteTeam = typeof body.favoriteTeam === 'string' ? body.favoriteTeam.trim() : '';
+      if (bio.length > 500 || favoriteTeam.length > 120) fail(422,'Perfil: apresentação de até 500 caracteres e um time válido.');
+      if (favoriteTeam) {
+        const content = await require('./content-store').getContent(event);
+        if (!content.teams.some(team => team.name === favoriteTeam && team.status !== 'draft')) fail(422,'Escolha um time disponível no HLTPC.');
+      }
+      await rate(event,'profile',user.username,10,3600);
+      const saved = await mutate(keyForUser(user.username),null,record => {
+        if (!record?.active || record.version !== user.version) fail(409,'A conta mudou. Entre novamente.');
+        record.bio=bio; record.favoriteTeam=favoriteTeam;
+      });
+      return json(200,{user:publicUser(saved)});
+    }
     if (action === 'password') {
       await rate(event, 'password', user.username, 5, 600);
       if (!await matches(body.currentPassword,user.credential)) fail(401,'A senha atual está incorreta.');
