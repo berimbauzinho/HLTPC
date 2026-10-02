@@ -23,3 +23,5 @@ Prévias Netlify com ID imutável usam `hltpc-community-preview-<deploy-id>`. Co
 ## Validação
 
 `node --test tests/community.test.mjs` cobre isolamento do admin, origem das solicitações, colisão de nickname, autenticação, persistência concorrente, denúncia, ocultação, fechamento, recuperação, revogação, suspensão e limites de tentativas. As funções usam o adaptador local nos testes e o Supabase na implantação.
+
+As contas são do HLTPC inteiro. O fórum e os comentários continuam públicos para leitura. A ação de publicar leva a `#entrar` e retorna à conversa após autenticação; `#cadastro` e `#recuperar` têm telas separadas. `#conta` permite editar apresentação (até 500 caracteres) e time favorito, além de acessar segurança e sair. `#usuario/<nickname>` exibe apenas nickname, apresentação, time favorito e data de entrada. As alterações são feitas exclusivamente na conta da sessão autenticada; campos de senha, recuperação, suspensão e permissões nunca são aceitos pelo editor de perfil.

@@ -45,3 +45,24 @@
   .community-panel,.community-form,.community-post,.community-topic { padding: 18px; }
   .community-post header { align-items: flex-start; flex-direction: column; gap: 4px; }
 }
+.hltpc-auth-shell { min-height: 62vh; display: grid; place-items: center; padding: 36px 0 64px; }
+.hltpc-auth-card { width: min(100%,420px); padding: 32px; border: 1px solid #414958; border-radius: 18px; background: #1b2028; box-shadow: 0 18px 60px #0003; }
+.hltpc-auth-brand { display: block; color: #fff; font-size: 30px; font-weight: 800; text-decoration: none; }
+.hltpc-auth-brand span { display: block; color: #aeb8c7; font-size: 13px; font-weight: 400; margin-top: 4px; }
+.hltpc-auth-card h1 { font-size: 25px; margin: 28px 0 22px; }
+.hltpc-auth-card .community-form { padding: 0; background: none; border: 0; border-radius: 0; }
+.hltpc-auth-card .community-primary { width: 100%; margin-top: 8px; }
+.hltpc-auth-links { display: grid; gap: 18px; margin-top: 22px; font-size: 13px; text-align: center; }
+.public-site .hltpc-auth-links a { color: var(--accent); }
+.hltpc-auth-hint { margin: 0; color: #b9c3d2; font-size: 13px; line-height: 1.5; }
+.hltpc-profile-grid { display: grid; grid-template-columns: minmax(0,2fr) minmax(240px,1fr); gap: 24px; }
+.hltpc-profile-summary { display: flex; flex-direction: column; align-items: flex-start; gap: 20px; }
+.hltpc-profile-summary h2 { margin: 0; }
+.hltpc-user-avatar { width: 88px; height: 88px; display: grid; place-items: center; background: #333b48; color: #f2f4f8; border-radius: 50%; font-size: 32px; font-weight: 700; }
+.hltpc-public-profile { max-width: 760px; margin-top: 24px; padding: 36px; overflow-wrap: anywhere; }
+.hltpc-public-profile>span { display: block; margin-top: 24px; color: #aeb8c7; font-size: 12px; letter-spacing: .1em; }
+.hltpc-profile-bio { white-space: pre-wrap; line-height: 1.7; }
+.hltpc-password-form { max-width: 600px; }
+.community-post header a { color: #f3f5f8; text-decoration: none; }
+.community-post header a:hover { text-decoration: underline; }
+@media(max-width:760px) { .hltpc-profile-grid { grid-template-columns: 1fr; } .hltpc-auth-card { padding: 26px 22px; } .hltpc-auth-shell { padding-top: 20px; } .hltpc-public-profile { padding: 24px; } }
