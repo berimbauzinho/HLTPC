@@ -1,0 +1,50 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import {createRequire} from 'node:module';
+const require=createRequire(import.meta.url);
+process.env.HLTPC_STORAGE='local';
+process.env.HLTPC_LOCAL_DATA_DIR=fs.mkdtempSync(path.resolve('artifacts/owner-password-test-'));
+process.env.HLTPC_OWNER_USERNAME='lanches';
+process.env.HLTPC_OWNER_PASSWORD='bootstrap-owner-password';
+process.env.HLTPC_SESSION_SECRET='isolated-owner-password-session-secret';
+const auth=require('../netlify/functions/auth-utils');
+const login=require('../netlify/functions/admin-login').handler;
+const change=require('../netlify/functions/admin-change-password').handler;
+const {getStore}=require('../netlify/functions/storage');
+async function call(handler,body,cookie='',host='hltpc.test',origin=`https://${host}`){
+ const event={httpMethod:'POST',headers:{host,origin,'content-type':'application/json',cookie},body:JSON.stringify(body)};
+ const r=await handler(event);return {status:r.statusCode,data:JSON.parse(r.body),cookie:r.headers['Set-Cookie']?.split(';')[0]};
+}
+test('owner can change password; old environment password and old sessions cannot regain access',async()=>{
+ const initial=await call(login,{username:'lanches',password:process.env.HLTPC_OWNER_PASSWORD});assert.equal(initial.status,200);
+ assert.equal((await call(change,{password:'new-owner-password-123'})).status,401);
+ assert.equal((await call(change,{password:'new-owner-password-123',currentPassword:'wrong'},initial.cookie)).status,401);
+ assert.equal((await call(change,{password:'new-owner-password-123',currentPassword:process.env.HLTPC_OWNER_PASSWORD},initial.cookie,'hltpc.test','https://attacker.test')).status,403);
+ assert.equal((await call(change,{password:'short',currentPassword:process.env.HLTPC_OWNER_PASSWORD},initial.cookie)).status,422);
+ assert.equal((await call(change,{password:process.env.HLTPC_OWNER_PASSWORD,currentPassword:process.env.HLTPC_OWNER_PASSWORD},initial.cookie)).status,422);
+ const changed=await call(change,{password:'new-owner-password-123',currentPassword:process.env.HLTPC_OWNER_PASSWORD,username:'someone',role:'admin'},initial.cookie);assert.equal(changed.status,200);assert.equal(changed.data.user.role,'owner');
+ assert.equal(await auth.validateSession(initial.cookie),null);
+ assert.equal((await auth.validateSession(changed.cookie)).role,'owner');
+ assert.equal((await call(login,{username:'lanches',password:process.env.HLTPC_OWNER_PASSWORD})).status,401);
+ assert.equal((await call(login,{username:'lanches',password:'new-owner-password-123'})).status,200);
+ const stored=await getStore('hltpc-admin-security').get('owner/lanches',{type:'json'});assert.equal(stored.password,undefined);assert.ok(auth.verifyPassword('new-owner-password-123',stored));assert.equal(changed.data.hash,undefined);
+ const preview='abcdef0123456789abcdef01--hltpc.netlify.app';
+ assert.equal((await call(login,{username:'lanches',password:process.env.HLTPC_OWNER_PASSWORD},'',preview)).status,401,'a fresh preview cannot restore the retired environment password');
+ const inherited=await call(login,{username:'lanches',password:'new-owner-password-123'},'',preview);assert.equal(inherited.status,200);
+ const isolated=await call(change,{password:'preview-owner-password-123',currentPassword:'new-owner-password-123'},inherited.cookie,preview);assert.equal(isolated.status,200);
+ assert.equal((await call(login,{username:'lanches',password:'new-owner-password-123'})).status,200,'preview rotation does not change production');
+ assert.equal(await auth.validateSession(isolated.cookie),null,'preview rotated cookie cannot authenticate production');
+ const results=await Promise.all(['next-password-one-123','next-password-two-123'].map(password=>call(change,{password,currentPassword:'new-owner-password-123'},changed.cookie)));
+ assert.equal(results.filter(r=>r.status===200).length,1,'one concurrent password update wins');
+ assert.equal(await auth.validateSession(changed.cookie),null);
+ await getStore('hltpc-admin-security').setJSON('owner/lanches',{hash:'corrupt'});
+ assert.equal((await call(login,{username:'lanches',password:process.env.HLTPC_OWNER_PASSWORD})).status,503,'storage corruption never falls back to the old password');
+});
+test('invited admin can complete the existing mandatory password change without an owner role',async()=>{
+ const store=getStore('hltpc-admin-users');await store.setJSON('users',[{username:'editor',role:'admin',active:true,mustChangePassword:true,authVersion:'guest-v1',...auth.hashPassword('mudar1234')}]);
+ const cookie=auth.cookie(auth.createSession('editor',process.env.HLTPC_SESSION_SECRET,'admin',true,'guest-v1'));
+ const changed=await call(change,{password:'guest-new-password-123'},cookie);assert.equal(changed.status,200);assert.equal(changed.data.user.role,'admin');assert.equal(await auth.validateSession(cookie),null);
+ assert.equal((await call(change,{password:'guest-next-password-123'},changed.cookie)).status,401,'regular changes require the current password');
+});

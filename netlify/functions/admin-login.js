@@ -2,6 +2,7 @@ const { configuration, createSession, cookie, json, safeEqual, normalizeUsername
 const { findUser } = require("./user-store");
 
 exports.handler = async (event) => {
+  try {
   if (event.httpMethod !== "POST") return json(405, { error: "Método não permitido." });
   const config = configuration();
   if (!config) return json(503, { error: "Cadastre HLTPC_OWNER_PASSWORD nas variáveis do Netlify para ativar o owner lanches." });
@@ -11,8 +12,9 @@ exports.handler = async (event) => {
   if (String(credentials.password || '').length > 256) return json(400, { error: 'Credenciais inválidas.' });
   let user;
   if (safeEqual(username, normalizeUsername(config.username))) {
-    if (!safeEqual(credentials.password || "", config.password)) return json(401, { error: "Usuário ou senha incorretos." });
-    user = { username: config.username, role: "owner", mustChangePassword: false };
+    const stored = await require('./owner-credential').readOwnerCredential(event,config.username);
+    if (!(stored ? verifyPassword(credentials.password || '',stored.data) : safeEqual(credentials.password || '',config.password))) return json(401, { error: "Usuário ou senha incorretos." });
+    user = { username: config.username, role: "owner", mustChangePassword: false, authVersion: stored?.data.authVersion || null };
   } else {
     if (process.env.HLTPC_OWNER_ONLY === 'true') return json(401, { error: 'Usuário ou senha incorretos.' });
     const stored = await findUser(event, username);
@@ -21,4 +23,5 @@ exports.handler = async (event) => {
   }
   const session = createSession(user.username, config.secret, user.role, user.mustChangePassword, user.authVersion);
   return json(200, { user }, { "Set-Cookie": cookie(session) });
+  } catch (_) { return json(503,{error:"O acesso está temporariamente indisponível. Tente novamente."}); }
 };

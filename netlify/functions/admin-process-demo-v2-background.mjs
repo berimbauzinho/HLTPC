@@ -13,7 +13,7 @@ const { configuration, readSession } = authUtils;
 const { processDemoPath } = demoProcessor;
 
 async function authorized(request) {
-  const session = await authUtils.validateSession(request.headers.get("cookie") || "");
+  const session = await authUtils.validateSession(request.headers.get("cookie") || "", {headers:{host:new URL(request.url).host}});
   return session && !session.mustChangePassword ? session : null;
 }
 
