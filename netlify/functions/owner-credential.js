@@ -1,7 +1,7 @@
 const {connectLambda,getStore}=require('./storage');
 const keyFor=username=>`owner/${String(username).trim().toLowerCase()}`;
 function securityStore(event) {
-  if(event) connectLambda(event);
+  if(event?.httpMethod) connectLambda(event);
   const host=String(event?.headers?.host||'');
   const preview=host.match(/^([a-f0-9]{24})--hltpc\.netlify\.app$/);
   return getStore(preview?`hltpc-admin-security-preview-${preview[1]}`:'hltpc-admin-security');

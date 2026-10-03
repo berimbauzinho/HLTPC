@@ -69,7 +69,7 @@ async function validateSession(cookieHeader, event) {
     return !stored || stored.data.authVersion === session.authVersion ? session : null;
   }
   if (process.env.HLTPC_OWNER_ONLY === 'true') return null;
-  const stored = await require('./user-store').findUser(event, session.sub);
+  const stored = await require('./user-store').findUser(event?.httpMethod ? event : undefined, session.sub);
   if (!stored?.active || stored.role !== 'admin' || (stored.authVersion && stored.authVersion !== session.authVersion)) return null;
   return { ...session, role: stored.role, mustChangePassword: stored.mustChangePassword };
 }
