@@ -63,7 +63,11 @@ async function validateSession(cookieHeader, event) {
   const config = configuration();
   const session = config && readSession(cookieHeader, config.secret);
   if (!session) return null;
-  if (session.role === 'owner') return normalizeUsername(session.sub) === normalizeUsername(config.username) ? session : null;
+  if (session.role === 'owner') {
+    if (normalizeUsername(session.sub) !== normalizeUsername(config.username)) return null;
+    const stored = await require('./owner-credential').readOwnerCredential(event, config.username);
+    return !stored || stored.data.authVersion === session.authVersion ? session : null;
+  }
   if (process.env.HLTPC_OWNER_ONLY === 'true') return null;
   const stored = await require('./user-store').findUser(event, session.sub);
   if (!stored?.active || stored.role !== 'admin' || (stored.authVersion && stored.authVersion !== session.authVersion)) return null;

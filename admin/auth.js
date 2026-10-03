@@ -93,5 +93,20 @@
     location.reload();
   });
 
+  const securityDialog=document.querySelector('#securityPasswordDialog');
+  const securityForm=document.querySelector('#securityPasswordForm');
+  const securityStatus=document.querySelector('#securityPasswordStatus');
+  document.querySelector('#changeMyPasswordButton').addEventListener('click',()=>{securityForm.reset();securityStatus.textContent='';securityDialog.showModal();securityForm.querySelector('input').focus();});
+  document.querySelector('#closeSecurityPassword').addEventListener('click',()=>securityDialog.close());
+  securityForm.addEventListener('submit',async event=>{
+    event.preventDefault();
+    const values=Object.fromEntries(new FormData(securityForm));
+    if(values.password!==values.confirmation){securityStatus.textContent='As duas senhas precisam ser iguais.';return;}
+    const button=securityForm.querySelector('[type="submit"]');button.disabled=true;securityStatus.textContent='Salvando…';
+    try {const result=await request('/api/admin/change-password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({currentPassword:values.currentPassword,password:values.password})});window.HLTPC_CURRENT_USER=result.user;securityForm.reset();securityStatus.textContent='Senha alterada. As outras sessões foram encerradas.';}
+    catch(error){securityStatus.textContent=error.message;}
+    finally{button.disabled=false;}
+  });
+  securityDialog.addEventListener('close',()=>{securityForm.reset();securityStatus.textContent='';});
   restoreSession();
 })();
