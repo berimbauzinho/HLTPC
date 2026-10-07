@@ -1,6 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import rounds from '../netlify/functions/demo-rounds.js';
+test('Cache initialization event with no winner cannot add a point or round', () => {
+  const events = [{event_name:'round_end',tick:0,winner:null},
+    ...Array.from({length:21},(_,i)=>({event_name:'round_end',tick:6446+i*6000,winner:i<8?'T':'CT'}))];
+  const completed = events.filter(rounds.isCompletedRound);
+  assert.equal(completed.length,21);
+  assert.equal(completed.filter(e=>e.winner==='CT').length,13);
+  assert.equal(rounds.isFinalCompetitiveScore(8,13),true);
+});
 test('a cancelled live round before a restart cannot alter official score or event stats', () => {
   // Regression fixture from the actual PGL group-1 demo: a live start and round
   // were followed by a new match before the 22 official rounds.

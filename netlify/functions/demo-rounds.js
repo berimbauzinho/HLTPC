@@ -14,4 +14,7 @@ function isFinalCompetitiveScore(a, b) {
   const high = Math.max(a, b), low = Math.min(a, b);
   return (high === 13 && low <= 11) || (high >= 16 && high % 3 === 1 && high - low >= 2);
 }
-module.exports = { officialMatchEvents, hasCompetitiveActivity, isFinalCompetitiveScore };
+function isCompletedRound(event) {
+  return event.event_name === 'round_end' && ['CT', 'T'].includes(event.winner);
+}
+module.exports = { officialMatchEvents, hasCompetitiveActivity, isFinalCompetitiveScore, isCompletedRound };

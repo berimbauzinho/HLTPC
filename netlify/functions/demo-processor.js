@@ -1,5 +1,5 @@
 const parser = require("@laihoe/demoparser2");
-const { officialMatchEvents, hasCompetitiveActivity, isFinalCompetitiveScore } = require('./demo-rounds');
+const { officialMatchEvents, hasCompetitiveActivity, isFinalCompetitiveScore, isCompletedRound } = require('./demo-rounds');
 
 function numberValue(value) {
   const number = Number(value);
@@ -68,7 +68,7 @@ function processDemoPath(filePath, match, content, fileMeta = {}) {
     ["total_rounds_played", "is_warmup_period"]
   );
   const matchEvents = officialMatchEvents(events);
-  const roundEnds = matchEvents.filter((event) => event.event_name === "round_end").sort((a, b) => numberValue(a.tick) - numberValue(b.tick));
+  const roundEnds = matchEvents.filter(isCompletedRound).sort((a, b) => numberValue(a.tick) - numberValue(b.tick));
   if (!roundEnds.length) throw new Error("A demo não possui rounds completos depois do início oficial.");
   const rounds = roundEnds.length;
   const deaths = matchEvents.filter((event) => event.event_name === "player_death").sort((a, b) => numberValue(a.tick) - numberValue(b.tick));

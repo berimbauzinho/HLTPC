@@ -88,7 +88,7 @@
       const historicEntries = new Map(event.entries.map((entry) => [entry.teamId || entry.team, entry]));
       event.entries = saved.teams.map((team, index) => {
         const teamId = saved.teamIds?.[index] || sharedTeamIdByName.get(normalizedTeam(team)) || "";
-        const historic = historicEntries.get(teamId) || historicEntries.get(team);
+        const historic = saved.entries?.find(entry => entry.teamId === teamId || entry.team === team) || historicEntries.get(teamId) || historicEntries.get(team);
         return { ...(historic || { players: [] }), teamId, team: canonicalTeamName(team, teamId) };
       });
     }
@@ -104,7 +104,7 @@
       format: saved.format || "Formato a definir",
       demos: "future",
       note: "Estrutura e confrontos publicados pelo painel administrativo.",
-      entries: (saved.teams || []).map((team, index) => ({ teamId: saved.teamIds?.[index] || "", team: canonicalTeamName(team, saved.teamIds?.[index]), players: [] }))
+      entries: (saved.teams || []).map((team, index) => ({ teamId: saved.teamIds?.[index] || "", team: canonicalTeamName(team, saved.teamIds?.[index]), players: saved.entries?.find(entry => entry.teamId === saved.teamIds?.[index] || entry.team === team)?.players || [] }))
     });
   });
   if (Array.isArray(shared.matches)) data.matches = shared.matches.filter((item) => ["published", "scheduled", "live", "finished"].includes(item.status)).map((match) => ({ ...match, teamA: canonicalTeamName(match.teamA, match.teamAId), teamB: canonicalTeamName(match.teamB, match.teamBId), winner: canonicalTeamName(match.winner, match.winnerId) }));
