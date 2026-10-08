@@ -39,10 +39,14 @@
 .community-pagination { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; margin-bottom: 24px; }
 .community-recovery-key { max-width: 700px; margin: 24px auto; }
 .community-recovery-key .community-primary { margin-top: 24px; }
-.community-admin-section { margin: 24px 0; padding: 20px; background: #20242d; border: 1px solid #485263; border-radius: 8px; }
-.community-admin-section article { padding: 16px 0; border-bottom: 1px solid #49505e; }
-.community-admin-section article p { white-space: pre-wrap; overflow-wrap: anywhere; }
-.community-admin-section article small { display: block; margin: 6px 0; }
+.community-admin-section { margin: 24px 0; padding: 20px; background: #fff; color: #17202c; border: 1px solid #dfe4ea; border-radius: 8px; }
+.community-admin-section h2 { margin: 0 0 16px; color: #17202c; font-size: 20px; }
+.community-admin-section article { min-width: 0; padding: 16px 0; border-bottom: 1px solid #dfe4ea; }
+.community-admin-section article:last-child { border-bottom: 0; }
+.community-admin-section article p { white-space: pre-wrap; overflow-wrap: anywhere; color: #334155; line-height: 1.6; }
+.community-admin-section article small { display: block; margin: 6px 0; color: #526174; }
+.community-admin-section .community-admin-message { max-height: 360px; overflow: auto; padding: 14px; border: 1px solid #dfe4ea; border-radius: 6px; background: #f3f5f7; }
+.community-admin-section button:focus-visible { outline: 3px solid #d89531; outline-offset: 3px; }
 .community-admin-section button { padding: 8px 12px; margin: 8px 8px 0 0; border: 1px solid #636e80; background: #343e4d; color: #fff; border-radius: 5px; cursor: pointer; }
 @media(max-width:760px) {
   .community-account-grid { grid-template-columns: minmax(0,1fr); }
